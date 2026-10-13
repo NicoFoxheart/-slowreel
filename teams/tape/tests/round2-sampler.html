@@ -1,0 +1,163 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Round 2 sampler tests</title><link rel="stylesheet" href="../css/studio.css"></head>
+<body style="background:var(--room);padding:16px">
+<div id="ui" style="width:1100px"></div>
+<script type="module">
+import { createEngine } from '../js/sound/engine.js';
+import { INSTRUMENTS, INSTRUMENT_MAP } from '../js/sound/instruments.js';
+import { SAMPLER, setSampleSongBase, registerSample, importSampleFile, loadSample, forgetSample, ensureSamples, computeSlices } from '../js/sound/sampler.js';
+import { FX2, createFx2, scheduleFx } from '../js/sound/fx2.js';
+import { applyAutomation, laneValueAt, automationTargets, createAutomationEditor } from '../js/ui/automation.js';
+import { createSamplerPanel } from '../js/ui/sampler-ui.js';
+
+const SR = 44100, db = x => +(20 * Math.log10(Math.max(1e-9, x))).toFixed(2);
+function stats(buf, a = 0, b = buf.length) {
+  let pk = 0, s = 0, nan = 0, clip = 0, n = 0;
+  for (let c = 0; c < buf.numberOfChannels; c++) { const d = buf.getChannelData(c); for (let i = a; i < b; i++) { const x = d[i]; if (x !== x) { nan++; continue; } const ax = Math.abs(x); if (ax > pk) pk = ax; if (ax >= 0.999) clip++; s += x * x; n++; } }
+  return { peakDb: db(pk), rmsDb: db(Math.sqrt(s / Math.max(1, n))), nan, clipped: clip };
+}
+const rmsAt = (buf, t0, t1, ch = 0) => { const d = buf.getChannelData(ch), a = Math.floor(t0 * buf.sampleRate), b = Math.floor(t1 * buf.sampleRate); let s = 0; for (let i = a; i < b; i++) s += d[i] * d[i]; return db(Math.sqrt(s / Math.max(1, b - a))); };
+const zcFreq = (buf, t0, t1) => { const d = buf.getChannelData(0), a = Math.floor(t0 * SR), b = Math.floor(t1 * SR); let z = 0; for (let i = a + 1; i < b; i++) if ((d[i - 1] < 0) !== (d[i] < 0)) z++; return +(z / 2 / ((b - a) / SR)).toFixed(1); };
+// spectral "brightness": energy of the first difference relative to the signal (rises with high frequencies)
+const bright = (buf, t0, t1) => { const d = buf.getChannelData(0), a = Math.floor(t0 * SR), b = Math.floor(t1 * SR); let e = 0, f = 0; for (let i = a + 1; i < b; i++) { e += d[i] * d[i]; f += (d[i] - d[i - 1]) ** 2; } return db(Math.sqrt(f / Math.max(1e-12, e))); };
+
+// test sample: 8 one-beat hits at 120 BPM (decaying tones with a click), each a different pitch -> clear transients
+function makeHits(ctx) {
+  const len = 4 * SR, b = ctx.createBuffer(2, len, SR);
+  for (let c = 0; c < 2; c++) { const d = b.getChannelData(c); for (let k = 0; k < 8; k++) { const s0 = Math.floor(k * 0.5 * SR + 0.013 * SR * (k % 3)); const f = 220 * Math.pow(2, k / 7); for (let i = 0; i < 0.45 * SR && s0 + i < len; i++) { const t = i / SR; d[s0 + i] += 0.5 * Math.exp(-t * 7) * Math.sin(2 * Math.PI * f * t) + (i < 60 ? 0.4 * Math.sin(i * 1.7) * (1 - i / 60) : 0); } } }
+  return b;
+}
+function makeSine(ctx, f = 440, sec = 3) { const b = ctx.createBuffer(1, sec * SR, SR), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = 0.5 * Math.sin(2 * Math.PI * f * i / SR); return b; }
+function wavBlob(buf) {
+  const n = buf.length, ch = buf.numberOfChannels, ab = new ArrayBuffer(44 + n * ch * 2), v = new DataView(ab);
+  const w = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  w(0, 'RIFF'); v.setUint32(4, 36 + n * ch * 2, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, ch, true);
+  v.setUint32(24, SR, true); v.setUint32(28, SR * ch * 2, true); v.setUint16(32, ch * 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * ch * 2, true);
+  let o = 44; for (let i = 0; i < n; i++) for (let c = 0; c < ch; c++) { v.setInt16(o, Math.max(-1, Math.min(1, buf.getChannelData(c)[i])) * 32767, true); o += 2; }
+  return new Blob([ab], { type: 'audio/wav' });
+}
+
+const R = { sampler: {}, fx: {}, automation: {}, ui: {} };
+async function run() {
+  INSTRUMENTS.push(SAMPLER); INSTRUMENT_MAP.chop = SAMPLER;   // what the integrator does (test only)
+  const live = new AudioContext();
+  const engine = await createEngine({ context: live, songBaseUrl: '../audio/' }); setSampleSongBase('../audio/');
+  const hits = makeHits(live), sine = makeSine(live);
+  registerSample('imp:test-hits', hits, 'Test hits'); registerSample('imp:test-sine', sine, 'Test sine');
+
+  // ---------------- sampler: slicing
+  const P = { slices: 8, position: 0, length: 4 };
+  const eq = computeSlices(hits, { ...P, sliceMode: 'equal' }), tr = computeSlices(hits, { ...P, sliceMode: 'transient' });
+  const onsets = [...Array(8)].map((_, k) => k * 0.5 + 0.013 * (k % 3));
+  R.sampler.slicing = { equal: eq.length, transient: tr.length, transientErrMs: +(Math.max(...tr.slice(1).map((z, i) => Math.min(...onsets.map(o => Math.abs(o - z.start))))) * 1000).toFixed(1) };
+
+  // ---------------- sampler: renders through the engine
+  const proj = (instParams, notes, extra = {}) => { const p = engine.newProject('t'); p.bpm = 120; p.lengthBars = 2; p.tracks = [{ id: 'c', name: 'Chops', kind: 'instrument', volumeDb: 0, pan: 0, sends: { space: 0, echo: 0 }, fx: [], clips: [{ id: 'k', startBeat: 0, lengthBeats: 8, notes }], instrument: { id: 'chop', preset: 'tape-keys', params: instParams, ...extra } }]; p.buses.space.returnDb = -60; return p; };
+  const notes8 = [...Array(8)].map((_, i) => ({ s: i, d: 0.9, p: 48 + i, v: 0.9 }));
+  const base = { slices: 8, position: 0, length: 4, sliceMode: 'transient', slowed: 0, pitch: 0, tone: 1, attack: 0.002, release: 0.05, level: 1 };
+  const render = async p => { await ensureSamples(live, p); return engine.render(p, { tailSeconds: 2 }); };
+  const r1 = await render(proj(base, notes8, { sample: { sampleId: 'imp:test-hits', name: 'Test hits' } }));
+  R.sampler.hits = { ...stats(r1), perBeat: [...Array(8)].map((_, i) => rmsAt(r1, i * 0.5, i * 0.5 + 0.4)) };
+  // reverse + per-slice pitch change the sound
+  const r2 = await render(proj(base, notes8, { sample: { sampleId: 'imp:test-hits', name: 'Test hits' }, slices: [{ reverse: true }, { pitch: 12 }] }));
+  R.sampler.reverse = { fwdFirst50ms: rmsAt(r1, 0, 0.05), revFirst50ms: rmsAt(r2, 0, 0.05), fwdLate: rmsAt(r1, 0.3, 0.4), revLate: rmsAt(r2, 0.3, 0.4) };
+  R.sampler.slicePitch = { zcOrig: zcFreq(r1, 0.52, 0.8), zcUp12: zcFreq(r2, 0.52, 0.8) };
+  // Slowed: playback rate 0.75 (pitch drop) + extra hall
+  const sn = [{ s: 0, d: 6, p: 48, v: 0.9 }];
+  const sp = { slices: 4, position: 0, length: 3, sliceMode: 'equal', pitch: 0, tone: 1, attack: 0.01, release: 0.1, loop: 1, level: 1 };
+  const s0 = await render(proj({ ...sp, slowed: 0 }, sn, { sample: { sampleId: 'imp:test-sine', name: 's' } }));
+  const s1 = await render(proj({ ...sp, slowed: 1 }, sn, { sample: { sampleId: 'imp:test-sine', name: 's' } }));
+  R.sampler.slowed = { hz0: zcFreq(s0, 0.5, 2.5), hz1: zcFreq(s1, 0.5, 2.5), tail0: rmsAt(s0, 3.3, 3.8), tail1: rmsAt(s1, 3.3, 3.8), loopHeld: rmsAt(s0, 2.4, 2.9), early: rmsAt(s0, 0.5, 1.0), prof: [...Array(16)].map((_, i) => rmsAt(s0, i * 0.25, i * 0.25 + 0.25)), ...stats(s1) };
+  // one of Nico's songs as the source (Vocal Chops preset, transients)
+  const songP = proj({}, notes8, {}); songP.tracks[0].instrument.preset = 'vocal-chops';
+  const miss = await ensureSamples(live, songP);
+  const r3 = await engine.render(songP, { tailSeconds: 3 });
+  R.sampler.song = { missing: miss.missing.length, ...stats(r3), stats: engine.lastRenderStats };
+  // import a WAV file -> IndexedDB by content hash -> back from IndexedDB after the memory cache is dropped; missing sample
+  const imp = await importSampleFile(live, new File([wavBlob(sine)], 'my loop.wav', { type: 'audio/wav' }));
+  forgetSample(imp.sampleId);
+  const back = await loadSample(live, imp.sampleId).catch(e => null);
+  const imp2 = await importSampleFile(live, new File([wavBlob(sine)], 'same again.wav'));
+  const gone = await ensureSamples(live, proj({}, [], { sample: { sampleId: 'imp:0000deadbeef', name: 'Lost loop' } }));
+  R.sampler.import = { id: imp.sampleId, stored: imp.stored, name: imp.name, dur: +imp.duration.toFixed(2), reloadedFromIdb: !!back && back.length === sine.length, sameHash: imp2.sampleId === imp.sampleId, missing: gone.missing.map(m => m.name) };
+
+  // ---------------- fx2: each effect measurably changes the sound, no clipping, no NaN
+  const bpm = 120, env = { bpm: () => bpm };
+  async function fxRender(id, params, sec = 4, srcKind = 'chord') {
+    const off = new OfflineAudioContext(2, sec * SR, SR);
+    const out = off.createGain(); out.connect(off.destination);
+    // source: stereo saw chord + a bit of noise (stereo-ish), or a mono chord
+    const mix = off.createGain(); mix.gain.value = 0.12;
+    [110, 165, 220.5, 277, 330].forEach((f, i) => { const o = off.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; const pan = off.createStereoPanner(); pan.pan.value = srcKind === 'mono' ? 0 : (i % 2 ? -0.7 : 0.7); o.connect(pan); pan.connect(mix); o.start(0); });
+    let fx = null;
+    if (id) { fx = createFx2(off, id, params, env); mix.connect(fx.input); fx.output.connect(out); fx.transport?.(true, 0); scheduleFx([fx], 0, sec * bpm / 60, b => b * 60 / bpm, { beatsPerBar: 4, tracks: [] }); }
+    else mix.connect(out);
+    const buf = await off.startRendering(); fx?.dispose(); return buf;
+  }
+  const dry = await fxRender(null), dryMono = await fxRender(null, {}, 4, 'mono');
+  const env16 = (b, from, to, step) => { const v = []; for (let t = from; t < to - 1e-9; t += step) v.push(rmsAt(b, t, t + step)); return v; };
+  const diffDb = (a, b) => { let e = 0, s = 0; const x = a.getChannelData(0), y = b.getChannelData(0); for (let i = 0; i < x.length; i++) { e += (x[i] - y[i]) ** 2; s += y[i] * y[i]; } return db(Math.sqrt(e / s)); };
+  const side = b => { const L = b.getChannelData(0), Rr = b.getChannelData(1); let m = 0, s = 0; for (let i = SR; i < L.length; i++) { m += ((L[i] + Rr[i]) / 2) ** 2; s += ((L[i] - Rr[i]) / 2) ** 2; } return db(Math.sqrt(s / m)); };
+  { const b = await fxRender('pump', { depth: 0.8, rate: '1', shape: 0.4 }); const e = env16(b, 1, 3, 0.0625), d = env16(dry, 1, 3, 0.0625);
+    R.fx.pump = { ...stats(b), swingDb: +(Math.max(...e) - Math.min(...e)).toFixed(1), drySwingDb: +(Math.max(...d) - Math.min(...d)).toFixed(1), onBeat: rmsAt(b, 1.0, 1.04), offBeat: rmsAt(b, 1.4, 1.48) }; }
+  { // kick-keyed: kicks on beats 0, 1.5, 2.5 of a 4-beat clip in a drum track
+    const pr = { beatsPerBar: 4, tracks: [{ id: 'd', instrument: { id: 'drums' }, clips: [{ startBeat: 0, lengthBeats: 8, notes: [0, 1.5, 2.5, 4, 5.5, 6.5].map(s => ({ s, p: 36, v: 1, d: 0.25 })) }] }] };
+    const off = new OfflineAudioContext(2, 4 * SR, SR), o = off.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 110; const g = off.createGain(); g.gain.value = 0.2;
+    const fx = createFx2(off, 'pump', { source: 'kick', depth: 0.9, shape: 0.3 }, env); o.connect(g); g.connect(fx.input); fx.output.connect(off.destination); o.start();
+    fx.transport(true, 0); scheduleFx([fx], 0, 8, b => b * 0.5, pr); const b = await off.startRendering();
+    R.fx.pumpKick = { atKick1_5: rmsAt(b, 0.75, 0.79), atBeat1_noKick: rmsAt(b, 0.5, 0.54), ...stats(b) }; }
+  { const b = await fxRender('tapestop', { every: '1', length: 1, tone: 0.6 });   // bar = 2 s at 120 BPM; stop over the last beat (1.5-2.0 s)
+    R.fx.tapestop = { ...stats(b), beforeStop: rmsAt(b, 1.2, 1.45), lastBit: rmsAt(b, 1.93, 1.99), afterRestart: rmsAt(b, 2.1, 2.4), zcNormal: zcFreq(b, 1.0, 1.4), zcSlowing: zcFreq(b, 1.75, 1.9) }; }
+  { const b = await fxRender('crusher', { bits: 4, downsample: 8, mix: 1 });
+    R.fx.crusher = { ...stats(b), errorDb: diffDb(b, dry), brightDry: bright(dry, 1, 3), brightCrushed: bright(b, 1, 3) }; }
+  { const b = await fxRender('autofilter', { mode: 'lowpass', rate: '4', cutoff: 600, depth: 0.8, resonance: 2 }); const e = env16(b, 0, 4, 0.125);
+    R.fx.autofilter = { ...stats(b), swingDb: +(Math.max(...e) - Math.min(...e)).toFixed(1), brightStart: bright(b, 0.05, 0.3), brightMid: bright(b, 0.9, 1.1) }; }
+  { const b = await fxRender('widener', { width: 2, haas: 0.6, bassMono: 120 }); const bm = await fxRender('widener', { width: 1, haas: 0.6 }, 4, 'mono'); const n0 = await fxRender('widener', { width: 0, haas: 0 });
+    R.fx.widener = { ...stats(b), sideDry: side(dry), sideWide: side(b), sideMonoIn: side(dryMono), sideMonoHaas: side(bm), sideWidth0: side(n0) }; }
+  R.fx.defs = FX2.map(d => ({ id: d.id, params: d.params.length, enumsOk: d.params.filter(p => p.type === 'enum').every(p => p.options.every(o => 'value' in o && 'label' in o) && p.options.some(o => o.value === p.default)) }));
+
+  // ---------------- automation: volume ramp + smooth filter sweep, scheduled in chunks like the engine (suspend every 0.5 s)
+  {
+    const sec = 6, off = new OfflineAudioContext(2, sec * SR, SR), tb = b => b * 60 / bpm;
+    const o = off.createOscillator(); o.frequency.value = 220; const fader = off.createGain(), panner = off.createStereoPanner(), sendSpace = off.createGain(), sendEcho = off.createGain();
+    const af = createFx2(off, 'autofilter', { depth: 0, cutoff: 8000, mode: 'lowpass' }, env);
+    const o2 = off.createOscillator(); o2.type = 'sawtooth'; o2.frequency.value = 110; const g2 = off.createGain(); g2.gain.value = 0.15;
+    o.connect(fader); fader.connect(panner); panner.connect(off.destination); o2.connect(g2); g2.connect(af.input);
+    const mrg = off.createChannelMerger(2); af.output.connect(mrg, 0, 1); mrg.connect(off.destination);   // filter test on the right channel only
+    o.start(); o2.start();
+    const track = { id: 't', automation: [
+      { target: 'track', param: 'volumeDb', points: [{ beat: 0, value: -40 }, { beat: 4, value: -6 }, { beat: 8, value: -6 }, { beat: 10, value: -60 }] },
+      { target: 'track', param: 'pan', points: [{ beat: 0, value: -1 }] },
+      { target: 'fx:0', param: 'cutoff', curve: 'smooth', points: [{ beat: 0, value: 200 }, { beat: 8, value: 8000 }] } ] };
+    const ectx = { ctx: off, runtime: { fader, panner, sendSpace, sendEcho, fx: [af], params: {} } };
+    let last = 0, events = 0;
+    const chunk = h => { const to = h * bpm / 60; events += applyAutomation(ectx, track, last, to, tb); last = to; };
+    chunk(1.0);
+    for (let t = 0.5; t < sec; t += 0.5) off.suspend(t).then(() => { chunk(Math.min(sec, t + 1.0)); off.resume(); });
+    const b = await off.startRendering();
+    const expect = beat => laneValueAt(track.automation[0], beat) + db(0.5 / Math.SQRT2 * Math.SQRT2);   // sine 1.0 peak -> RMS -3 dB; pan hard left -> left gain 1
+    R.automation.volume = [0.5, 1, 1.5, 2, 3, 4.5].map(t => ({ t, got: rmsAt(b, t - 0.05, t + 0.05, 0), want: +(laneValueAt(track.automation[0], t * 2) - 3.01).toFixed(2) }));
+    R.automation.panLeft = { left: rmsAt(b, 2, 3, 0), right: null };
+    R.automation.filterBright = [0.5, 1.5, 2.5, 3.5].map(t => bright(b, t - 0.2, t + 0.2) /* right channel has only the filter */);
+    { const d = b.getChannelData(1); const br = t => { const a = Math.floor((t - 0.2) * SR), z = Math.floor((t + 0.2) * SR); let e = 0, f = 0; for (let i = a + 1; i < z; i++) { e += d[i] * d[i]; f += (d[i] - d[i - 1]) ** 2; } return db(Math.sqrt(f / e)); }; R.automation.filterBright = [0.5, 1.5, 2.5, 3.5].map(br); }
+    R.automation.events = events; R.automation.stats = stats(b);
+    R.automation.targets = automationTargets({ kind: 'instrument', instrument: { id: 'chop' }, fx: [{ id: 'autofilter' }] }, { instruments: [SAMPLER], effects: FX2 }).map(t => t.key);
+  }
+
+  // ---------------- UI smoke: automation editor + sampler panel
+  {
+    const ui = document.getElementById('ui');
+    const t = { id: 'c', kind: 'instrument', volumeDb: 0, pan: 0, fx: [{ id: 'autofilter', params: {} }], instrument: { id: 'chop', preset: 'tape-keys', params: { song: 'sleepy-rain' }, sample: { sampleId: 'imp:test-hits', name: 'Test hits' } }, automation: [] };
+    let begins = 0, ends = 0;
+    const edA = createAutomationEditor({ track: t, targets: automationTargets(t, { instruments: [SAMPLER], effects: FX2 }), pxPerBeat: 24, beats: 32, onBegin: () => begins++, onEnd: () => ends++ });
+    edA.id = 'auto-ed';
+    const edS = createSamplerPanel({ track: t, ctx: live, onBegin: () => begins++, onEnd: () => ends++ }); edS.id = 'chop-panel';
+    ui.append(edS, document.createElement('br'), edA);
+    window.__uiTrack = t; window.__uiCounts = () => ({ begins, ends });
+  }
+
+  window.__result = R;
+}
+run().catch(e => { window.__result = { error: String(e && e.stack || e) }; });
+</script>
+</body></html>

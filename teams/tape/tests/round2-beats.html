@@ -1,0 +1,110 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Slowreel beats tests</title></head><body>
+<pre id="log">running...</pre>
+<script type="module">
+// BEATS lane offline tests: raw voices (every kit x every drum key, 808 presets), engine renders (grooves, glide), numbers only.
+import { createEngine } from '../js/sound/engine.js';
+import { INSTRUMENTS, INSTRUMENT_MAP } from '../js/sound/instruments.js';
+import { DRUM_INSTRUMENTS, DRUMS, BASS808, DRUM_MAP } from '../js/sound/drums.js';
+import { encodeWav } from '../lib/export.js';
+import { setStep, setSwing, repeatPattern } from '../js/ui/steps.js';
+// register in this page only (the integrator does this in the engine for real)
+for (const d of DRUM_INSTRUMENTS) { if (!INSTRUMENT_MAP[d.id]) { INSTRUMENTS.push(d); INSTRUMENT_MAP[d.id] = d; } }
+const log = s => { document.getElementById('log').textContent += '\n' + s; };
+const db = x => (x <= 1e-9 ? -180 : Math.round(20 * Math.log10(x) * 100) / 100);
+const SR = 44100;
+const save = async (name, buf) => { await fetch('/__save?name=' + name, { method: 'POST', body: encodeWav(buf, { bitDepth: 24 }) }); };
+function stats(buf, from = 0, to = buf.length) {
+  let pk = 0, nan = 0, clip = 0, ss = 0;
+  for (let ch = 0; ch < buf.numberOfChannels; ch++) { const d = buf.getChannelData(ch); for (let i = from; i < to; i++) { const a = d[i]; if (!Number.isFinite(a)) { nan++; continue; } const m = Math.abs(a); if (m > pk) pk = m; if (m >= 1) clip++; ss += a * a; } }
+  return { peakDb: db(pk), rmsDb: db(Math.sqrt(ss / Math.max(1, (to - from) * buf.numberOfChannels))), nan, clipped: clip };
+}
+const resolve = (def, preset) => { const o = {}; for (const p of def.params) o[p.id] = p.default; Object.assign(o, def.presets.find(x => x.id === preset).params); return o; };
+// raw voices: one OfflineAudioContext per kit, every key once a second at velocity 1, straight to the destination
+async function rawKit(def, preset, keys, gap = 1, vel = 1) {
+  const secs = keys.length * gap + 10, ctx = new OfflineAudioContext(2, secs * SR, SR), p = resolve(def, preset);
+  let live = 0, maxLive = 0, ended = 0;
+  const env = { bpm: () => 120, voiceEnded() { live--; ended++; } };
+  keys.forEach((m, i) => { const v = def.voice(ctx, env, p, m, vel, 0.05 + i * gap); v.out.connect(ctx.destination); live++; maxLive = Math.max(maxLive, live); v.release(0.05 + i * gap + 0.1); });
+  const buf = await ctx.startRendering();
+  await new Promise(r => setTimeout(r, 50));
+  const per = keys.map((m, i) => ({ midi: m, ...stats(buf, Math.floor((0.05 + i * gap) * SR), Math.floor((0.05 + (i + 1) * gap) * SR)) }));
+  // the last 0.5 s of each slot must be (nearly) silent unless the voice is long (crash / riser / boom)
+  const tails = keys.map((m, i) => stats(buf, Math.floor((0.05 + (i + 1) * gap - 0.1) * SR), Math.floor((0.05 + (i + 1) * gap) * SR)).peakDb);
+  return { buf, all: stats(buf), per, tails, ended, made: keys.length };
+}
+const host = await createEngine({ context: new OfflineAudioContext(2, 128, SR), songBaseUrl: '../audio/' });
+const out = { meta: { instruments: host.instruments.length, ids: host.instruments.map(i => i.id) }, raw: [], groove: [], bass: [], glide: null, stress: null };
+const keys = DRUM_MAP.map(d => d.midi);
+
+// 1) raw voices, every kit
+for (const pr of DRUMS.presets) {
+  const r = await rawKit(DRUMS, pr.id, keys);
+  out.raw.push({ kit: pr.id, ...r.all, ended: r.ended, made: r.made, per: r.per.map((x, i) => ({ midi: x.midi, name: DRUM_MAP[i].name, peakDb: x.peakDb, rmsDb: x.rmsDb, tailDb: r.tails[i] })) });
+  if (pr.id === 'future-garage') await save('beats-raw-drums.wav', r.buf);
+  log(`raw ${pr.id}: peak ${r.all.peakDb}`);
+}
+// 808 raw: a low phrase per preset
+for (const pr of BASS808.presets) {
+  const r = await rawKit(BASS808, pr.id, [24, 31, 36, 43, 48], 1.2);
+  out.bass.push({ preset: pr.id, ...r.all, ended: r.ended, made: r.made, per: r.per.map(x => ({ midi: x.midi, peakDb: x.peakDb })) });
+  log(`808 ${pr.id}: peak ${r.all.peakDb}`);
+}
+
+// 2) engine renders: a 2-bar future-garage groove per kit, written with the step helpers (swing 0.55)
+function grooveProject(kit, extra = {}) {
+  const p = host.newProject('beats'); p.bpm = 132; p.lengthBars = 2;
+  const t = host.newTrack({ instrument: 'drums', preset: kit }); t.volumeDb = extra.volumeDb ?? -6; t.sends = { space: 0.25, echo: 0.05 }; t.fx = [];
+  const c = { id: 'c', startBeat: 0, lengthBeats: 4, notes: [], beat: { steps: 16, swing: 0, mute: [], muted: [] } };
+  // 2-step: kick 0, 10; clap/snare 4, 12; shuffled hats; rim; shaker; cowbell on phonk
+  [[36, 0, 1], [36, 10, 0.85], [39, 4, 0.9], [38, 12, 0.9], [40, 7, 0.4], [37, 14, 0.6], [46, 6, 0.6], [49, 0, 0.7]].forEach(([m, k, v]) => setStep(c, m, k, v));
+  for (let k = 0; k < 16; k += 2) setStep(c, 42, k + 1, k % 4 ? 0.55 : 0.75);
+  for (let k = 0; k < 16; k += 4) setStep(c, 44, k + 2, 0.5);
+  if (kit === 'phonk') for (const k of [0, 3, 6, 8, 11, 14]) setStep(c, 47, k, 0.8);
+  setSwing(c, 0.55); repeatPattern(c, 2);
+  if (extra.allMax) for (const n of c.notes) n.v = 1;
+  t.clips = [c]; p.tracks = [t];
+  return p;
+}
+for (const pr of DRUMS.presets) {
+  const proj = grooveProject(pr.id);
+  const buf = await host.render(proj, { tailSeconds: 10 });
+  const st = host.lastRenderStats;
+  out.groove.push({ kit: pr.id, notes: proj.tracks[0].clips[0].notes.length, ...stats(buf), maxVoices: st.maxVoices, maxNodes: st.maxNodes, endVoices: st.voices, endDb: stats(buf, buf.length - SR / 2).peakDb });
+  if (pr.id === 'phonk') await save('beats-groove-phonk.wav', buf);
+  log(`groove ${pr.id}`);
+}
+// stress: every step of every row on, velocity 1, track at 0 dB (Phonk = most grit)
+{
+  const p = host.newProject('stress'); p.bpm = 140; p.lengthBars = 1;
+  const t = host.newTrack({ instrument: 'drums', preset: 'phonk' }); t.volumeDb = 0; t.sends = { space: 0, echo: 0 }; t.fx = [];
+  const c = { id: 'c', startBeat: 0, lengthBeats: 4, notes: [] };
+  for (const m of keys) for (let k = 0; k < 16; k += 2) setStep(c, m, k, 1);
+  t.clips = [c]; p.tracks = [t];
+  const buf = await host.render(p, { tailSeconds: 2 });
+  out.stress = { notes: c.notes.length, ...stats(buf), maxVoices: host.lastRenderStats.maxVoices, maxNodes: host.lastRenderStats.maxNodes };
+}
+
+// 3) 808 glide through the engine: 36 held 0-4 beats, 43 overlapping from beat 2 -> one voice that slides up
+function pitchHz(buf, t0, t1) {
+  const d = buf.getChannelData(0), a = Math.floor(t0 * SR), b = Math.floor(t1 * SR); let zc = 0, first = -1, last = -1;
+  for (let i = a + 1; i < b; i++) if (d[i - 1] < 0 && d[i] >= 0) { zc++; if (first < 0) first = i; last = i; }
+  return zc > 1 ? Math.round((zc - 1) / ((last - first) / SR) * 10) / 10 : 0;
+}
+{
+  const p = host.newProject('glide'); p.bpm = 60; p.lengthBars = 2;
+  const t = host.newTrack({ instrument: 'bass808', preset: 'deep-sub' }); t.volumeDb = -6; t.sends = { space: 0, echo: 0 }; t.fx = [];
+  t.instrument.params = { drive: 0, punch: 0, length: 1, glide: 0.5 };
+  t.clips = [{ id: 'c', startBeat: 0, lengthBeats: 8, notes: [{ p: 36, s: 0, d: 4, v: 0.9 }, { p: 43, s: 2, d: 3, v: 0.9 }, { p: 41, s: 4.5, d: 1, v: 0.9 }] }]; p.tracks = [t];
+  const buf = await host.render(p, { tailSeconds: 2 });
+  out.glide = { before: pitchHz(buf, 1.0, 1.9), during: pitchHz(buf, 2.02, 2.08), after: pitchHz(buf, 3.0, 3.9), third: pitchHz(buf, 4.8, 5.4),
+    expect: { before: 65.4, after: 98.0, third: 87.3 }, ...stats(buf), maxVoices: host.lastRenderStats.maxVoices, endVoices: host.lastRenderStats.voices, endDb: stats(buf, buf.length - SR / 2).peakDb };
+  await save('beats-808-glide.wav', buf);
+  // 808 Phonk with drive through the engine at 0 dB track volume
+  const t2 = host.newTrack({ instrument: 'bass808', preset: 'phonk-808' }); t2.volumeDb = 0; t2.sends = { space: 0, echo: 0 }; t2.fx = [];
+  t2.clips = [{ id: 'c', startBeat: 0, lengthBeats: 8, notes: [24, 31, 36, 29].map((m, i) => ({ p: m, s: i * 2, d: 1.5, v: 1 })) }]; p.tracks = [t2];
+  const b2 = await host.render(p, { tailSeconds: 2 });
+  out.phonk808 = { ...stats(b2), maxVoices: host.lastRenderStats.maxVoices };
+  await save('beats-808-phonk.wav', b2);
+}
+window.__result = out; log('done');
+</script></body></html>

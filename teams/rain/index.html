@@ -1,0 +1,62 @@
+<title>Lamplit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@1,6..72,400&display=swap">
+<link rel="stylesheet" href="css/studio.css">
+<style>
+  /* first paint before studio.css arrives: night, never white */
+  :root { color-scheme: dark; } body { background: #131b24; color: #ece5d8; }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <radialGradient id="capGrad" cx="38%" cy="30%" r="75%"><stop offset="0" stop-color="#4a5868"/><stop offset=".55" stop-color="#2a3644"/><stop offset="1" stop-color="#18212b"/></radialGradient>
+  </defs>
+</svg>
+
+<div id="app">
+  <header id="band" aria-label="Lamplit window and transport">
+    <canvas id="window-canvas" aria-hidden="true"></canvas>
+    <div class="brand">
+      <span class="mark" id="mark"></span>
+      <span class="wordmark">Lamplit</span>
+      <div class="proj">
+        <button class="proj-btn" id="proj-btn" type="button" aria-haspopup="dialog" title="Project menu"><span class="n" id="proj-name">Window Seat</span><span class="ico" data-icon="down"></span></button>
+        <span class="proj-meta" id="proj-meta"><span class="dot"></span><span id="save-state">Saved</span></span>
+      </div>
+    </div>
+    <div class="transport glass" role="toolbar" aria-label="Transport">
+      <button class="tbtn" id="t-start" type="button" title="Back to start (Home)" aria-label="Back to start"><span class="ico" data-icon="rewind"></span></button>
+      <button class="tbtn play" id="t-play" type="button" title="Play / pause (Space)" aria-label="Play"><span class="ico" data-icon="play"></span></button>
+      <button class="tbtn" id="t-stop" type="button" title="Stop (Space twice returns)" aria-label="Stop"><span class="ico" data-icon="stop"></span></button>
+      <button class="tbtn" id="t-loop" type="button" title="Loop region (Shift+L)" aria-label="Loop" aria-pressed="false"><span class="ico" data-icon="loop"></span></button>
+      <button class="tbtn rec" id="t-rec" type="button" title="Record what you play on the keyboard (Shift+R)" aria-label="Record" aria-pressed="false"><span class="ico" data-icon="rec"></span></button>
+      <span class="tsep"></span>
+      <div class="clock" aria-live="off"><span class="big" id="clk-bar">1.1</span><span class="small" id="clk-time">0:00</span></div>
+      <span class="tsep"></span>
+      <label class="field"><span class="lbl">Tempo</span><input class="num" id="bpm" type="number" min="40" max="160" step="1" value="66" aria-label="Tempo in BPM"></label>
+      <div class="field"><span class="lbl">Key</span><span id="keysel"></span></div>
+    </div>
+    <div class="band-r">
+      <div class="glass">
+        <button class="ibtn" id="undo" type="button" title="Undo (Ctrl+Z)" aria-label="Undo" disabled><span class="ico" data-icon="undo"></span></button>
+        <button class="ibtn" id="redo" type="button" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" disabled><span class="ico" data-icon="redo"></span></button>
+      </div>
+      <div class="glass" id="atmo-wrap" title="Atmosphere: how much of the room you hear"></div>
+      <button class="ibtn glass" id="listen-btn" type="button" title="Listen mode: the window, big, with play pads" style="height:46px;padding:0 12px"><span class="ico" data-icon="window"></span><span class="t">Listen</span></button>
+      <button class="btn-lamp" id="export-btn" type="button" title="Export WAV + MP3 (Ctrl+E)"><span class="ico" data-icon="export"></span>Export</button>
+    </div>
+    <div class="lamp-hint" id="lamp-hint">The lamp is off. Press play, or any note key, to turn the sound on.</div>
+    <div class="toast" id="toast" role="status"></div>
+  </header>
+
+  <main id="desk">
+    <section id="arrange" class="panel" aria-label="Arrange"></section>
+    <aside id="inspector" class="panel" aria-label="Inspector"></aside>
+    <section id="dock" class="panel" aria-label="Editors"></section>
+  </main>
+</div>
+
+<section id="listen" aria-label="Listen and play pads"></section>
+
+<script type="module" src="js/ui/app.js"></script>

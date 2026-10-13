@@ -1,0 +1,118 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Slowreel sound tests</title></head><body>
+<pre id="log">running...</pre>
+<script type="module">
+import { createEngine } from '../js/sound/engine.js';
+import { encodeWav } from '../lib/export.js';
+const log = s => { document.getElementById('log').textContent += '\n' + s; };
+const db = x => (x <= 1e-9 ? -180 : 20 * Math.log10(x));
+
+// numbers for one rendered buffer
+function analyse(buf, musicEndSec) {
+  const sr = buf.sampleRate, L = buf.getChannelData(0), R = buf.getChannelData(1), n = L.length;
+  let pk = 0, ss = 0, nan = 0, clip = 0, sl = 0, sr2 = 0, slr = 0;
+  for (let i = 0; i < n; i++) {
+    const a = L[i], b = R[i];
+    if (!Number.isFinite(a) || !Number.isFinite(b)) { nan++; continue; }
+    const m = Math.max(Math.abs(a), Math.abs(b)); if (m > pk) pk = m; if (m >= 1) clip++;
+    ss += a * a + b * b; sl += a * a; sr2 += b * b; slr += a * b;
+  }
+  // RMS per second (stereo) for the decay check
+  const win = [];
+  for (let s = 0; s + sr <= n; s += sr) { let e = 0; for (let i = s; i < s + sr; i++) e += L[i] * L[i] + R[i] * R[i]; win.push(Math.round(db(Math.sqrt(e / (2 * sr))) * 10) / 10); }
+  const endIdx = Math.min(win.length - 1, Math.floor(musicEndSec));
+  const tail = win.slice(endIdx);
+  let rises = 0; for (let i = 1; i < tail.length; i++) if (tail[i] > tail[i - 1] + 1.5) rises++;
+  return { seconds: Math.round(n / sr * 10) / 10, peakDb: Math.round(db(pk) * 100) / 100, rmsDb: Math.round(db(Math.sqrt(ss / (2 * n))) * 100) / 100,
+    nan, clipped: clip, corr: Math.round(slr / Math.sqrt(sl * sr2 + 1e-20) * 1000) / 1000,
+    endDb: tail[0], lastDb: tail[tail.length - 1], tailDrop: Math.round((tail[0] - tail[tail.length - 1]) * 10) / 10, tailRises: rises, perSecond: win };
+}
+
+const host = await createEngine({ context: new OfflineAudioContext(2, 128, 44100), songBaseUrl: '../audio/' });   // only for the lists
+const out = { instruments: [], effects: [], meta: { instruments: host.instruments.length, effects: host.effects.length } };
+
+function oneTrackProject(instId, preset, notes, beats, extra = {}) {
+  const p = host.newProject('test'); p.bpm = 60; p.lengthBars = Math.ceil(beats / 4);
+  p.master.atmosphere = 0.5;
+  const t = host.newTrack({ instrument: instId, preset }); t.sends = { space: extra.space ?? 0, echo: extra.echo ?? 0 }; t.fx = extra.fx || [];
+  if (instId === 'cloud') t.instrument.params = { song: 'after-the-storm' };
+  t.clips = [{ id: 'c', startBeat: 0, lengthBeats: beats, notes }]; p.tracks = [t];
+  return p;
+}
+const params = new URLSearchParams(location.search);
+const only = params.get('only');
+
+if (!only || only === 'presets') {
+  for (const inst of host.instruments) {
+    for (const pr of inst.presets) {
+      const long = inst.kind !== 'synth';
+      const notes = long ? [{ p: 60, s: 0, d: 6, v: 0.8 }, { p: 67, s: 1, d: 5, v: 0.6 }]
+        : [{ p: 57, s: 0, d: 3, v: 0.8 }, { p: 64, s: 0.5, d: 2.5, v: 0.7 }, { p: 69, s: 1, d: 2, v: 0.9 }, { p: 76, s: 2, d: 2, v: 1 }, { p: 45, s: 2, d: 2, v: 1 }];
+      const proj = oneTrackProject(inst.id, pr.id, notes, long ? 6 : 4, { space: 0.4, echo: 0.15 });
+      const t0 = performance.now();
+      const buf = await host.render(proj, { tailSeconds: 10 });
+      const a = analyse(buf, long ? 6 : 4); delete a.perSecond;
+      out.instruments.push({ inst: inst.id, preset: pr.id, ms: Math.round(performance.now() - t0), stats: host.lastRenderStats, ...a });
+    }
+  }
+}
+if (!only || only === 'effects') {
+  // each effect at extreme settings on a short felt phrase: must decay, never run away
+  const extreme = { reverb: { type: 'infinite', mix: 1, size: 2, shimmer: 1 }, shimmer: { type: 'cathedral', mix: 1, size: 2, shimmer: 1 },
+    echo: { feedback: 0.92, drive: 1, mix: 1 }, tape: { drive: 1, age: 1, wow: 1, flutter: 1, hiss: 1 }, chorus: { depth: 1, mix: 1 },
+    filter: { cutoff: 800, resonance: 12, motion: 1 }, eq: { low: 12, mid: 12, high: 12 }, glue: { threshold: -40, ratio: 8, makeup: 12 } };
+  const cases = host.effects.map(fx => [fx.id, extreme[fx.id] || {}]);
+  cases.push(['reverb', { type: 'cathedral', mix: 1, size: 2, shimmer: 1 }, 'reverb-cathedral-shimmer'], ['reverb', { type: 'spring', mix: 1, size: 2 }, 'reverb-spring']);
+  for (const [id, prm, label] of cases) {
+    const fx = { id, label: label || id };
+    const proj = oneTrackProject('felt', 'felt-upright', [{ p: 60, s: 0, d: 1, v: 0.9 }, { p: 67, s: 0.5, d: 1, v: 0.8 }], 2,
+      { fx: [{ id: fx.id, params: prm, bypass: false }] });
+    const buf = await host.render(proj, { tailSeconds: 28 });
+    const a = analyse(buf, 2); const ps = a.perSecond; delete a.perSecond;
+    out.effects.push({ fx: fx.label, ...a, last5: ps.slice(-5) });
+  }
+}
+if (!only || only === 'unity') {
+  // "keep Nico's mix as he made it": a song clip at 0 dB, no sends, no fx must come out at the same level
+  const p = host.newProject('unity'); p.bpm = 60; p.lengthBars = 3; p.master.atmosphere = 0.5;
+  const t = host.newTrack({ kind: 'song' }); t.volumeDb = 0; t.sends = { space: 0, echo: 0 }; t.fx = [];
+  t.clips = [{ id: 'u', startBeat: 0, lengthBeats: 12, notes: [], song: { songId: 'after-the-storm', offsetSec: 60, gainDb: 0, fadeInSec: 0.01, fadeOutSec: 0.01, rate: 1 } }];
+  p.tracks = [t];
+  const buf = await host.render(p, { tailSeconds: 0 });
+  const src = await host.loadSong('after-the-storm');
+  const rms = (b, off, n) => { let e = 0; for (let c = 0; c < 2; c++) { const d = b.getChannelData(Math.min(c, b.numberOfChannels - 1)); for (let i = off; i < off + n; i++) e += d[i] * d[i]; } return db(Math.sqrt(e / (2 * n))); };
+  const n = 44100 * 10, outDb = rms(buf, 44100, n), inDb = rms(src, 44100 * 61, n);
+  out.unity = { inDb: Math.round(inDb * 100) / 100, outDb: Math.round(outDb * 100) / 100, diffDb: Math.round((outDb - inDb) * 100) / 100 };
+}
+if (!only || only === 'demo') {
+  const t0 = performance.now();
+  const demo = host.demo;
+  const musicEnd = host.projectSeconds(demo);
+  const buf = await host.render(demo, { tailSeconds: 14 });
+  const a = analyse(buf, musicEnd);
+  out.demo = { ms: Math.round(performance.now() - t0), musicEnd: Math.round(musicEnd * 10) / 10, stats: host.lastRenderStats, ...a };
+  const wav = encodeWav(buf, { bitDepth: 24 });
+  const r = await fetch('/__save?name=demo-render.wav', { method: 'POST', body: wav });
+  out.demo.saved = r.status;
+}
+if (!only || only === 'live') {
+  // live context: play, noteOn/Off, meters, position, stop
+  const ctx = new AudioContext(); await ctx.resume();
+  const eng = await createEngine({ context: ctx, songBaseUrl: '../audio/' });
+  await eng.load(eng.demo);
+  eng.play(64);
+  await new Promise(r => setTimeout(r, 1500));
+  const pos = eng.position();
+  eng.noteOn('felt', 69, 0.8); eng.noteOn('cloud', 60, 0.7);
+  await new Promise(r => setTimeout(r, 600));
+  const m = eng.meter('felt'), mm = eng.meter('master'), grains = eng.cloudGrains().length;
+  eng.noteOff('felt', 69); eng.noteOff('cloud', 60);
+  eng.setParam({ track: 'felt' }, 'felt', 0.9); eng.setParam({ bus: 'space', fx: 0 }, 'type', 'hall'); eng.setParam({ master: true }, 'atmosphere', 0.7);
+  eng.stop();
+  const st = eng.stats();
+  await new Promise(r => setTimeout(r, 400));
+  out.live = { state: ctx.state, posBeat: Math.round(pos.beat * 100) / 100, playing: pos.playing, feltMeter: m, masterMeter: mm, grains, stats: st, afterStop: eng.position() };
+  eng.dispose(); ctx.close();
+}
+window.__result = out;
+log('done');
+</script></body></html>

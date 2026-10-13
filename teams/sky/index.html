@@ -1,0 +1,134 @@
+<title>Daylong</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="css/studio.css">
+<style>
+  /* first paint before studio.css arrives */
+  :root { color-scheme: light; }
+  body { background: #f4f8fd; margin: 0; }
+</style>
+
+<div id="app" class="booting" aria-busy="true">
+
+  <!-- ============================================================ desktop studio -->
+  <div id="studio">
+    <header class="topbar" role="banner">
+      <div class="brand">
+        <svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true">
+          <defs><linearGradient id="bm-sun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd27f"/><stop offset="1" stop-color="#f08a5d"/></linearGradient></defs>
+          <path d="M8 27a12 12 0 0 1 24 0z" fill="url(#bm-sun)"/>
+          <path d="M3 27.5h34" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M10 32.5h20M15 36.5h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".45"/>
+          <path d="M31 6.5l1 2.6 2.6 1-2.6 1-1 2.6-1-2.6-2.6-1 2.6-1z" fill="currentColor" opacity=".7"/>
+        </svg>
+        <div class="brand-words"><span class="brand-name">Daylong</span><span class="brand-sub">ambient studio · Nicofoxheart</span></div>
+      </div>
+
+      <div class="project">
+        <button id="project-btn" class="project-btn" aria-haspopup="dialog" aria-expanded="false" aria-controls="project-menu">
+          <span id="project-name" class="project-name">First Light</span>
+          <svg viewBox="0 0 16 16" class="chev" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </button>
+        <span id="save-state" class="save-state" aria-live="polite">Opening…</span>
+      </div>
+
+      <div class="transport" role="group" aria-label="Transport">
+        <button id="t-home" class="tbtn" title="Return to start (Home)" aria-label="Return to start"><svg viewBox="0 0 20 20"><path d="M5 4v12M15 4.5 8 10l7 5.5z"/></svg></button>
+        <button id="t-play" class="tbtn play" title="Play / pause (Space)" aria-label="Play" aria-pressed="false"><svg class="i-play" viewBox="0 0 20 20"><path d="M6.5 4.2v11.6L16 10z"/></svg><svg class="i-pause" viewBox="0 0 20 20"><path d="M6 4.5h3v11H6zM11 4.5h3v11h-3z"/></svg></button>
+        <button id="t-stop" class="tbtn" title="Stop" aria-label="Stop"><svg viewBox="0 0 20 20"><rect x="5.5" y="5.5" width="9" height="9" rx="1.5"/></svg></button>
+        <button id="t-loop" class="tbtn toggle" title="Loop region" aria-label="Loop" aria-pressed="false"><svg viewBox="0 0 20 20"><path d="M6 7h8.5a2.5 2.5 0 0 1 0 5H13M14 13H5.5a2.5 2.5 0 0 1 0-5H7" fill="none" stroke-width="1.6"/><path d="M12 10.2 14.3 12.5 12 14.8M8 5.2 5.7 7.5 8 9.8" fill="none" stroke-width="1.6"/></svg></button>
+        <button id="t-rec" class="tbtn rec toggle" title="Record live keys into a clip (R)" aria-label="Record" aria-pressed="false"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="4.6"/></svg></button>
+        <div class="clock" aria-live="off">
+          <span id="clock-bars" class="clock-bars">1.1.00</span>
+          <span id="clock-time" class="clock-time">0:00.0</span>
+        </div>
+        <label class="field tempo" title="Tempo (drag, or type)"><span class="flabel">BPM</span><input id="bpm" type="number" min="40" max="160" step="1" value="68" inputmode="numeric"></label>
+        <label class="field"><span class="flabel">Key</span><select id="key"></select></label>
+        <label class="field"><span class="flabel">Scale</span><select id="scale"></select></label>
+      </div>
+
+      <div class="top-right">
+        <div class="history" role="group" aria-label="History">
+          <button id="undo" class="ibtn" title="Undo (Ctrl+Z)" aria-label="Undo"><svg viewBox="0 0 20 20"><path d="M7.5 5 4 8.5 7.5 12M4.5 8.5H12a4 4 0 0 1 0 8H9" fill="none" stroke-width="1.6"/></svg></button>
+          <button id="redo" class="ibtn" title="Redo (Ctrl+Shift+Z)" aria-label="Redo"><svg viewBox="0 0 20 20"><path d="M12.5 5 16 8.5 12.5 12M15.5 8.5H8a4 4 0 0 0 0 8h3" fill="none" stroke-width="1.6"/></svg></button>
+        </div>
+        <button id="keys-toggle" class="chip toggle" aria-pressed="true" title="Play notes with the computer keyboard (A-K row, Z/X octave)"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="5" width="15" height="10" rx="2" fill="none" stroke-width="1.4"/><path d="M6 5v6M10 5v6M14 5v6" stroke-width="1.4"/></svg><span>Keys <b id="keys-oct">C4</b></span></button>
+        <div id="atmo-slot" class="atmo-slot"></div>
+        <div class="master-meter" aria-hidden="true"><canvas id="master-meter" width="96" height="22"></canvas><span class="mm-label">out</span></div>
+        <button id="export-btn" class="btn primary" aria-haspopup="dialog"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3.5v9M6 9l4 4 4-4M4 16.5h12" fill="none" stroke-width="1.7"/></svg>Export</button>
+      </div>
+    </header>
+
+    <section class="horizon" aria-label="Song sky: overview and visual. Click to jump there.">
+      <canvas id="horizon-canvas" tabindex="0" role="slider" aria-label="Song position" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></canvas>
+      <div class="horizon-legend" aria-hidden="true"><span>dawn</span><span>morning</span><span>noon</span><span>golden hour</span><span>dusk</span><span>night</span></div>
+    </section>
+
+    <main class="arrange" aria-label="Arrange">
+      <div class="pane-bar">
+        <h2 class="pane-title">Sky</h2>
+        <button id="add-inst" class="btn ghost sm"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12" fill="none" stroke-width="1.7"/></svg>Instrument track</button>
+        <button id="add-song" class="btn ghost sm"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12" fill="none" stroke-width="1.7"/></svg>Song track</button>
+        <span class="sep"></span>
+        <label class="field sm"><span class="flabel">Snap</span><select id="arr-snap">
+          <option value="4">Bar</option><option value="2">1/2 bar</option><option value="1" selected>Beat</option><option value="0.5">1/8</option><option value="0.25">1/16</option><option value="0">Off</option></select></label>
+        <label class="field sm"><span class="flabel">Length</span><input id="song-bars" type="number" min="4" max="512" step="1" value="32" inputmode="numeric"><span class="unit">bars</span></label>
+        <span class="grow"></span>
+        <button id="follow" class="chip toggle sm" aria-pressed="true" title="Scroll with the playhead">Follow</button>
+        <div class="zoom" role="group" aria-label="Zoom">
+          <button id="zoom-out" class="ibtn sm" aria-label="Zoom out" title="Zoom out (Ctrl+wheel)"><svg viewBox="0 0 20 20"><path d="M5 10h10" fill="none" stroke-width="1.7"/></svg></button>
+          <button id="zoom-fit" class="ibtn sm wide" aria-label="Fit song" title="Fit the whole song">Fit</button>
+          <button id="zoom-in" class="ibtn sm" aria-label="Zoom in" title="Zoom in (Ctrl+wheel)"><svg viewBox="0 0 20 20"><path d="M5 10h10M10 5v10" fill="none" stroke-width="1.7"/></svg></button>
+        </div>
+      </div>
+      <div id="arr-scroll" class="arr-scroll" data-scroll tabindex="-1">
+        <div id="arr-content" class="arr-content"></div>
+      </div>
+    </main>
+
+    <section class="dock" aria-label="Editors">
+      <div class="dock-tabs" role="tablist" aria-label="Editor">
+        <button role="tab" id="tab-roll" aria-controls="panel-roll" aria-selected="true" class="tab">Piano roll</button>
+        <button role="tab" id="tab-mixer" aria-controls="panel-mixer" aria-selected="false" class="tab" tabindex="-1">Mixer</button>
+        <button role="tab" id="tab-songs" aria-controls="panel-songs" aria-selected="false" class="tab" tabindex="-1">My songs</button>
+        <button role="tab" id="tab-keys" aria-controls="panel-keys" aria-selected="false" class="tab" tabindex="-1">Keys</button>
+        <span class="grow"></span>
+        <span id="dock-hint" class="dock-hint"></span>
+      </div>
+      <div id="panel-roll" role="tabpanel" aria-labelledby="tab-roll" class="panel"></div>
+      <div id="panel-mixer" role="tabpanel" aria-labelledby="tab-mixer" class="panel" hidden></div>
+      <div id="panel-songs" role="tabpanel" aria-labelledby="tab-songs" class="panel" hidden></div>
+      <div id="panel-keys" role="tabpanel" aria-labelledby="tab-keys" class="panel" hidden></div>
+    </section>
+
+    <aside id="inspector" class="inspector" aria-label="Sound" data-scroll></aside>
+  </div>
+
+  <!-- ============================================================ phone: listen / play pads -->
+  <div id="listen" aria-label="Listen and play pads">
+    <header class="l-head">
+      <svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true"><defs><linearGradient id="lm-sun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd27f"/><stop offset="1" stop-color="#f08a5d"/></linearGradient></defs><path d="M8 27a12 12 0 0 1 24 0z" fill="url(#lm-sun)"/><path d="M3 27.5h34" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <div><div class="brand-name">Daylong</div><div id="l-project" class="l-project">First Light</div></div>
+    </header>
+    <div class="l-sky"><canvas id="listen-canvas" aria-hidden="true"></canvas><div id="l-tod" class="l-tod">dawn</div></div>
+    <div class="l-transport">
+      <button id="l-play" class="tbtn play big" aria-label="Play" aria-pressed="false"><svg class="i-play" viewBox="0 0 20 20"><path d="M6.5 4.2v11.6L16 10z"/></svg><svg class="i-pause" viewBox="0 0 20 20"><path d="M6 4.5h3v11H6zM11 4.5h3v11h-3z"/></svg></button>
+      <div class="l-progress-wrap">
+        <input id="l-progress" type="range" min="0" max="1000" value="0" aria-label="Song position">
+        <div class="l-times"><span id="l-time">0:00</span><span id="l-total">0:00</span></div>
+      </div>
+    </div>
+    <div class="l-pads-head"><h2>Play pads</h2><span id="l-scale" class="l-scale">D lydian</span></div>
+    <div id="l-inst" class="l-inst" role="radiogroup" aria-label="Pad sound" data-scroll></div>
+    <div id="l-pads" class="l-pads"></div>
+    <label class="l-atmo"><span>Atmosphere</span><input id="l-atmo" type="range" min="0" max="100" value="50"></label>
+    <p class="l-note">The full studio opens on a wider screen.</p>
+  </div>
+
+  <div id="start-hint" class="start-hint" role="status">Press play and the sky wakes up.</div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="popover-root"></div>
+</div>
+
+<script type="module" src="js/app.js"></script>

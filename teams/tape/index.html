@@ -1,0 +1,199 @@
+<title>Slowreel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="css/studio.css">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <radialGradient id="kn-body" cx="38%" cy="30%" r="80%"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".55" stop-color="#E6E9E7"/><stop offset="1" stop-color="#C4C9C7"/></radialGradient>
+    <linearGradient id="kn-skirt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3B4044"/><stop offset="1" stop-color="#1D2124"/></linearGradient>
+    <linearGradient id="kn-cap" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FBFCFB"/><stop offset="1" stop-color="#E1E5E3"/></linearGradient>
+    <symbol id="i-play" viewBox="0 0 16 16"><path d="M4 2.5v11l9-5.5z" fill="currentColor"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 16 16"><rect x="3.5" y="3.5" width="9" height="9" rx="1" fill="currentColor"/></symbol>
+    <symbol id="i-return" viewBox="0 0 16 16"><path d="M3 3v10M13 3L6 8l7 5z" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+    <symbol id="i-loop" viewBox="0 0 16 16"><path d="M3 9.5V7a3 3 0 0 1 3-3h6.5M10.5 2l2 2-2 2M13 6.5V9a3 3 0 0 1-3 3H3.5M5.5 14l-2-2 2-2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-rec" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4.6" fill="currentColor"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-dup" viewBox="0 0 16 16"><rect x="2.5" y="4.5" width="8" height="9" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5.5 2.5h6.5a1.5 1.5 0 0 1 1.5 1.5v7" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 16 16"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.7 8.5h5.6l.7-8.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 16 16"><path d="M5.5 3L2.5 6l3 3M2.5 6H10a3.5 3.5 0 0 1 0 7H6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-redo" viewBox="0 0 16 16"><path d="M10.5 3l3 3-3 3M13.5 6H6a3.5 3.5 0 0 0 0 7h4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-zin" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10.5 10.5L14 14M5 7h4M7 5v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-zout" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10.5 10.5L14 14M5 7h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-export" viewBox="0 0 16 16"><path d="M8 2v8M4.5 6.5L8 10l3.5-3.5M2.5 11v2.5h11V11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 16 16"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-close" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="i-cloud" viewBox="0 0 16 16"><path d="M4.5 12.5h7a3 3 0 0 0 .3-6A4 4 0 0 0 4 7.2a2.7 2.7 0 0 0 .5 5.3z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+    <symbol id="i-follow" viewBox="0 0 16 16"><path d="M8 2v12M4 6L2 8l2 2M12 6l2 2-2 2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-panel" viewBox="0 0 16 16"><rect x="2.5" y="3" width="11" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10 3v10" stroke="currentColor" stroke-width="1.5"/></symbol>
+    <symbol id="i-set" viewBox="0 0 16 16"><path d="M2.5 4.5h11M2.5 11.5h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10.5" cy="4.5" r="2" fill="var(--panel-hi,#fff)" stroke="currentColor" stroke-width="1.5"/><circle cx="5.5" cy="11.5" r="2" fill="var(--panel-hi,#fff)" stroke="currentColor" stroke-width="1.5"/></symbol>
+    <symbol id="i-fox" viewBox="0 0 24 24"><path d="M12 21.2L3.6 12.8C1.9 11 1.8 8.2 2.8 6.1L4.4 2.4l4.1 3.1c1.4-.3 2.6.1 3.5.9.9-.8 2.1-1.2 3.5-.9l4.1-3.1 1.6 3.7c1 2.1.9 4.9-.8 6.7z" fill="#EC4E20"/><path d="M12 21.2L8.8 12.6h6.4z" fill="#F7F8F7" opacity=".9"/></symbol>
+  </defs>
+</svg>
+
+<div class="app" id="app">
+  <header class="deck" aria-label="Deck">
+    <div class="module brand">
+      <div class="brand-name"><svg aria-hidden="true"><use href="#i-fox"/></svg>Slowreel</div>
+      <div class="brand-model">SR-8 ambient tape studio<span>for Nicofoxheart</span></div>
+    </div>
+
+    <div class="module transport" role="group" aria-label="Transport">
+      <div>
+        <div class="tgroup">
+          <button class="key big" id="t-return" aria-label="Return to start (Home)" title="Return to start (Home)"><svg><use href="#i-return"/></svg></button>
+          <button class="key big dark" id="t-play" aria-label="Play (Space)" aria-pressed="false" title="Play / pause (Space)"><span class="led"></span><svg><use href="#i-play"/></svg></button>
+          <button class="key big" id="t-stop" aria-label="Stop" title="Stop"><svg><use href="#i-stop"/></svg></button>
+          <button class="key big led-saffron" id="t-loop" aria-label="Loop" aria-pressed="false" title="Loop the marked region"><span class="led"></span><svg><use href="#i-loop"/></svg></button>
+          <button class="key big signal rec" id="t-rec" aria-label="Record keys (R)" aria-pressed="false" title="Record what you play on the keys (R)"><svg><use href="#i-rec"/></svg></button>
+        </div>
+        <div class="tgroup" aria-hidden="true"><span class="label cap">Rtn</span><span class="label cap">Play</span><span class="label cap">Stop</span><span class="label cap">Loop</span><span class="label cap">Rec</span></div>
+      </div>
+    </div>
+
+    <div class="module lcd">
+      <div class="glass">
+        <div class="lcd-counter mono" id="lcd-counter" aria-live="off">001<small>.</small>1<small>.</small>00</div>
+        <div class="lcd-time" id="lcd-time">00:00.0</div>
+        <div class="lcd-led"><span id="led-play"><i></i>PLAY</span><span id="led-rec"><i></i>REC</span></div>
+        <div class="lcd-row">
+          <label class="lcd-field"><span class="k">BPM</span><input id="f-bpm" type="number" min="40" max="160" step="1" value="68" aria-label="Tempo in BPM"></label>
+          <label class="lcd-field"><span class="k">KEY</span><select id="f-key" aria-label="Key"></select></label>
+          <label class="lcd-field"><select id="f-scale" aria-label="Scale"></select></label>
+        </div>
+      </div>
+    </div>
+
+    <div class="module window">
+      <div class="glass" id="deck-glass">
+        <canvas id="deck-canvas" aria-label="Tape deck visual" role="img"></canvas>
+        <canvas id="vu-canvas" aria-label="Master VU meters" role="img"></canvas>
+        <span class="wake" id="wake">Press play to wake the deck</span>
+      </div>
+    </div>
+
+    <div class="module masterctl" id="masterctl" aria-label="Master"></div>
+
+    <div class="module proj">
+      <button class="key proj-btn" id="proj-btn" aria-haspopup="true" aria-expanded="false"><span class="nm" id="proj-name">Morning Tape</span><svg><use href="#i-chev"/></svg></button>
+      <div class="proj-meta">
+        <div class="proj-state" id="proj-state"><i></i><span>Saved</span></div>
+        <button class="key sm" id="b-settings" aria-haspopup="true" aria-expanded="false" title="Settings (Light mode for slower computers)"><svg><use href="#i-set"/></svg>Settings</button>
+      </div>
+      <div class="proj-row">
+        <button class="key sm" id="b-undo" aria-label="Undo (Ctrl+Z)" title="Undo (Ctrl+Z)"><svg><use href="#i-undo"/></svg></button>
+        <button class="key sm" id="b-redo" aria-label="Redo (Ctrl+Shift+Z)" title="Redo (Ctrl+Shift+Z)"><svg><use href="#i-redo"/></svg></button>
+        <button class="key sm signal" id="b-export" title="Export WAV + MP3"><svg><use href="#i-export"/></svg>Export</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="body" id="body">
+    <section class="module arrange" aria-label="Arrange">
+      <div class="tbar">
+        <span class="label"><b>02</b>Arrange</span>
+        <button class="key sm" id="a-add" title="New clip on the selected track at the playhead"><svg><use href="#i-plus"/></svg>Clip</button>
+        <button class="key sm" id="a-dup" title="Duplicate clip (Ctrl+D)"><svg><use href="#i-dup"/></svg>Duplicate</button>
+        <button class="key sm" id="a-del" title="Delete clip (Delete)"><svg><use href="#i-trash"/></svg>Delete</button>
+        <span class="sep"></span>
+        <label class="field"><span class="label">Snap</span><select class="sel" id="a-snap" aria-label="Snap"><option value="0">Off</option><option value="0.25">1/16</option><option value="0.5">1/8</option><option value="1" selected>Beat</option><option value="4">Bar</option></select></label>
+        <label class="field"><span class="label">Bars</span><input class="sel mono" id="a-len" type="number" min="4" max="256" style="width:58px;padding-right:6px" aria-label="Song length in bars"></label>
+        <span class="grow"></span>
+        <button class="key sm sq" id="a-follow" aria-pressed="true" title="Follow the playhead" aria-label="Follow the playhead"><span class="led"></span><svg><use href="#i-follow"/></svg></button>
+        <button class="key sm sq" id="a-zout" aria-label="Zoom out" title="Zoom out"><svg><use href="#i-zout"/></svg></button>
+        <button class="key sm sq" id="a-zin" aria-label="Zoom in" title="Zoom in"><svg><use href="#i-zin"/></svg></button>
+        <button class="key sm sq" id="a-tapes" aria-pressed="true" aria-label="Show Nico's tapes" title="Show Nico's tapes"><svg><use href="#i-panel"/></svg></button>
+      </div>
+      <div class="scroller" id="arr-scroll" data-scroll tabindex="-1"><div class="arr" id="arr"></div></div>
+    </section>
+
+    <aside class="module tapes" aria-label="Nico's tapes">
+      <div class="tbar"><span class="label"><b>03</b>Nico's tapes</span><span class="label" id="tape-count"></span></div>
+      <div class="scroller" data-scroll><ul class="tape-list" id="tape-list"></ul></div>
+    </aside>
+  </main>
+
+  <section class="module dock" id="dock" aria-label="Editor">
+    <div class="tbar">
+      <div class="tabs" role="tablist" aria-label="Editors">
+        <button class="key tab" role="tab" id="tab-notes" aria-controls="pane-notes" aria-selected="true"><span class="num">1</span>Notes</button>
+        <button class="key tab" role="tab" id="tab-sound" aria-controls="pane-sound" aria-selected="false"><span class="num">2</span>Sound</button>
+        <button class="key tab" role="tab" id="tab-fx" aria-controls="pane-fx" aria-selected="false"><span class="num">3</span>Effects</button>
+        <button class="key tab" role="tab" id="tab-mix" aria-controls="pane-mix" aria-selected="false"><span class="num">4</span>Mixer</button>
+        <button class="key tab" role="tab" id="tab-keys" aria-controls="pane-keys" aria-selected="false"><span class="num">5</span>Keys</button>
+      </div>
+      <span class="sep"></span>
+      <div class="dock-ctx" id="dock-ctx"></div>
+      <span class="grow"></span>
+      <div id="dock-tools" class="field"></div>
+    </div>
+    <div class="dock-body">
+      <div class="pane" id="pane-notes" role="tabpanel" aria-labelledby="tab-notes"></div>
+      <div class="pane" id="pane-sound" role="tabpanel" aria-labelledby="tab-sound" hidden></div>
+      <div class="pane" id="pane-fx" role="tabpanel" aria-labelledby="tab-fx" hidden></div>
+      <div class="pane" id="pane-mix" role="tabpanel" aria-labelledby="tab-mix" hidden></div>
+      <div class="pane" id="pane-keys" role="tabpanel" aria-labelledby="tab-keys" hidden></div>
+    </div>
+  </section>
+</div>
+
+<section class="phone" id="phone" aria-label="Slowreel pocket">
+  <div class="ph-head">
+    <div class="brand-name"><svg aria-hidden="true" width="22" height="22"><use href="#i-fox"/></svg>Slowreel</div>
+    <div class="label">Pocket mode<br>for Nicofoxheart</div>
+  </div>
+  <div class="module ph-window">
+    <div class="glass">
+      <canvas id="ph-deck" role="img" aria-label="Tape deck visual"></canvas>
+      <div class="ph-meta"><strong id="ph-title">Morning Tape</strong><span id="ph-time">00:00</span></div>
+      <div class="ph-bar"><i id="ph-bar"></i></div>
+    </div>
+  </div>
+  <div class="ph-transport">
+    <button class="key" id="ph-return" aria-label="Return to start"><svg><use href="#i-return"/></svg></button>
+    <button class="key dark" id="ph-play" aria-label="Play" aria-pressed="false"><span class="led"></span><svg><use href="#i-play"/></svg></button>
+    <button class="key" id="ph-stop" aria-label="Stop"><svg><use href="#i-stop"/></svg></button>
+  </div>
+  <div class="seg" role="tablist" aria-label="Mode">
+    <button class="key" role="tab" id="ph-listen" aria-selected="true">Listen</button>
+    <button class="key" role="tab" id="ph-pads-tab" aria-selected="false">Play pads</button>
+  </div>
+  <div id="ph-listen-pane">
+    <ul class="ph-tracks" id="ph-tracks"></ul>
+    <p class="ph-note">Open Slowreel on a computer to arrange and edit.</p>
+  </div>
+  <div id="ph-pads-pane" hidden>
+    <div class="pad-ctl">
+      <select class="sel" id="ph-sound" aria-label="Pad sound"></select>
+      <button class="key" id="ph-oct-dn" aria-label="Octave down">-</button>
+      <span class="mono" id="ph-oct" aria-live="polite">Oct 4</span>
+      <button class="key" id="ph-oct-up" aria-label="Octave up">+</button>
+    </div>
+    <div class="pads" id="pads" style="margin-top:10px"></div>
+    <p class="ph-note" id="ph-scale-note"></p>
+  </div>
+</section>
+
+<div class="pop" id="proj-pop" hidden role="dialog" aria-label="Projects"></div>
+<div class="pop" id="set-pop" hidden role="dialog" aria-label="Settings"></div>
+
+<section class="pconly" id="pconly" hidden aria-labelledby="pc-title">
+  <div class="brand-name"><svg aria-hidden="true"><use href="#i-fox"/></svg>Slowreel</div>
+  <div class="module pc-window"><div class="glass"><canvas id="pc-reels" role="img" aria-label="The Slowreel tape reels, resting"></canvas></div></div>
+  <h1 id="pc-title">Slowreel is made for your computer.</h1>
+  <p>Open this link on your PC.</p>
+  <p class="label">An ambient tape studio for Nicofoxheart</p>
+</section>
+
+<div class="scrim" id="export-scrim" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="exp-title">
+    <header><h2 id="exp-title">Export master</h2><button class="key sm sq" id="exp-close" aria-label="Close"><svg><use href="#i-close"/></svg></button></header>
+    <div class="dbody" id="exp-body"></div>
+    <footer id="exp-foot"></footer>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script type="module" src="js/ui/app.js"></script>
