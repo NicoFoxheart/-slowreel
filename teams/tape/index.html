@@ -1,8 +1,9 @@
 <title>Slowreel</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500&family=Dela+Gothic+One&family=M+PLUS+Rounded+1c:wght@500&display=swap">
 <link rel="stylesheet" href="css/studio.css">
+<link rel="stylesheet" href="css/visual.css">
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <defs>
@@ -28,6 +29,7 @@
     <symbol id="i-follow" viewBox="0 0 16 16"><path d="M8 2v12M4 6L2 8l2 2M12 6l2 2-2 2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-panel" viewBox="0 0 16 16"><rect x="2.5" y="3" width="11" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10 3v10" stroke="currentColor" stroke-width="1.5"/></symbol>
     <symbol id="i-set" viewBox="0 0 16 16"><path d="M2.5 4.5h11M2.5 11.5h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10.5" cy="4.5" r="2" fill="var(--panel-hi,#fff)" stroke="currentColor" stroke-width="1.5"/><circle cx="5.5" cy="11.5" r="2" fill="var(--panel-hi,#fff)" stroke="currentColor" stroke-width="1.5"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 16 16"><path d="M8 13.5L2.9 8.6C1.6 7.3 1.6 5.2 2.9 4c1.2-1.1 3-1 4.1.2L8 5.3l1-1.1c1.1-1.2 2.9-1.3 4.1-.2 1.3 1.2 1.3 3.3 0 4.6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M3.2 4.6L3 1.8l2.4 1.5M12.8 4.6l.2-2.8-2.4 1.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
     <symbol id="i-fox" viewBox="0 0 24 24"><path d="M12 21.2L3.6 12.8C1.9 11 1.8 8.2 2.8 6.1L4.4 2.4l4.1 3.1c1.4-.3 2.6.1 3.5.9.9-.8 2.1-1.2 3.5-.9l4.1-3.1 1.6 3.7c1 2.1.9 4.9-.8 6.7z" fill="#EC4E20"/><path d="M12 21.2L8.8 12.6h6.4z" fill="#F7F8F7" opacity=".9"/></symbol>
   </defs>
 </svg>
@@ -84,6 +86,7 @@
       <div class="proj-row">
         <button class="key sm" id="b-undo" aria-label="Undo (Ctrl+Z)" title="Undo (Ctrl+Z)"><svg><use href="#i-undo"/></svg></button>
         <button class="key sm" id="b-redo" aria-label="Redo (Ctrl+Shift+Z)" title="Redo (Ctrl+Shift+Z)"><svg><use href="#i-redo"/></svg></button>
+        <button class="key sm" id="b-visual" title="Make a music video with the fox heart" aria-label="Music video"><svg><use href="#i-heart"/></svg>Video</button>
         <button class="key sm signal" id="b-export" title="Export WAV + MP3"><svg><use href="#i-export"/></svg>Export</button>
       </div>
     </div>
@@ -183,6 +186,8 @@
   <div class="module pc-window"><div class="glass"><canvas id="pc-reels" role="img" aria-label="The Slowreel tape reels, resting"></canvas></div></div>
   <h1 id="pc-title">Slowreel is made for your computer.</h1>
   <p>Open this link on your PC.</p>
+  <button class="key dark pc-video" id="pc-video"><svg aria-hidden="true"><use href="#i-heart"/></svg>Make a music video</button>
+  <p class="pm-note">Turn one of your songs, or a song on this phone, into a video with the fox heart.</p>
   <p class="label">An ambient tape studio for Nicofoxheart</p>
 </section>
 
@@ -196,4 +201,5 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
 <script type="module" src="js/ui/app.js"></script>

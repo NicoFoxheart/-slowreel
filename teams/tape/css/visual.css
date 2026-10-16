@@ -1,0 +1,74 @@
+/* Slowreel - the music video window (PC) and the phone video maker. Same chassis language: light keys, dark glass for
+   anything that shows the picture. Uses the tokens in studio.css. */
+.dialog footer .grow, .vz-dialog footer .grow { flex: 1; }
+.vz-dialog { width: min(1060px, calc(100vw - 32px)); max-height: calc(100vh - 32px); display: flex; flex-direction: column; }
+.vz-dialog header .label { display: block; margin-top: 6px; }
+.vz-body { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(300px, 1fr); gap: 18px; padding: 16px 18px; overflow: auto; }
+.vz-left { display: grid; grid-template-rows: 1fr auto; gap: 10px; min-height: 0; }
+.vz-stage { height: min(62vh, 600px); min-height: 280px; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 40%, #1d1640, #0d0b1f 75%); }
+.vz-stage canvas { display: block; border-radius: 4px; box-shadow: 0 0 0 1px rgba(255,255,255,.06), 0 10px 30px rgba(0,0,0,.45); }
+.vz-canvas { display: grid; place-items: center; width: 100%; height: 100%; }
+.vz-stage .vz-canvas:empty { display: none; }
+.vz-wait { color: var(--glass-dim); font: 500 12px/1.4 var(--f-sans); text-align: center; padding: 0 24px; }
+.vz-under { display: flex; align-items: center; gap: 10px; }
+.vz-under .pm-note { flex: 1; }
+.vz-right { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.vz-src { display: grid; gap: 4px; }
+.vz-src strong { font: 700 16px/1.2 var(--f-sans); font-stretch: 105%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vz-group { display: grid; gap: 6px; }
+.vz-fmts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.vz-fmt { flex-direction: column; align-items: flex-start; height: auto; min-height: 76px; padding: 10px; gap: 6px; text-align: left; white-space: normal; }
+.vz-fmt span { display: grid; gap: 2px; }
+.vz-fmt strong { font: 800 14px/1 var(--f-sans); }
+.vz-fmt small { font: 500 10px/1.25 var(--f-sans); color: var(--ink-3); letter-spacing: 0; }
+.vz-fmt em { font-style: normal; font-size: 10px; color: var(--ink-3); }
+.vz-shape { --ar: 1; display: block; height: 18px; width: calc(18px * var(--ar)); max-width: 32px; border-radius: 2px; border: 1.5px solid currentColor; opacity: .6; }
+.vz-fmt[aria-pressed="true"], .vz-mood[aria-pressed="true"], .vm-song[aria-pressed="true"] { background: linear-gradient(#3A3F43, #24282B); color: #F2F3F1; box-shadow: inset 0 1px 0 rgba(255,255,255,.14), inset 0 -2px 0 rgba(0,0,0,.35), 0 2px 4px rgba(20,24,26,.25); }
+.vz-fmt[aria-pressed="true"] small, .vz-fmt[aria-pressed="true"] em { color: #B9C0BD; }
+.vz-two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.vz-field { display: grid; gap: 6px; min-width: 0; }
+.vz-field .label b { color: var(--ink); margin-left: 4px; }
+.vz-in { height: 34px; border-radius: 6px; border: 0; box-shadow: inset 0 0 0 1px var(--seam-strong); padding: 0 10px; background: #fff; font: var(--t-name); min-width: 0; width: 100%; }
+.vz-in:focus-visible { box-shadow: inset 0 0 0 1px var(--seam-strong), var(--focus); }
+.vz-moods { display: flex; gap: 6px; flex-wrap: wrap; }
+.vz-mood { flex: 1; min-height: 34px; justify-content: flex-start; }
+.vz-mood i { width: 14px; height: 14px; border-radius: 50%; flex: none; box-shadow: 0 0 0 1px rgba(0,0,0,.15); }
+.vz-range { width: 100%; accent-color: var(--ink); height: 24px; margin: 0; }
+.vz-specs strong { font-size: 13px; }
+.vz-status { min-height: 18px; margin: 0; font: 600 12px/1.45 var(--f-sans); color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.vz-status.err { color: var(--signal); }
+.vz-right .progress i, .vmaker .progress i { background: linear-gradient(90deg, #ff8fc7, #ffb36b); }
+.vz-right #vz-note { margin: -6px 0 0; }
+@media (max-width: 900px) { .vz-body { grid-template-columns: 1fr; } .vz-stage { height: 46vh; } }
+
+/* the phone: "made for your computer" screen gets a way in */
+.pconly .pc-video { min-height: 46px; padding: 0 18px; font-size: 14px; gap: 8px; margin-top: 6px; }
+.pconly .pc-video svg { width: 18px; height: 18px; }
+.pconly .pm-note { max-width: 32ch; }
+html.vmaker-on .pconly { display: none !important; }
+.vmaker[hidden] { display: none !important; }
+.vmaker { display: flex; flex-direction: column; gap: 12px; max-width: 520px; margin: 0 auto; padding: 14px 16px 40px; min-height: 100vh; }
+.vm-head { display: flex; align-items: center; gap: 12px; }
+.vm-head h1 { margin: 0 0 4px; font: 800 22px/1 var(--f-sans); font-stretch: 108%; }
+.vm-head .key { min-height: 40px; }
+.vm-card { background: var(--panel); border-radius: var(--r-chassis); box-shadow: 0 0 0 1px var(--seam), 0 1px 0 var(--seam-hi), 0 4px 14px rgba(20,24,26,.08); padding: 14px; display: grid; gap: 12px; }
+.vm-card h2 { margin: 0; }
+.vm-songs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.vm-song { min-height: 48px; height: auto; padding: 8px 10px; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; white-space: normal; text-align: left; }
+.vm-song .nm { font: 600 13px/1.15 var(--f-sans); }
+.vm-song .mono { font-size: 10px; color: var(--ink-3); }
+.vm-song[aria-pressed="true"] .mono { color: #B9C0BD; }
+.vm-import { min-height: 46px; font-size: 13px; cursor: pointer; }
+.vm-import:focus-within { box-shadow: var(--focus); }
+.vm-stage { height: min(58vh, 500px); display: grid; place-items: center; background: radial-gradient(ellipse at 50% 40%, #1d1640, #0d0b1f 75%); }
+.vm-stage canvas { display: block; border-radius: 4px; }
+.vm-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.vm-row .key { min-height: 42px; }
+.vm-seg .key { min-height: 38px; padding: 0 14px; font-size: 13px; }
+.vm-row .segk { margin-left: auto; }
+.vmaker .vz-mood { min-height: 44px; font-size: 12px; }
+.vmaker .vz-in { height: 42px; font-size: 16px; }
+.vm-warn { margin: 0; padding: 10px 12px; border-radius: 8px; background: color-mix(in srgb, var(--saffron) 16%, var(--panel-hi)); font: 600 13px/1.4 var(--f-sans); color: var(--ink); }
+.vm-go { justify-content: flex-end; }
+.vm-go .key.signal { min-height: 48px; padding: 0 20px; font-size: 14px; flex: 1; }
+.vmaker .key.off { opacity: .45; }

@@ -19,4 +19,14 @@ Open `index.html` (artifact form). The demo song loads ready to play; press Play
 - Publish with capabilities `{ downloads: true, db: {}, user: {} }`.
 - **Tests**: `node shared/qa.cjs teams/tape` (QA tool) and `node teams/tape/tests/run-sound.cjs` (sound engine, ~140 s).
   `window.__studio` also has test-only helpers: `meters()`, `playFrom(beat)`, `info()`, `setLight(on)`, `speedProbe()`.
-- **Not done yet**: video export (stretch), stems, automation lanes, Web MIDI.
+- **Music video** (`js/visual/`): Nico's glowing fox heart (three.js 0.160.0 via the import map) as a music-video scene. "Video" in
+  the transport, "Music video" in the export dialog and "Video" on each of Nico's tapes open the window (`visual-panel.js`):
+  live preview, 9:16 1080x1920 / 16:9 1920x1080 / 1:1 1080x1080, title + artist, 3 moods, intensity. Export: audio first (engine.render
+  for a project, the mp3 decoded unchanged for a song), per-frame audio numbers (`features.js`, deterministic), frames rendered in a
+  worker (`render-worker.js` + `video-core.js`) and encoded with WebCodecs: H.264 + AAC in .mp4 (mp4-muxer 5.2.2), else VP9 + Opus in
+  .webm (webm-muxer 5.1.4, the window says so), else lib/export.js recordVideo in real time. The preview draws in its own worker
+  (`preview.js` + `preview-worker.js`, OffscreenCanvas; `?preview=page` draws on the page) only while the window is open, 30 fps cap,
+  DPR <= 1.5. Phones: "Make a music video" on the PC-only screen opens `phone-maker.js` (his 9 songs or a file from the phone,
+  720x1280 or 1080x1920, lighter scene, Wake Lock). Test: `node teams/tape/tests/video.cjs` (results in qa/video-results.json).
+  `window.__studio.exportVideo({format, seconds, source})` -> `{bytes, mime, width, height, frames, hasAudio}`.
+- **Not done yet**: stems, automation lanes, Web MIDI.

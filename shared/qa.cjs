@@ -60,6 +60,8 @@ server.listen(0, async () => {
       const j = u.match(/^https:\/\/cdn\.jsdelivr\.net\/npm\/three@0\.160\.0\/((?:build|examples)\/[^?#]+)/);
       const tl = '/home/user/nicofoxheart/redesign/shared/three@0.160.0';
       if (j && fs.existsSync(path.join(tl, j[1]))) return r.fulfill({ path: path.join(tl, j[1]), contentType: 'text/javascript', headers: { 'Access-Control-Allow-Origin': '*' } });
+      const mx = u.match(/^https:\/\/cdn\.jsdelivr\.net\/npm\/((?:mp4|webm)-muxer@5\.(?:2\.2|1\.4))\/(build\/[^?#]+)/);   // video export muxers (vendored in shared/vendor)
+      if (mx && fs.existsSync(path.join(ROOT, 'shared/vendor', mx[1], mx[2]))) return r.fulfill({ path: path.join(ROOT, 'shared/vendor', mx[1], mx[2]), contentType: 'text/javascript', headers: { 'Access-Control-Allow-Origin': '*' } });
       blocked.push(u); return r.abort(); });
     await page.goto(base, { waitUntil: 'load' }); await page.waitForTimeout(4000);
     const metrics = await page.evaluate(() => {

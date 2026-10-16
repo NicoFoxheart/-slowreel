@@ -15,6 +15,7 @@ import { TRACK_COLORS } from './sample-project.js';
 import { SONGS, loadSong } from '../../lib/songs.js';
 import { openProjects, autosave } from '../../lib/storage.js';
 import { measure } from '../../lib/export.js';
+import { initVisual, openVisual, isVisualOpen, exportVideoFor } from '../visual/visual-panel.js';
 
 const $ = id => document.getElementById(id);
 const LAST_KEY = 'slowreel:last';
@@ -193,9 +194,10 @@ function renderTapes() {
     const li = h('li', { class: 'tape', id: `tape-${s.id}`, style: { '--c': TRACK_COLORS[i % TRACK_COLORS.length] } },
       h('h3', { text: s.title, title: s.title }), h('span', { class: 'dur', text: fmtDur(s.duration) }), cv,
       h('div', { class: 'acts' },
-        h('button', { class: 'key sm', id: `tape-listen-${s.id}`, 'aria-pressed': 'false', 'aria-label': `Listen to ${s.title}`, onclick: () => togglePreview(s.id) }, icon('play'), 'Listen'),
-        h('button', { class: 'key sm', id: `tape-clip-${s.id}`, 'aria-label': `Add ${s.title} as a song clip at the playhead`, title: 'Add a section of this song to a song track', onclick: () => addSongClip(s.id) }, icon('plus'), 'Clip'),
-        h('button', { class: 'key sm', id: `tape-cloud-${s.id}`, 'aria-label': `Make a Song Cloud instrument from ${s.title}`, title: 'Turn this song into a playable granular pad', onclick: () => addCloud(s.id) }, icon('cloud'), 'Cloud')));
+        h('button', { class: 'key sm', id: `tape-listen-${s.id}`, 'aria-pressed': 'false', 'aria-label': `Listen to ${s.title}`, onclick: () => togglePreview(s.id) }, icon('play'), h('span', { class: 'lb', text: 'Listen' })),
+        h('button', { class: 'key sm', id: `tape-clip-${s.id}`, 'aria-label': `Add ${s.title} as a song clip at the playhead`, title: 'Add a section of this song to a song track', onclick: () => addSongClip(s.id) }, icon('plus'), h('span', { class: 'lb', text: 'Clip' })),
+        h('button', { class: 'key sm', id: `tape-cloud-${s.id}`, 'aria-label': `Make a Song Cloud instrument from ${s.title}`, title: 'Turn this song into a playable granular pad', onclick: () => addCloud(s.id) }, icon('cloud'), h('span', { class: 'lb', text: 'Cloud' })),
+        h('button', { class: 'key sm', id: `tape-video-${s.id}`, 'aria-label': `Make a music video of ${s.title}`, title: 'Make a music video of this song (the fox heart)', onclick: () => openVisual({ kind: 'song', id: s.id }) }, icon('heart'), h('span', { class: 'lb', text: 'Video' }))));
     ul.append(li);
     requestAnimationFrame(() => drawPeaks(cv, s.peaks, getComputedStyle(li).getPropertyValue('--c')));
   });
@@ -357,7 +359,7 @@ function finishRecording() {
 const typing = el => el && (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
 window.addEventListener('keydown', e => {
   if (e.key === 'Escape') { closeProj(); if (!$('export-scrim').hidden && !exporting) closeExport(); return; }
-  if (typing(e.target) || !$('export-scrim').hidden) return;
+  if (typing(e.target) || !$('export-scrim').hidden || isVisualOpen()) return;
   const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
   if (mod && k === 'z') { e.preventDefault(); e.shiftKey ? doRedo() : doUndo(); return; }
   if (mod && k === 'y') { e.preventDefault(); doRedo(); return; }
@@ -475,7 +477,8 @@ function openExport() {
       h('li', { id: `st-${id}` }, h('i'), h('span', { text: n }), h('span', { class: 'mono', text: '' })))),
     h('div', { class: 'progress', 'aria-hidden': 'true' }, h('i', { id: 'exp-bar' })));
   $('exp-foot').innerHTML = '';
-  $('exp-foot').append(h('button', { class: 'key', id: 'exp-cancel', text: 'Close', onclick: () => { if (exporting) exportAbort?.abort(); closeExport(); } }),
+  $('exp-foot').append(h('button', { class: 'key', id: 'exp-video', title: 'A music video with the fox heart and this mix', onclick: () => { if (exporting) return; closeExport(); openVisual({ kind: 'project' }); } }, icon('heart'), 'Music video'), h('span', { class: 'grow' }),
+    h('button', { class: 'key', id: 'exp-cancel', text: 'Close', onclick: () => { if (exporting) exportAbort?.abort(); closeExport(); } }),
     h('button', { class: 'key signal', id: 'exp-go', onclick: runExport }, icon('export'), 'Export'));
   $('export-scrim').hidden = false; $('exp-go').focus();
 }
@@ -627,6 +630,11 @@ window.__studio = {
   },
   async renderOffline(seconds = 8) { const { buf } = await renderProject({ seconds, tailSeconds: 0 }); const m = measure(buf); return { ...m, seconds: +buf.duration.toFixed(2) }; },
   async exportMaster({ seconds = 6 } = {}) { return exportMaster({ seconds }); },
+  // music video (test hook): source 'project' or a song id; returns {bytes, mime, width, height, frames, hasAudio, codec, saveStatus}
+  async exportVideo({ format = '9:16', seconds = 4, source = 'project', mood, intensity } = {}) {
+    const r = await exportVideoFor({ source: source === 'project' ? { kind: 'project' } : { kind: 'song', id: source }, format, seconds, mood, intensity });
+    return { bytes: r.bytes, mime: r.mime, width: r.width, height: r.height, frames: r.frames, hasAudio: r.hasAudio, codec: r.codec, note: r.note, where: r.where, saveStatus: r.saveStatus };
+  },
   // extra test helpers (not in the contract): per-track meters, play from a beat, the live project and backend
   meters() { const o = {}; for (const t of S.project.tracks) o[t.name] = S.engine.meter(t.id); return o; },
   playFrom(beat) { play(beat); return true; },
@@ -642,6 +650,8 @@ else {
   initRoll($('pane-notes'));
   initPanels({ sound: $('pane-sound'), fx: $('pane-fx'), mix: $('pane-mix'), keys: $('pane-keys') });
   // pocket mode: only for a narrow window on a computer (phones get the made-for-your-computer screen instead)
+  initVisual({ S, play: () => play(), stop, togglePreview, stopPreview, previewId: () => preview?.id || null, openAudioExport: openExport, toast });
+  $('b-visual').onclick = () => openVisual({ kind: 'project' });
   initPhone({ play: () => play(), stop, returnToStart, keyOn: (tid, m) => { S.engine.noteOn(tid, m, 0.7); startLoop(); }, keyOff: (tid, m) => S.engine.noteOff(tid, m), startLoop });
   boot().catch(e => { console.error('[slowreel] boot failed', e); toast('Slowreel could not start: ' + (e?.message || e)); });
 }
@@ -652,5 +662,7 @@ function showPcOnly() {
   const cv = $('pc-reels'), d = createDeck(cv);
   const draw = () => d.draw({ playing: false, frac: 0.38, level: 0, analyser: null, dt: 0, still: true });
   requestAnimationFrame(draw); new ResizeObserver(() => requestAnimationFrame(draw)).observe(cv);
+  // the studio stays PC only, but a phone can make a music video of one of Nico's songs (or a file from the phone)
+  $('pc-video').onclick = () => import('../visual/phone-maker.js').then(m => m.openPhoneMaker()).catch(e => { console.error('[slowreel] video maker', e); });
 }
 void renderTab; void instDef; void kb;

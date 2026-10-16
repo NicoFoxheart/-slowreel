@@ -31,3 +31,6 @@ Old single run (stopped): wf_41114ea1-33c.
 - 05:25 composer DONE (demo-night-garage.json + tests/validate-night-garage.cjs; preview mp3 sent to Nico). Still waiting perf-engineer (watcher bo52oxmzu).
 - 05:26 Nico: ABORT round 2 for now, save for later; just finish stutter fix -> fast QA -> publish. DO NOT launch r2-integrate.js. Round-2 files exist but are not wired (no effect on app). TODO later: back up studio to a private repo (not in git yet!).
 - 17:19 perf-engineer hit limit (resets 9:40) but work was mostly done; my fast QA passed (desktop ok, phone computer-only screen, play ~15ms, export ok, one cold 427ms blip). Published Version 3. Round 2 still on hold (files not wired). Studio NOT backed up to git yet.
+- 17:32 BACKED UP to private repo NicoFoxheart/-slowreel commit 45c6eb7 (130 files). Clone at /home/user/-slowreel.
+- 10-16 10:23 Heart visualizer (fox-ear heart, 9:16/16:9/1:1, video+audio export): task wol94fr35 run wf_e597296e-335 (scratchpad/heart-visualizer.js). After: my fast QA -> publish -> push to -slowreel repo.
+- 10-16 10:27 Nico: add phone video maker -> stopped wol94fr35, relaunched: task wy73hzapn run wf_ca253eef-fcc (scratchpad/heart-visualizer.js, PC visual panel + phone 'Make a music video' page).

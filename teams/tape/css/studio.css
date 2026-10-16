@@ -103,7 +103,7 @@ button { cursor: pointer; }
 .awake .wake { opacity: 0; }
 
 .masterctl { flex: 0 0 auto; gap: 14px !important; }
-.proj { flex: 0 0 auto; flex-direction: column; align-items: stretch !important; justify-content: space-between; width: 176px; gap: 6px !important; }
+.proj { flex: 0 0 auto; flex-direction: column; align-items: stretch !important; justify-content: space-between; width: 222px; gap: 6px !important; }
 .proj-btn { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; text-align: left; }
 .proj-btn .nm { font: var(--t-name); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .proj-state { font: 500 10px/1 var(--f-mono); color: var(--ink-3); display: flex; gap: 6px; align-items: center; }
@@ -111,6 +111,7 @@ button { cursor: pointer; }
 .proj-state.dirty i { background: var(--saffron); }
 .proj-row { display: flex; gap: 6px; }
 .proj-row .key { flex: 1; }
+.proj-row #b-undo, .proj-row #b-redo { flex: 0 0 30px; padding: 0; }
 
 /* ------------------------------------------------------------------ keycaps */
 .key { position: relative; border: 0; border-radius: var(--r-key); background: linear-gradient(#FAFBFA, #EDEFED); box-shadow: var(--key-shadow); min-height: 30px; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font: 600 11px/1 var(--f-sans); letter-spacing: .04em; color: var(--ink); transition: transform .08s var(--ease), box-shadow .08s var(--ease), background .2s; white-space: nowrap; user-select: none; }
@@ -222,8 +223,9 @@ select.sel { appearance: none; -webkit-appearance: none; border: 0; border-radiu
 .tape h3 { margin: 0; font: var(--t-name); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tape .dur { font: 500 10px/1.3 var(--f-mono); color: var(--ink-3); align-self: center; }
 .tape canvas { grid-column: 1 / -1; width: 100%; height: 30px; display: block; }
-.tape .acts { grid-column: 1 / -1; display: flex; gap: 4px; }
-.tape .acts .key { flex: 1; }
+.tape .acts { grid-column: 1 / -1; display: grid; grid-template-columns: 30px repeat(3, minmax(0, 1fr)); gap: 4px; }
+.tape .acts .key { min-width: 0; padding: 0 6px; gap: 5px; }
+.tape .acts .key:first-child .lb { display: none; }   /* Listen: the play icon says it (aria-label keeps the words) */
 .tape.playing { box-shadow: 0 0 0 1.5px var(--c), 0 1px 0 var(--seam-hi); }
 
 /* ------------------------------------------------------------------ dock */
@@ -485,13 +487,18 @@ select.sel { appearance: none; -webkit-appearance: none; border: 0; border-radiu
 
 /* ------------------------------------------------------------------ narrower desktops */
 @media (max-width: 1360px) {
-  #vu-canvas { flex-basis: 104px; }
+  #vu-canvas { display: none; }
+  .window { min-width: 110px; }
+  .proj { width: 214px; }
+  .proj-row .key { padding: 0 7px; gap: 4px; }
   .brand { width: 150px; }
   .masterctl .knob.lg { --kw: 56px; }
 }
 @media (max-width: 1200px) {
   #vu-canvas { display: none; }
   .body { grid-template-columns: 1fr 230px; }
+  .tape .acts { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .tape .acts .lb { display: none; }
 }
 
 /* ------------------------------------------------------------------ phone: listen / play pads */
