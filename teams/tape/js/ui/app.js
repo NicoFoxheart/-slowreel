@@ -1,24 +1,24 @@
 // app.js - Slowreel boot + the deck (transport, counter, master), Nico's tapes, projects, export dialog, the dock,
 // QWERTY playing / recording, keyboard shortcuts, the visual loop and the test hook window.__studio.
 import { S, on, emit, edit, track, clipOf, clamp, uid, clone, bpb, songBeats, fmtTime, isSongTrack, instDef, isSongParam,
-  doUndo, doRedo, canUndo, canRedo, resetHistory } from './state.js';
-import { h, icon, knob } from './controls.js';
-import { loadEngine } from './engine.js';
-import { initArrange, render as renderArrange, fitZoom, zoomBy, setPlayhead, updateLoop, updateMeters, addClipHere, duplicateClip, deleteClip, addTrack, createClipAt, selectClip } from './arrange.js';
-import { initRoll, render as renderRoll, setRollHead, zoom as rollZoom } from './pianoroll.js';
-import { initPanels, renderTab, renderSongClip, updateMixMeters, animateCloud, KEYMAP, markKbKey } from './panels.js';
-import { createDeck, createVU } from './deck.js';
-import { exportMaster, renderProject, songSeconds, kb } from './exporter.js';
-import { initPhone, phoneFrame } from './phone.js';
-import { KEYS, CHORDS, scaleGroups } from './theory.js';
-import { TRACK_COLORS } from './sample-project.js';
-import { SONGS, loadSong } from '../../lib/songs.js';
-import { openProjects, autosave } from '../../lib/storage.js';
-import { measure } from '../../lib/export.js';
-import { initVisual, openVisual, isVisualOpen, exportVideoFor } from '../visual/visual-panel.js';
-import { mountStudio3D } from '../ui3d/studio3d.js';
-import { initSteps, renderSteps } from './steps.js';
-import { createLiveArp } from '../sound/arp.js';
+  doUndo, doRedo, canUndo, canRedo, resetHistory } from './state.js?v=7';
+import { h, icon, knob } from './controls.js?v=7';
+import { loadEngine } from './engine.js?v=7';
+import { initArrange, render as renderArrange, fitZoom, zoomBy, setPlayhead, updateLoop, updateMeters, addClipHere, duplicateClip, deleteClip, addTrack, createClipAt, selectClip } from './arrange.js?v=7';
+import { initRoll, render as renderRoll, setRollHead, zoom as rollZoom } from './pianoroll.js?v=7';
+import { initPanels, renderTab, renderSongClip, updateMixMeters, animateCloud, KEYMAP, markKbKey } from './panels.js?v=7';
+import { createDeck, createVU } from './deck.js?v=7';
+import { exportMaster, renderProject, songSeconds, kb } from './exporter.js?v=7';
+import { initPhone, phoneFrame } from './phone.js?v=7';
+import { KEYS, CHORDS, scaleGroups } from './theory.js?v=7';
+import { TRACK_COLORS } from './sample-project.js?v=7';
+import { SONGS, loadSong } from '../../lib/songs.js?v=7';
+import { openProjects, autosave } from '../../lib/storage.js?v=7';
+import { measure } from '../../lib/export.js?v=7';
+import { initVisual, openVisual, isVisualOpen, exportVideoFor } from '../visual/visual-panel.js?v=7';
+import { mountStudio3D } from '../ui3d/studio3d.js?v=7';
+import { initSteps, renderSteps } from './steps.js?v=7';
+import { createLiveArp } from '../sound/arp.js?v=7';
 
 const $ = id => document.getElementById(id);
 const LAST_KEY = 'slowreel:last';
@@ -470,7 +470,7 @@ async function restoreDemo() {
 // The second demo, "Night Garage" (Antent-style future garage: drums, 808, supersaw pad with pump, chops, arp, automation).
 // Fetched when asked for (demo-night-garage.json next to index.html); opening it always gives a fresh copy.
 async function nightGarageCopy() {
-  const r = await fetch('demo-night-garage.json', { cache: 'no-cache' }); if (!r.ok) throw new Error('HTTP ' + r.status);
+  const r = await fetch('demo-night-garage.json?v=7', { cache: 'no-cache' }); if (!r.ok) throw new Error('HTTP ' + r.status);
   const d = await r.json(); d.id = 'demo-night-garage'; d.schema = d.schema || 'nfx-studio/1'; d.updatedAt = Date.now(); return d;
 }
 async function openNightGarage() {
@@ -482,7 +482,7 @@ async function openNightGarage() {
 }
 // ---------------------------------------------------------------- recipes (js/recipes + js/ui/recipes-panel.js)
 let recipesMod = null;
-const recipesPanel = () => (recipesMod ||= import('./recipes-panel.js'));
+const recipesPanel = () => (recipesMod ||= import('./recipes-panel.js?v=7'));
 /** Load a recipe project the way opening a project or the demo does: the current tape is saved first, the recipe becomes
  *  the current project (its own id, saved, autosaved from here on) and starts with a clean undo history. */
 async function loadRecipeProject(project, recipe) {
@@ -698,7 +698,7 @@ window.__studio = {
   setLight(on) { setLight(on, { save: false }); return S.light; },
   speedProbe(seconds = 3) { return S.engine.speedProbe?.({ seconds }); },
   // load a recipe by id through the same path as the Recipes panel (tests)
-  async loadRecipe(id) { const m = await import('../recipes/recipes.js'); const r = m.recipeById?.(id) || m.RECIPES.find(x => x.id === id); if (!r) return null; const p = await loadRecipeProject(m.recipeProject ? m.recipeProject(r) : clone(r.project), r); return { id: p.id, name: p.name, tracks: p.tracks.length }; },
+  async loadRecipe(id) { const m = await import('../recipes/recipes.js?v=7'); const r = m.recipeById?.(id) || m.RECIPES.find(x => x.id === id); if (!r) return null; const p = await loadRecipeProject(m.recipeProject ? m.recipeProject(r) : clone(r.project), r); return { id: p.id, name: p.name, tracks: p.tracks.length }; },
 };
 
 // ---------------------------------------------------------------- go
@@ -722,6 +722,6 @@ function showPcOnly() {
   const draw = () => d.draw({ playing: false, frac: 0.38, level: 0, analyser: null, dt: 0, still: true });
   requestAnimationFrame(draw); new ResizeObserver(() => requestAnimationFrame(draw)).observe(cv);
   // the studio stays PC only, but a phone can make a music video of one of Nico's songs (or a file from the phone)
-  $('pc-video').onclick = () => import('../visual/phone-maker.js').then(m => m.openPhoneMaker()).catch(e => { console.error('[slowreel] video maker', e); });
+  $('pc-video').onclick = () => import('../visual/phone-maker.js?v=7').then(m => m.openPhoneMaker()).catch(e => { console.error('[slowreel] video maker', e); });
 }
 void renderTab; void instDef; void kb;

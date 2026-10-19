@@ -8,12 +8,12 @@ export async function loadEngine(context) {
   const wantReal = q ? q === 'real' : USE_REAL;
   if (wantReal) {
     try {
-      const m = await import('../sound/engine.js');
+      const m = await import('../sound/engine.js?v=7');
       const e = await m.createEngine({ context });
       e.isMock = false;
       return e;
     } catch (err) { console.warn('[slowreel] real engine unavailable, using the mock', err); }
   }
-  const m = await import('./mock-engine.js');
+  const m = await import('./mock-engine.js?v=7');
   return m.createEngine({ context });
 }

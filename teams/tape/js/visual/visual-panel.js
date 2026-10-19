@@ -1,11 +1,11 @@
 // visual-panel.js - the "Music video" window on the PC: live preview of Nico's fox heart, format, title / artist, mood,
 // intensity, and the frame-exact video export with the audio inside. Three.js loads only when the window first opens;
 // the preview renders only while it is open (30 fps cap, pixel ratio <= 1.5) and never touches the audio graph.
-import { h, icon } from '../ui/controls.js';
-import { SONGS, songUrl } from '../../lib/songs.js';
-import { FORMATS, pickCodecs, makeVideo, renderProjectAudio, decodeAudio, saveVideo } from './video.js';
-import { MOOD_LIST, fmtEta, kbmb, previewPacer } from './common.js';
-import { createPreview } from './preview.js';
+import { h, icon } from '../ui/controls.js?v=7';
+import { SONGS, songUrl } from '../../lib/songs.js?v=7';
+import { FORMATS, pickCodecs, makeVideo, renderProjectAudio, decodeAudio, saveVideo } from './video.js?v=7';
+import { MOOD_LIST, fmtEta, kbmb, previewPacer } from './common.js?v=7';
+import { createPreview } from './preview.js?v=7';
 
 let H = null;            // hooks from app.js
 let ui = null;           // open window state
@@ -184,7 +184,7 @@ function fitPreview() {
 function startLoop() { if (ui && !ui.raf && !document.hidden) { ui.pacer?.reset(); ui.raf = requestAnimationFrame(frame); } }
 function stopLoop() { if (ui?.raf) { cancelAnimationFrame(ui.raf); ui.raf = 0; } }
 let idleMod = null;
-import('./features.js').then(m => { idleMod = m; });
+import('./features.js?v=7').then(m => { idleMod = m; });
 function frame(now) {
   if (!ui) return;
   ui.raf = 0;
