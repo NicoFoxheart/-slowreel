@@ -2,3 +2,4 @@ node_modules/
 test-results/
 teams/*/qa/
 *.log
+shared/lib/tests/out/

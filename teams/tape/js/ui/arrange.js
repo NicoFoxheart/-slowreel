@@ -1,6 +1,6 @@
 // arrange.js - the multitrack timeline: track heads, lanes, clips (move / resize / duplicate / delete, also by keyboard),
 // ruler with seek + loop strip, playhead, zoom, snap. All edits go through state.edit / begin+end (undoable).
-import { S, on, emit, edit, begin, end, track, clipOf, snapTo, songBeats, bpb, uid, clamp, isSongTrack, instDef, optName } from './state.js';
+import { S, on, emit, edit, begin, end, track, clipOf, snapTo, songBeats, bpb, uid, clamp, isSongTrack, instDef, optName, instGroups } from './state.js';
 import { h } from './controls.js';
 import { SONGS, getSong } from '../../lib/songs.js';
 import { TRACK_COLORS } from './sample-project.js';
@@ -77,7 +77,7 @@ export function render() {
   const canAdd = p.tracks.length < MAX_TRACKS;
   rows.append(h('div', { class: 'add-row' },
     h('div', { class: 'thead' }, h('div', { class: 'add-btns' },
-      h('button', { class: 'key sm', id: 'add-inst-track', disabled: !canAdd, onclick: () => addTrack('instrument') }, '+ Instrument'),
+      h('button', { class: 'key sm', id: 'add-inst-track', disabled: !canAdd, 'aria-haspopup': 'true', 'aria-expanded': 'false', onclick: e => openInstPicker(e.currentTarget) }, '+ Instrument'),
       h('button', { class: 'key sm', id: 'add-song-track', disabled: !canAdd, onclick: () => addTrack('song') }, '+ Song track'))),
     h('div', { class: 'lane empty-lane', style: { width: laneW + 'px' } })));
   root.append(rows);
@@ -99,7 +99,7 @@ function trackRow(t, i) {
   const def = instDef(t.instrument?.id);
   const sel = t.id === S.sel.trackId;
   const preset = def?.presets.find(x => x.id === t.instrument?.preset);
-  const sub = isSongTrack(t) ? 'Song clips' : `${def?.name || t.instrument?.id || ''}${preset ? ' · ' + preset.name : ''}`;
+  const sub = isSongTrack(t) ? 'Song clips' : [def?.region && t.name === def?.name ? '' : (def?.name || t.instrument?.id || ''), def?.region, preset?.name].filter(Boolean).join(' · ');
   const nameBtn = h('button', { class: 'tname', id: `tn-${t.id}`, title: 'Double-click or F2 to rename', text: t.name });
   nameBtn.addEventListener('dblclick', () => rename(nameBtn, t));
   nameBtn.addEventListener('keydown', e => { if (e.key === 'F2') { e.preventDefault(); rename(nameBtn, t); } });
@@ -214,6 +214,35 @@ export function addTrack(kind, opts = {}) {
   S.sel.trackId = id; S.sel.clipId = null; emit('select');
   requestAnimationFrame(() => { scroller.scrollTop = scroller.scrollHeight; });
   return t;
+}
+// "+ Instrument": a picker grouped by region (Slowreel, Korean, Chinese, Japanese)
+let instPop = null;
+function closeInstPicker() {
+  if (!instPop) return; const { el, btn, off } = instPop; instPop = null;
+  el.remove(); off(); btn?.setAttribute('aria-expanded', 'false'); if (btn?.isConnected) btn.focus();
+}
+function openInstPicker(btn) {
+  if (instPop) { closeInstPicker(); return; }
+  const el = h('div', { class: 'pop inst-pop', id: 'inst-pop', role: 'dialog', 'aria-label': 'Add an instrument track' }, h('h2', { text: 'Add a track' }));
+  const body = h('div', { class: 'inst-groups', 'data-scroll': '' });
+  let n = 0;
+  for (const g of instGroups()) {
+    const grid = h('div', { class: 'cartridges', role: 'group', 'aria-label': g.label });
+    g.items.forEach(d => grid.append(h('button', { class: 'key cart', id: `add-inst-${d.id}`, style: { '--c': TRACK_COLORS[n++ % TRACK_COLORS.length] },
+      onclick: () => { closeInstPicker(); addTrack('instrument', { instrument: d.id }); } }, h('span', { class: 'sw' }), d.name)));
+    body.append(h('section', { class: 'inst-group' }, h('span', { class: 'label', text: g.label }), grid));
+  }
+  el.append(body);
+  document.body.append(el);
+  const r = btn.getBoundingClientRect(), H = Math.min(el.offsetHeight, innerHeight - 20);
+  el.style.left = Math.max(10, Math.min(innerWidth - el.offsetWidth - 10, r.left)) + 'px';
+  el.style.top = (r.bottom + 6 + H < innerHeight - 10 ? r.bottom + 6 : Math.max(10, r.top - 6 - H)) + 'px';
+  const outside = e => { if (!el.contains(e.target) && e.target !== btn && !btn.contains(e.target)) closeInstPicker(); };
+  const esc = e => { if (e.key === 'Escape') { e.stopPropagation(); closeInstPicker(); } };
+  document.addEventListener('pointerdown', outside, true); el.addEventListener('keydown', esc);
+  instPop = { el, btn, off: () => document.removeEventListener('pointerdown', outside, true) };
+  btn.setAttribute('aria-expanded', 'true');
+  el.querySelector('button')?.focus();
 }
 export function removeTrack(id) {
   const i = S.project.tracks.findIndex(t => t.id === id); if (i < 0) return;

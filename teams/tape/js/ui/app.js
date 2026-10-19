@@ -10,12 +10,13 @@ import { initPanels, renderTab, renderSongClip, updateMixMeters, animateCloud, K
 import { createDeck, createVU } from './deck.js';
 import { exportMaster, renderProject, songSeconds, kb } from './exporter.js';
 import { initPhone, phoneFrame } from './phone.js';
-import { SCALES, KEYS, CHORDS } from './theory.js';
+import { KEYS, CHORDS, scaleGroups } from './theory.js';
 import { TRACK_COLORS } from './sample-project.js';
 import { SONGS, loadSong } from '../../lib/songs.js';
 import { openProjects, autosave } from '../../lib/storage.js';
 import { measure } from '../../lib/export.js';
 import { initVisual, openVisual, isVisualOpen, exportVideoFor } from '../visual/visual-panel.js';
+import { mountStudio3D } from '../ui3d/studio3d.js';
 
 const $ = id => document.getElementById(id);
 const LAST_KEY = 'slowreel:last';
@@ -55,6 +56,7 @@ function demoCopy() { const d = clone(S.engine.demo); d.id = 'demo'; d.schema = 
 
 async function openProject(p, { fresh } = {}) {
   S.project = p; normalize(p);
+  recipesMod?.then(m => m.closeTips()).catch(() => { });   // tips of an earlier recipe never stay over another tape (the panel reopens them for its own load)
   const firstClip = p.tracks.find(t => t.clips.some(c => !c.song));
   S.sel.trackId = firstClip?.id || p.tracks[0]?.id || null; S.sel.clipId = firstClip?.clips.find(c => !c.song)?.id || null; S.sel.notes.clear();
   if (S.playing) stop();
@@ -78,7 +80,7 @@ function normalize(p) {
 // ---------------------------------------------------------------- header deck
 const keySel = $('f-key'), scaleSel = $('f-scale'), bpmIn = $('f-bpm'), lenIn = $('a-len');
 KEYS.forEach(k => keySel.append(h('option', { value: k, text: k })));
-SCALES.forEach(s => scaleSel.append(h('option', { value: s.id, text: s.name })));
+scaleGroups().forEach(g => scaleSel.append(h('optgroup', { label: g.label }, ...g.scales.map(s => h('option', { value: s.id, text: s.name })))));
 bpmIn.addEventListener('change', () => { const v = clamp(Math.round(+bpmIn.value || 70), 40, 160); bpmIn.value = v; edit(p => { p.bpm = v; }, { type: 'tempo' }); });
 keySel.addEventListener('change', () => edit(p => { p.key = keySel.value; }, { type: 'all' }));
 scaleSel.addEventListener('change', () => edit(p => { p.scale = scaleSel.value; }, { type: 'all' }));
@@ -403,7 +405,8 @@ async function fillProj() {
     h('div', { class: 'row' },
       h('button', { class: 'key', id: 'proj-new', onclick: newProject }, icon('plus'), 'New'),
       h('button', { class: 'key', id: 'proj-dup', onclick: dupProject }, icon('dup'), 'Duplicate'),
-      h('button', { class: 'key', id: 'proj-demo', title: 'Open a fresh copy of the demo song', onclick: restoreDemo }, 'Original demo')));
+      h('button', { class: 'key', id: 'proj-demo', title: 'Open a fresh copy of the demo song', onclick: restoreDemo }, 'Original demo'),
+      h('button', { class: 'key', id: 'proj-recipes', title: 'Starter projects that teach: Korean, Chinese, Japanese and ambient basics', onclick: () => { closeProj(); showRecipes(); } }, icon('book'), 'Recipes')));
   const ul = h('ul', { class: 'plist', 'data-scroll': '' });
   let list = [];
   try { await S.saver?.flush(); list = S.store ? await S.store.list() : []; } catch (e) { console.warn(e); }
@@ -450,6 +453,26 @@ async function restoreDemo() {
   try { await S.store?.save(d); } catch { }
   closeProj(); await openProject(d, { fresh: true }); toast('The original demo, fresh.');
 }
+// ---------------------------------------------------------------- recipes (js/recipes + js/ui/recipes-panel.js)
+let recipesMod = null;
+const recipesPanel = () => (recipesMod ||= import('./recipes-panel.js'));
+/** Load a recipe project the way opening a project or the demo does: the current tape is saved first, the recipe becomes
+ *  the current project (its own id, saved, autosaved from here on) and starts with a clean undo history. */
+async function loadRecipeProject(project, recipe) {
+  await S.saver?.flush();
+  const p = clone(project);
+  if (!p.id || p.id === S.project?.id) p.id = 'p-' + Date.now().toString(36);
+  p.createdAt = p.updatedAt = Date.now();
+  try { await S.store?.save(p); } catch (e) { console.warn('[slowreel] recipe save', e); }
+  await openProject(p, { fresh: true });
+  toast(`Recipe loaded: ${recipe?.title || p.name}. Press play.`);
+  return p;
+}
+async function showRecipes(opts = {}) {
+  try { const m = await recipesPanel(); m.openRecipes({ onLoad: loadRecipeProject, ...opts }); }
+  catch (e) { console.error('[slowreel] recipes', e); toast('Recipes could not open.'); }
+}
+$('b-recipes').onclick = () => showRecipes();
 async function deleteProject(id) {
   try { await S.store?.remove(id); } catch { }
   if (id === S.project.id) { S.saver?.cancel?.(); const d = demoCopy(); await openProject(d, { fresh: true }); }
@@ -513,6 +536,7 @@ on('toast', toast);
 // VU, song cloud), meters and level analysis run at 30 fps (20 fps in Light mode); in Light mode the whole loop runs
 // at 20 fps. Hidden canvases are skipped, the loop stops when the tab is hidden and sleeps 1.5 s after the music stops.
 const deck = createDeck($('deck-canvas')), vu = createVU($('vu-canvas'));
+const ui3d = mountStudio3D({ S, pcOnly: PC_ONLY_SCREEN });   // 3D studio deck (js/ui3d), setting 'ui3d', default on
 let raf = 0, lastT = 0, quietSince = 0, lastDecor = 0, decorN = 0, level = 0;
 const phoneMQ = matchMedia('(max-width: 760px)');
 const reduceMQ = matchMedia('(prefers-reduced-motion: reduce)');
@@ -539,6 +563,7 @@ function loop(now) {
     else {
       deck.draw({ playing: S.playing || !!preview, frac: clamp(frac, 0, 1), level, analyser: an, dt, still: reduceMQ.matches });
       moving = vu.draw({ analyser: an, playing: sounding || level > 0.001, dt });
+      ui3d.frame({ playing: S.playing || !!preview, frac: clamp(frac, 0, 1), level, beat });
       const levels = {}, mini = {};
       for (const t of S.project.tracks) { const m = S.engine.meter(t.id); levels[t.id] = m; mini[t.id] = clamp((m.rmsDb + 60) / 54, 0, 1); }
       updateMeters(mini); updateMixMeters(levels, S.engine.meter('master'));
@@ -555,7 +580,7 @@ function drawIdle() {
   const b = S.engine?.position().beat || 0;
   updateCounter(b);
   if (phoneMQ.matches) phoneFrame({ beat: b, dt: 0, level: 0, playing: false, frac: b / songBeats() });
-  else { deck.draw({ playing: false, frac: clamp(b / songBeats(), 0, 1), level: 0, analyser: null, dt: 0 }); vu.draw({ analyser: null, playing: false, dt: 1 }); }
+  else { deck.draw({ playing: false, frac: clamp(b / songBeats(), 0, 1), level: 0, analyser: null, dt: 0 }); vu.draw({ analyser: null, playing: false, dt: 1 }); ui3d.frame({ playing: false, frac: clamp(b / songBeats(), 0, 1), level: 0, beat: b }); }
   updateMeters({}); animateCloud(0, 0);
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden) { cancelAnimationFrame(raf); raf = 0; } else startLoop(); });
@@ -573,6 +598,7 @@ try { probeInfo = JSON.parse(lsGet(PROBE_KEY) || 'null'); } catch { }
 function setLight(on, { save = true, why = '' } = {}) {
   on = !!on; S.light = on;
   S.engine.setLight?.(on);
+  ui3d.setLight(on);
   if (save) lsSet(LIGHT_KEY, on ? 'on' : 'off');
   $('b-settings')?.classList.toggle('lit', on);
   if (!$('set-pop').hidden) fillSettings();
@@ -614,7 +640,7 @@ function fillSettings() {
   setPop.append(h('h2', { text: 'Settings' }),
     h('div', { class: 'set-row' }, btn),
     h('p', { class: 'pm-note', text: 'For slower computers: one shared short room instead of every reverb, no shimmer, half the voices and grains, calmer visuals. Your project and your exports keep the full sound.' }),
-    h('p', { class: 'pm-note', id: 'set-speed', text: speed }));
+    h('p', { class: 'pm-note', id: 'set-speed', text: speed }), ui3d.settingsRow());
 }
 
 // ---------------------------------------------------------------- test hook (BRIEF "Test contract")
@@ -641,6 +667,8 @@ window.__studio = {
   info() { return { engine: S.engine.isMock ? 'mock' : 'real', backend: S.store?.backend || null, projectId: S.project?.id, stats: S.engine?.stats?.(), light: S.light, pcOnlyScreen: PC_ONLY_SCREEN }; },
   setLight(on) { setLight(on, { save: false }); return S.light; },
   speedProbe(seconds = 3) { return S.engine.speedProbe?.({ seconds }); },
+  // load a recipe by id through the same path as the Recipes panel (tests)
+  async loadRecipe(id) { const m = await import('../recipes/recipes.js'); const r = m.recipeById?.(id) || m.RECIPES.find(x => x.id === id); if (!r) return null; const p = await loadRecipeProject(m.recipeProject ? m.recipeProject(r) : clone(r.project), r); return { id: p.id, name: p.name, tracks: p.tracks.length }; },
 };
 
 // ---------------------------------------------------------------- go

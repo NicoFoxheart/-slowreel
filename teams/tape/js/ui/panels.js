@@ -1,7 +1,7 @@
 // panels.js - the dock's Sound (instrument), Effects, Mixer and Keys panes, the song-clip editor and the
 // glowing Song Cloud window. Knob drags are live (engine.setParam) and land in undo history on release.
 import { S, on, emit, edit, begin, end, track, clipOf, clamp, bpb, isSongTrack, instDef, fxDef, optId, optName,
-  isSongParam, isEnum, isToggle, instValue, fxValue, songBeats } from './state.js';
+  isSongParam, isEnum, isToggle, instValue, fxValue, songBeats, instGroups } from './state.js';
 import { h, icon, knob, fader, meter, fmt } from './controls.js';
 import { SONGS, getSong } from '../../lib/songs.js';
 import { TRACK_COLORS } from './sample-project.js';
@@ -42,10 +42,17 @@ function renderSound() {
   } else {
     const def = instDef(t.instrument.id);
     // cartridges: instrument picker
-    const carts = h('div', { class: 'cartridges', role: 'group', 'aria-label': 'Instrument' });
-    S.engine.instruments.forEach((d, i) => carts.append(h('button', { class: 'key cart', id: `inst-${d.id}`, 'aria-pressed': String(d.id === t.instrument.id), style: { '--c': TRACK_COLORS[i % TRACK_COLORS.length] },
-      onclick: () => setInstrument(t, d) }, h('span', { class: 'sw' }), d.name)));
-    rack.append(unit(['Instrument', h('span', { class: 'label', text: def?.kind || '' })], '', carts));
+    // cartridges grouped by region (Slowreel's own, then Korean / Chinese / Japanese)
+    const carts = h('div', { class: 'cart-groups', 'data-scroll': '' });
+    let ci = 0;
+    for (const g of instGroups()) {
+      const grid = h('div', { class: 'cartridges', role: 'group', 'aria-label': g.label === 'Slowreel' ? 'Instrument' : g.label + ' instruments' });
+      g.items.forEach(d => grid.append(h('button', { class: 'key cart', id: `inst-${d.id}`, 'aria-pressed': String(d.id === t.instrument.id), style: { '--c': TRACK_COLORS[ci++ % TRACK_COLORS.length] },
+        onclick: () => setInstrument(t, d) }, h('span', { class: 'sw' }), d.name)));
+      carts.append(h('div', {}, h('span', { class: 'label', text: g.label }), grid));
+    }
+    rack.append(unit(['Instrument', h('span', { class: 'label', text: [def?.region, def?.kind].filter(Boolean).join(' · ') })], 'inst-unit', carts));
+    requestAnimationFrame(() => { const on = carts.querySelector('.cart[aria-pressed="true"]'); if (on && carts.scrollHeight > carts.clientHeight) carts.scrollTop = Math.max(0, on.getBoundingClientRect().top - carts.getBoundingClientRect().top - 30); });
     if (def) {
       const pre = h('div', { class: 'presets', role: 'group', 'aria-label': 'Presets' });
       def.presets.forEach(p => pre.append(h('button', { class: 'key', id: `preset-${p.id}`, 'aria-pressed': String(p.id === t.instrument.preset), text: p.name,

@@ -21,6 +21,10 @@ Live (private): https://claude.ai/artifact/R3AWvYoSn5cr4kq6LS7uyX
   granular "song clouds"; piano roll, QWERTY playing and recording, mixer, projects, export (zip with a 24-bit WAV + 320 kbps MP3).
 - **Stutter fix (live):** play starts in ~15 ms, page freezes during playback mostly under 0.1 s, lighter reverbs, a Light mode
   setting for weaker PCs, and a "made for your computer" screen on phones.
+- **East Asia + recipes + 3D (live, Version 5):** `js/sound/asian.js` adds 14 instruments / 52 presets (Korean gayageum, haegeum,
+  daegeum, janggu; Chinese guzheng, erhu, dizi, pipa, temple bells; Japanese koto, shakuhachi, shamisen, taiko, wind chimes) and 13
+  scales in the scale lock. `js/recipes/` + `js/ui/recipes-panel.js`: 12 beginner recipes (3 Korea, 3 China, 3 Japan, 3 basics) with
+  tips. `js/ui3d/` + `css/studio3d.css`: 3D clay tape-machine header drawn in a worker (Settings > 3D studio, off in Light mode).
 - **Round 2, the "Antent pack" (built and tested, NOT wired in yet, on hold):**
   - `teams/tape/js/sound/synths.js` + `arp.js`: Supersaw Dream Pad, Analog Poly, FM E-Piano, Synth Lead, Synth Bass, Pluck Synth,
     Vox Pad (30 presets) and an arpeggiator.

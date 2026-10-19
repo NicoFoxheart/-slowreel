@@ -1,0 +1,129 @@
+/* Slowreel - 3D studio layer (js/ui3d). Same design language as studio.css (light painted clay/aluminium you touch,
+   dark glass for anything that shows the sound, four signal colours), with richer depth, lighting and materials.
+   html.ui3d        the 3D deck is wanted and possible: taller one-piece deck, deeper keys and panels.
+   html.ui3d-ready  the worker is drawing: the clay machine shows through the deck, the 2D reels and the knob bodies hide.
+   Without these classes (Light mode, setting off, no WebGL/OffscreenCanvas, worker failure) the flat UI is untouched. */
+html.ui3d {
+  --room-hi: #D9DDD9;
+  --clay: #EEF0EC;
+  --clay-hi: #FAFBF9;
+  --clay-lo: #E1E5E1;
+  --lift-1: 0 1px 2px rgba(20, 24, 26, .10);
+  --lift-2: 0 14px 26px -16px rgba(20, 24, 26, .42);
+  --rim: inset 0 1px 0 rgba(255, 255, 255, .92), inset 0 -2px 0 rgba(18, 22, 24, .05);
+  --key-shadow: inset 0 1px 0 #FFFFFF, inset 0 -2px 0 rgba(18, 22, 24, .11), 0 0 0 1px rgba(18, 22, 24, .07), 0 1px 0 rgba(18, 22, 24, .06), 0 3px 6px -2px rgba(20, 24, 26, .22), 0 9px 14px -10px rgba(20, 24, 26, .36);
+  --key-shadow-down: inset 0 1px 3px rgba(0, 0, 0, .18), 0 0 0 1px rgba(18, 22, 24, .08), 0 1px 1px rgba(20, 24, 26, .10);
+}
+
+/* ------------------------------------------------------------------ room + panels */
+html.ui3d body {
+  background:
+    radial-gradient(1100px 420px at 34% -8%, rgba(255, 244, 226, .55), transparent 62%),
+    radial-gradient(900px 640px at 100% 110%, rgba(150, 160, 156, .45), transparent 70%),
+    linear-gradient(180deg, #CFD4D1 0%, #C4CAC7 100%);
+}
+html.ui3d .app { gap: 10px; }
+html.ui3d .app > .module, html.ui3d .body > .module {
+  background: linear-gradient(180deg, #F2F4F2 0%, #EBEEEC 100%);
+  border-radius: 12px;
+  box-shadow: var(--rim), 0 0 0 1px rgba(18, 22, 24, .10), var(--lift-1), var(--lift-2);
+}
+html.ui3d .tbar { border-bottom-color: rgba(18, 22, 24, .10); box-shadow: 0 1px 0 rgba(255, 255, 255, .7); }
+html.ui3d .tbar .label b { color: var(--signal); }
+
+/* ------------------------------------------------------------------ the deck: one clay machine */
+html.ui3d .deck {
+  position: relative; height: 128px; gap: 4px; padding: 0 6px; border-radius: var(--r-chassis);
+  background: linear-gradient(180deg, var(--clay-hi) 0%, var(--clay) 46%, var(--clay-lo) 100%);
+  box-shadow: inset 0 1px 0 #FFFFFF, inset 0 -3px 0 rgba(18, 22, 24, .07), 0 0 0 1px rgba(18, 22, 24, .11), 0 2px 3px rgba(20, 24, 26, .10), 0 22px 34px -18px rgba(20, 24, 26, .48);
+}
+html.ui3d .deck > .module { position: relative; z-index: 1; background: transparent; box-shadow: none; padding: 10px 8px; }
+.deck3d { position: absolute; inset: 0; z-index: 0; border-radius: inherit; overflow: hidden; pointer-events: none; opacity: 0; transition: opacity .7s var(--ease); }
+html.ui3d-ready .deck3d { opacity: 1; }
+.deck3d-canvas { display: block; width: 100%; height: 100%; }
+
+/* brand: debossed into the face */
+html.ui3d .brand { width: 140px; padding-left: 12px !important; }
+html.ui3d .brand-name { text-shadow: 0 1px 0 rgba(255, 255, 255, .9); }
+html.ui3d .brand-name svg { filter: drop-shadow(0 2px 2px rgba(150, 50, 15, .35)); }
+html.ui3d .brand-model, html.ui3d .tgroup .cap, html.ui3d .knob .kn-name { text-shadow: 0 1px 0 rgba(255, 255, 255, .85); }
+
+/* transport: taller keys that sit on the face */
+html.ui3d .key.big { height: 56px; border-radius: 12px; }
+html.ui3d .tgroup .cap { margin-top: 8px; }
+
+/* LCD: dark glass set into the clay (shadow at the top edge, light catching the bottom lip) */
+html.ui3d .lcd .glass {
+  width: 228px; border-radius: 10px;
+  background: radial-gradient(120% 90% at 30% 0%, #273035 0%, var(--glass) 60%), var(--glass);
+  box-shadow: inset 0 3px 9px rgba(0, 0, 0, .62), inset 0 0 0 1px rgba(255, 255, 255, .05), 0 1px 0 rgba(255, 255, 255, .95), 0 -1px 0 rgba(18, 22, 24, .18);
+}
+html.ui3d .lcd-counter { text-shadow: 0 0 10px rgba(238, 240, 234, .22); }
+
+/* tape window: while the 3D draws, the glass is clear and the niche behind it is the 3D scene */
+html.ui3d .window { padding: 8px 6px !important; }
+html.ui3d .window .glass { border-radius: 8px; }
+html.ui3d-ready .window .glass { background: transparent; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .06); }
+html.ui3d-ready .window .glass::after { background: linear-gradient(162deg, rgba(255, 255, 255, .13) 0%, rgba(255, 255, 255, .03) 34%, rgba(255, 255, 255, 0) 52%); }
+html.ui3d-ready #deck-canvas, html.ui3d-ready #vu-canvas { visibility: hidden; }
+
+/* master knobs: the 3D draws the clay bodies (and their glow); the DOM keeps the ticks, value arc and indicator line */
+html.ui3d .masterctl { gap: 12px !important; }
+html.ui3d-ready .masterctl .knob svg > circle:not(.kn-ring),
+html.ui3d-ready .masterctl .knob svg > g > circle,
+html.ui3d-ready .masterctl .knob svg > g > line:not(:last-child) { opacity: 0; }
+
+/* project corner */
+html.ui3d .proj { width: 214px; }
+
+/* ------------------------------------------------------------------ keycaps: deeper travel, a real lip */
+html.ui3d .key { background: linear-gradient(180deg, #FFFFFF 0%, #F4F6F4 55%, #E9ECEA 100%); }
+html.ui3d .key:hover { background: linear-gradient(180deg, #FFFFFF 0%, #F8F9F8 55%, #EEF0EE 100%); }
+html.ui3d .cart[aria-pressed="true"], html.ui3d .cart[aria-pressed="true"]:hover { background: linear-gradient(#3A3F43, #24282B); color: #fff; }
+html.ui3d .key:active, html.ui3d .key.down { transform: translateY(1.5px); }
+html.ui3d .key.big { box-shadow: inset 0 1px 0 #FFFFFF, inset 0 -3px 0 rgba(18, 22, 24, .12), 0 0 0 1px rgba(18, 22, 24, .08), 0 2px 0 rgba(18, 22, 24, .07), 0 6px 10px -3px rgba(20, 24, 26, .30), 0 16px 22px -14px rgba(20, 24, 26, .50); }
+html.ui3d .key.big:active, html.ui3d .key.big.down { transform: translateY(2px); box-shadow: var(--key-shadow-down); }
+html.ui3d .key.dark, html.ui3d .tab[aria-selected="true"] {
+  background: linear-gradient(180deg, #4A5055 0%, #2E3337 58%, #23272A 100%); color: #F2F3F1;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18), inset 0 -3px 0 rgba(0, 0, 0, .38), 0 0 0 1px rgba(0, 0, 0, .18), 0 4px 8px -2px rgba(20, 24, 26, .38), 0 12px 18px -12px rgba(20, 24, 26, .55);
+}
+html.ui3d .key.signal {
+  background: linear-gradient(180deg, #FF8257 0%, #EE5223 58%, #D8410F 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .38), inset 0 -3px 0 rgba(120, 30, 0, .25), 0 0 0 1px rgba(150, 40, 5, .25), 0 4px 8px -2px rgba(190, 60, 15, .40), 0 12px 18px -12px rgba(170, 50, 10, .55);
+}
+html.ui3d .key.signal:hover { background: linear-gradient(180deg, #FF8C63 0%, #F25C2D 58%, #DE4917 100%); }
+html.ui3d .key[aria-pressed="true"] .led { box-shadow: 0 0 6px 1px currentColor, 0 0 6px var(--signal); }
+html.ui3d .key.led-green[aria-pressed="true"] .led, html.ui3d .key.dark[aria-pressed="true"] .led { box-shadow: 0 0 8px 1px #57D19A; }
+html.ui3d .key.led-saffron[aria-pressed="true"] .led { box-shadow: 0 0 8px 1px var(--saffron); }
+/* a visible focus ring on every key (the depth shadows would otherwise hide it) */
+html.ui3d .key:focus-visible { box-shadow: 0 0 0 2px var(--panel-hi), 0 0 0 4px var(--cobalt), 0 6px 12px -6px rgba(20, 24, 26, .35); }
+
+select.sel { transition: box-shadow .15s var(--ease); }
+html.ui3d select.sel, html.ui3d .tbar input.sel { box-shadow: inset 0 1px 2px rgba(18, 22, 24, .14), inset 0 0 0 1px rgba(18, 22, 24, .10), 0 1px 0 rgba(255, 255, 255, .9); }
+
+/* ------------------------------------------------------------------ arrange + tapes + dock: a little more depth */
+html.ui3d .thead { background: linear-gradient(90deg, #F1F3F1, #ECEFED); }
+html.ui3d .thead.sel { background: linear-gradient(90deg, #FBFCFB, #F4F6F4); }
+html.ui3d .thead .chip { background: linear-gradient(90deg, color-mix(in srgb, var(--c) 82%, #fff), var(--c)); box-shadow: 1px 0 3px -1px color-mix(in srgb, var(--c) 60%, transparent); }
+html.ui3d .clip { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 55%, transparent), inset 0 1px 0 rgba(255, 255, 255, .6), 0 1px 1px rgba(20, 24, 26, .10), 0 4px 8px -5px rgba(20, 24, 26, .30); }
+html.ui3d .clip .ctop { background: linear-gradient(180deg, rgba(255, 255, 255, .22), rgba(255, 255, 255, 0) 70%), var(--c); text-shadow: 0 1px 0 rgba(0, 0, 0, .15); }
+html.ui3d .clip.sel { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 55%, transparent), 0 0 0 2px var(--ink), 0 8px 16px -6px rgba(20, 24, 26, .38); }
+html.ui3d .playhead { box-shadow: 0 0 6px rgba(236, 78, 32, .45); }
+html.ui3d .tape { background: linear-gradient(180deg, #FCFDFC, #F4F6F4); box-shadow: 0 0 0 1px rgba(18, 22, 24, .09), inset 0 1px 0 #FFFFFF, 0 6px 12px -9px rgba(20, 24, 26, .38); }
+html.ui3d .tape.playing { box-shadow: 0 0 0 1.5px var(--c), 0 0 16px -4px var(--c), 0 6px 12px -9px rgba(20, 24, 26, .38); }
+html.ui3d .tab .num { color: var(--ink-4); }
+html.ui3d .fader .cap { background: linear-gradient(#4A5055 0%, #2E3337 48%, #202427 52%, #3A4044 100%); box-shadow: 0 4px 8px -1px rgba(0, 0, 0, .35), 0 1px 0 rgba(255, 255, 255, .12) inset, 0 0 0 1px rgba(0, 0, 0, .25); }
+html.ui3d .knob svg { filter: drop-shadow(0 2px 1.5px rgba(20, 24, 26, .22)); }
+html.ui3d-ready .masterctl .knob svg { filter: none; }
+html.ui3d .pop, html.ui3d .dialog { box-shadow: 0 0 0 1px rgba(18, 22, 24, .14), inset 0 1px 0 #FFFFFF, 0 24px 48px -12px rgba(20, 24, 26, .40); }
+.pop .set-ui3d { flex-direction: column; align-items: stretch; gap: 8px; padding-top: 4px; border-top: 1px solid var(--seam); }
+
+/* narrow desktops: give the tape window a little more room */
+@media (max-width: 1360px) {
+  html.ui3d .brand { width: 128px; }
+  html.ui3d .brand-name { font-size: 19px; }
+  html.ui3d .lcd .glass { width: 216px; }
+  html.ui3d .proj { width: 206px; }
+  html.ui3d .masterctl { gap: 8px !important; }
+}
+@media (max-width: 760px) { .deck3d { display: none; } }

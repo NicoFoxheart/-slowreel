@@ -172,6 +172,23 @@ export async function createEngine({ context, songBaseUrl = 'audio/', light = fa
     } else { tr.def = null; tr.params = null; }
     return tr;
   }
+  // instruments that make buffers per pitch (asian.js plucked strings: def.prewarm) get them made here, before play(),
+  // in slices of ~10 ms on a live context so loading never blocks the page for long
+  let warmGen = 0;
+  async function prewarm(p, onlyTrackId) {
+    const jobs = [], gen = ++warmGen;
+    for (const spec of p?.tracks || []) {
+      if (spec.kind === 'song' || (onlyTrackId && spec.id !== onlyTrackId)) continue;
+      const tr = tracks.get(spec.id); if (!tr?.def?.prewarm || !tr.params) continue;
+      const ms = new Set(); for (const c of spec.clips || []) for (const n of c.notes || []) ms.add(n.p);
+      for (const m of ms) jobs.push([tr.def, tr.params, m]);
+    }
+    let t0 = performance.now();
+    for (const [def, params, m] of jobs) {
+      try { def.prewarm(ctx, params, m); } catch (e) { console.warn('[tape] prewarm', def.id, e); }
+      if (!offline && performance.now() - t0 > 10) { await new Promise(r => setTimeout(r, 0)); if (gen !== warmGen && !onlyTrackId) return; t0 = performance.now(); }
+    }
+  }
   function applyMixer(t = ctx.currentTime) {
     const anySolo = project.tracks.some(s => s.solo);
     for (const s of project.tracks) {
@@ -379,7 +396,8 @@ export async function createEngine({ context, songBaseUrl = 'audio/', light = fa
     reverbTypes: REVERB_TYPES,
     demo: clone(DEMO),
     instruments: INSTRUMENTS.map(i => ({
-      id: i.id, name: i.name, kind: i.kind, maxVoices: i.maxVoices,
+      id: i.id, name: i.name, kind: i.kind, maxVoices: i.maxVoices, region: i.region || '',
+      ...(i.drumMap ? { drumMap: i.drumMap.map(d => ({ midi: d.midi, name: d.name, short: d.short })) } : {}),
       presets: i.presets.map(p => ({ id: p.id, name: p.name })),
       macros: i.macros.map(id => { const p = i.params.find(x => x.id === id); return { id, name: p.name, min: p.min, max: p.max, default: p.default, unit: p.unit }; }),
       params: i.params.map(p => ({ ...p })),
@@ -416,7 +434,7 @@ export async function createEngine({ context, songBaseUrl = 'audio/', light = fa
       const want = songsInProject(project);
       // songs are decoded and every buffer the graph needs is made here (worker / idle time), never on play()
       await Promise.all([...want.map(id => loadSong(ctx, id, songBaseUrl).catch(e => console.warn('[tape] song failed to load', id, e))),
-        assetsReady().catch(e => console.warn('[tape] assets', e))]);
+        assetsReady().catch(e => console.warn('[tape] assets', e)), prewarm(project).catch(e => console.warn('[tape] prewarm', e))]);
       if (!offline) ensureBasics(ctx.sampleRate).catch(() => { });   // night rain too, in the background, for later edits
       return engine;
     },
@@ -466,14 +484,14 @@ export async function createEngine({ context, songBaseUrl = 'audio/', light = fa
     applyChange(p, change = {}) {
       if (p !== project) return engine.load(p);
       const type = change.type;
-      if (type === 'notes' || type === 'clips' || type === 'clip') { endBeat = projectBeats(); if (change.trackId && tracks.get(change.trackId)?.spec.kind === 'song') engine.load(p); return; }
+      if (type === 'notes' || type === 'clips' || type === 'clip') { endBeat = projectBeats(); if (change.trackId && tracks.get(change.trackId)?.spec.kind === 'song') engine.load(p); else if (!offline) prewarm(p, change.trackId).catch(() => { }); return; }
       if (type === 'mixer') { applyMixer(); return; }
       if (type === 'loop') { engine.setLoop(p.loop?.on, p.loop?.startBeat, p.loop?.endBeat); return; }
       if (type === 'tempo') {
         if (playing) { const now = ctx.currentTime; segs.push({ t: now, b: beatAt(now) }); if (segs.length > 3) segs.shift(); }
         allFx().forEach(f => f.retime && f.retime()); return;
       }
-      if (type === 'track' && change.trackId) { const spec = p.tracks.find(t => t.id === change.trackId); if (spec) { syncTrack(spec); applyMixer(); return; } }
+      if (type === 'track' && change.trackId) { const spec = p.tracks.find(t => t.id === change.trackId); if (spec) { syncTrack(spec); applyMixer(); if (!offline) prewarm(p, change.trackId).catch(() => { }); return; } }
       if (type === 'master') { syncBusesAndMaster(); return; }
       return engine.load(p);
     },

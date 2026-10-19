@@ -1,0 +1,18 @@
+const fs=require('fs'),path=require('path'),http=require('http');const{chromium}=require('playwright');
+const ROOT='/home/user/nicofoxheart/studio';
+const srv=http.createServer((q,r)=>{let u=decodeURIComponent(q.url.split('?')[0]);if(u.endsWith('/'))u+='index.html';const f=path.join(ROOT,u);if(!fs.existsSync(f)||fs.statSync(f).isDirectory()){r.writeHead(404);return r.end();}let b=fs.readFileSync(f);if(f.endsWith('.html')&&!/^\s*<!doctype/i.test(b))b=Buffer.from('<!doctype html><html><head><meta charset="utf8"></head><body>'+b+'</body></html>');r.writeHead(200,{'Content-Type':{'.js':'text/javascript','.css':'text/css','.html':'text/html'}[path.extname(f)]||'application/octet-stream'});r.end(b);});
+srv.listen(0,async()=>{const b=await chromium.launch({args:['--use-gl=swiftshader','--enable-unsafe-swiftshader','--autoplay-policy=no-user-gesture-required']});
+ const p=await b.newPage({viewport:{width:1440,height:900}});
+ await p.route('**/*',r=>{const u=r.request().url();if(u.startsWith('http://127.0.0.1'))return r.continue();const j=u.match(/three@0\.160\.0\/(build\/[^?#]+)/);if(j)return r.fulfill({path:'/home/user/nicofoxheart/redesign/shared/three@0.160.0/'+j[1],contentType:'text/javascript',headers:{'Access-Control-Allow-Origin':'*'}});r.abort();});
+ await p.goto(`http://127.0.0.1:${srv.address().port}/teams/tape/`);await p.waitForTimeout(6000);
+ const st=()=>p.evaluate(()=>window.__ui3d.stats());
+ const a=await st(); await p.waitForTimeout(3000); const b1=await st();
+ console.log('idle 3 s: frames', b1.frames-a.frames, 'awake', b1.awake);
+ await p.evaluate(()=>window.__studio.play()); const c=await st(); await p.waitForTimeout(4000); const d=await st();
+ console.log('playing 4 s: fps', ((d.frames-c.frames)/4).toFixed(1), 'cap', d.fps);
+ await p.evaluate(()=>window.__studio.stop()); await p.waitForTimeout(3500); const e=await st(); await p.waitForTimeout(2000); const f=await st();
+ console.log('after stop, 2 s later: frames', f.frames-e.frames, 'awake', f.awake);
+ await p.mouse.move(100,100); await p.mouse.move(1300,700,{steps:10}); const g=await st(); await p.waitForTimeout(3000); const h2=await st();
+ console.log('mouse parallax settle: frames', h2.frames-g.frames, 'awake', h2.awake);
+ await p.screenshot({path:'parallax-1440.png',clip:{x:0,y:0,width:1440,height:150}});
+ await b.close();srv.close();});

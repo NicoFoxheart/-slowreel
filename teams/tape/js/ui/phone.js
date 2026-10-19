@@ -2,7 +2,7 @@
 import { S, on, edit, clamp, isSongTrack, fmtTime, songBeats } from './state.js';
 import { h } from './controls.js';
 import { createDeck } from './deck.js';
-import { scaleRun, noteName, keyIndex } from './theory.js';
+import { scaleRun, noteName, keyIndex, scaleById } from './theory.js';
 
 const $ = id => document.getElementById(id);
 let api, deck, padOct = 4, padTrack = null;
@@ -52,7 +52,7 @@ function pads() {
     b.addEventListener('keyup', e => { if (e.key === 'Enter' || e.key === ' ') up(); });
     el.append(b);
   });
-  $('ph-scale-note').textContent = `${S.project.key} ${S.project.scale.replace('-', ' ')} · every pad is in key`;
+  $('ph-scale-note').textContent = `${S.project.key} ${scaleById(S.project.scale).name.toLowerCase()} · every pad is in key`;
 }
 
 export function phoneFrame({ beat, dt, level, playing, frac }) {

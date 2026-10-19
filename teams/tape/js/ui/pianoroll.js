@@ -1,7 +1,7 @@
 // pianoroll.js - note editor for the selected instrument clip: draw (with chord stamp + scale lock), select (click,
 // shift-click, marquee, Ctrl+A), move, resize, delete, velocity lane, audition keys. Notes may run as long as you like;
 // drawing past the clip end grows the clip.
-import { S, on, emit, begin, end, edit, clipOf, snapTo, clamp, bpb, isSongTrack } from './state.js';
+import { S, on, emit, begin, end, edit, clipOf, snapTo, clamp, bpb, isSongTrack, instDef } from './state.js';
 import { h } from './controls.js';
 import { noteName, isBlack, inScale, snapToScale, chordNotes, keyIndex, scaleById } from './theory.js';
 
@@ -9,7 +9,10 @@ const LO = 24, HI = 108, RH = 13, KW = 54, RULER = 22, VEL = 58;
 let pane, scroller, grid, velLane, notesLayer, headEl, built = null;
 const rowY = m => (HI - m) * RH;
 const pitchAt = y => clamp(HI - Math.floor(y / RH), LO, HI);
-let lastLen = 2;
+let lastLen = 2, lastDrumLen = 0.25;
+// drum kits (janggu, taiko: kind 'drums' with a drumMap): rows are named voices, no scale lock, no chord stamp
+const drumMapOf = t => { const d = instDef(t?.instrument?.id); return d?.kind === 'drums' && Array.isArray(d.drumMap) ? d.drumMap : null; };
+const lockFor = t => S.lock && !drumMapOf(t);
 
 export function initRoll(paneEl) {
   pane = paneEl;
@@ -21,7 +24,7 @@ export function render() {
   const f = clipOf();
   if (!f || isSongTrack(f.t) || f.c.song) { built = null; return false; }
   const { t, c } = f;
-  const keySig = `${c.id}|${c.startBeat}|${S.prZoom}|${S.project.key}|${S.project.scale}|${c.lengthBeats}|${t.color}`;
+  const keySig = `${c.id}|${c.startBeat}|${S.prZoom}|${S.project.key}|${S.project.scale}|${c.lengthBeats}|${t.color}|${t.instrument?.id || ''}`;
   if (built !== keySig || !pane.contains(scroller)) build(t, c, keySig);
   drawNotes(t, c);
   return true;
@@ -42,10 +45,12 @@ function build(t, c, sig) {
   // keys + grid
   const keys = h('div', { class: 'pr-keys', style: { height: Hh + 'px' } });
   const rows = h('div', { class: 'rows' });
-  const root = keyIndex(S.project.key);
+  const root = keyIndex(S.project.key), dm = drumMapOf(t), drumAt = new Map((dm || []).map(d => [d.midi, d]));
   for (let m = HI; m >= LO; m--) {
-    const inS = inScale(m, S.project.key, S.project.scale), isC = m % 12 === 0, isRoot = ((m - root) % 12 + 12) % 12 === 0;
-    const k = h('div', { class: 'pr-key' + (isBlack(m) ? ' blk' : '') + (isC ? ' c' : ''), 'data-m': m, text: isC || isRoot ? noteName(m) : '' });
+    const dv = drumAt.get(m);
+    const inS = dm ? !!dv : inScale(m, S.project.key, S.project.scale), isC = m % 12 === 0, isRoot = !dm && ((m - root) % 12 + 12) % 12 === 0;
+    const k = h('div', { class: 'pr-key' + (isBlack(m) ? ' blk' : '') + (isC ? ' c' : '') + (dv ? ' drum' : ''), 'data-m': m, title: dv ? dv.name : null,
+      text: dv ? (dv.short || dv.name) : isC || isRoot ? noteName(m) : '' });
     keys.append(k);
     rows.append(h('div', { class: 'row' + (inS ? '' : ' out') + (isBlack(m) ? ' blk' : '') + (isRoot ? ' root' : '') + (isC ? ' c' : '') }));
   }
@@ -66,7 +71,7 @@ function build(t, c, sig) {
   // initial scroll: centre on the notes
   requestAnimationFrame(() => {
     if (keepScroll) { scroller.scrollLeft = keepScroll.l; scroller.scrollTop = keepScroll.t; return; }
-    const ns = c.notes || []; const mid = ns.length ? ns.reduce((a, n) => a + n.p, 0) / ns.length : 60 + root;
+    const ns = c.notes || []; const mid = dm ? 38 : ns.length ? ns.reduce((a, n) => a + n.p, 0) / ns.length : 60 + root;
     scroller.scrollTop = Math.max(0, rowY(Math.round(mid)) - scroller.clientHeight / 2 + RULER);
   });
 }
@@ -121,13 +126,13 @@ function gridDown(e) {
         if (resize) { n.d = Math.max(snap || 0.0625, snap ? snapTo(o.s + o.d + dx, snap) - o.s : o.d + dx); }
         else {
           n.s = Math.max(0, snap ? snapTo(o.s + dx, snap) : o.s + dx);
-          let np = clamp(o.p + dy, LO, HI); if (S.lock && dy) np = snapToScale(np, S.project.key, S.project.scale); n.p = np;
+          let np = clamp(o.p + dy, LO, HI); if (lockFor(t) && dy) np = snapToScale(np, S.project.key, S.project.scale); n.p = np;
         }
       }
       growClip(c, notes);
       drawNotes(t, c);
     };
-    const up = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); if (moved) { lastLen = notes[orig[0].j].d; end({ type: 'notes', trackId: t.id }); } };
+    const up = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); if (moved) { if (!drumMapOf(t)) lastLen = notes[orig[0].j].d; end({ type: 'notes', trackId: t.id }); } };
     window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
     return;
   }
@@ -149,11 +154,12 @@ function gridDown(e) {
   }
   // draw
   const start = Math.max(0, snap ? Math.floor(p0.x / S.prZoom / snap) * snap : p0.x / S.prZoom);
-  let root = pitchAt(p0.y); if (S.lock) root = snapToScale(root, S.project.key, S.project.scale);
-  const ps = chordNotes(root, S.chord, S.lock, S.project.key, S.project.scale).filter(m => m >= LO && m <= HI);
+  const drum = !!drumMapOf(t), lock = lockFor(t);
+  let root = pitchAt(p0.y); if (lock) root = snapToScale(root, S.project.key, S.project.scale);
+  const ps = (drum ? [root] : chordNotes(root, S.chord, lock, S.project.key, S.project.scale)).filter(m => m >= LO && m <= HI);
   begin();
   const first = notes.length;
-  ps.forEach(p => notes.push({ p, s: start, d: lastLen, v: S.vel }));
+  ps.forEach(p => notes.push({ p, s: start, d: drum ? lastDrumLen : lastLen, v: S.vel }));
   S.sel.notes = new Set(ps.map((_, k) => first + k));
   growClip(c, notes); drawNotes(t, c);
   ps.forEach(p => audition(p, false));
@@ -162,7 +168,7 @@ function gridDown(e) {
     for (let k = first; k < notes.length; k++) notes[k].d = endB - start;
     growClip(c, notes); drawNotes(t, c);
   };
-  const up = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); lastLen = notes[first]?.d || lastLen; end({ type: 'notes', trackId: t.id }); render(); };
+  const up = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); if (drum) lastDrumLen = notes[first]?.d || lastDrumLen; else lastLen = notes[first]?.d || lastLen; end({ type: 'notes', trackId: t.id }); render(); };
   window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
 }
 /** Grow the clip (in whole bars) when notes run past its end. */
@@ -213,7 +219,7 @@ function keyDown(e) {
       else if (dx) n.s = Math.max(0, n.s + dx * step);
       else if (dy) {
         let np = n.p + dy * (e.shiftKey ? 12 : 1);
-        if (S.lock && !e.shiftKey) { while (np >= LO && np <= HI && !inScale(np, S.project.key, S.project.scale)) np += dy; }
+        if (lockFor(t) && !e.shiftKey) { while (np >= LO && np <= HI && !inScale(np, S.project.key, S.project.scale)) np += dy; }
         n.p = clamp(np, LO, HI);
       }
     }

@@ -4,6 +4,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500&family=Dela+Gothic+One&family=M+PLUS+Rounded+1c:wght@500&display=swap">
 <link rel="stylesheet" href="css/studio.css">
 <link rel="stylesheet" href="css/visual.css">
+<link rel="stylesheet" href="css/studio3d.css">
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <defs>
@@ -28,6 +29,7 @@
     <symbol id="i-cloud" viewBox="0 0 16 16"><path d="M4.5 12.5h7a3 3 0 0 0 .3-6A4 4 0 0 0 4 7.2a2.7 2.7 0 0 0 .5 5.3z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
     <symbol id="i-follow" viewBox="0 0 16 16"><path d="M8 2v12M4 6L2 8l2 2M12 6l2 2-2 2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-panel" viewBox="0 0 16 16"><rect x="2.5" y="3" width="11" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10 3v10" stroke="currentColor" stroke-width="1.5"/></symbol>
+    <symbol id="i-book" viewBox="0 0 16 16"><path d="M2.5 3.5h4a1.5 1.5 0 0 1 1.5 1.5v8a1.2 1.2 0 0 0-1.2-1.2H2.5zM13.5 3.5h-4A1.5 1.5 0 0 0 8 5v8a1.2 1.2 0 0 1 1.2-1.2h4.3z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
     <symbol id="i-set" viewBox="0 0 16 16"><path d="M2.5 4.5h11M2.5 11.5h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10.5" cy="4.5" r="2" fill="var(--panel-hi,#fff)" stroke="currentColor" stroke-width="1.5"/><circle cx="5.5" cy="11.5" r="2" fill="var(--panel-hi,#fff)" stroke="currentColor" stroke-width="1.5"/></symbol>
     <symbol id="i-heart" viewBox="0 0 16 16"><path d="M8 13.5L2.9 8.6C1.6 7.3 1.6 5.2 2.9 4c1.2-1.1 3-1 4.1.2L8 5.3l1-1.1c1.1-1.2 2.9-1.3 4.1-.2 1.3 1.2 1.3 3.3 0 4.6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M3.2 4.6L3 1.8l2.4 1.5M12.8 4.6l.2-2.8-2.4 1.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
     <symbol id="i-fox" viewBox="0 0 24 24"><path d="M12 21.2L3.6 12.8C1.9 11 1.8 8.2 2.8 6.1L4.4 2.4l4.1 3.1c1.4-.3 2.6.1 3.5.9.9-.8 2.1-1.2 3.5-.9l4.1-3.1 1.6 3.7c1 2.1.9 4.9-.8 6.7z" fill="#EC4E20"/><path d="M12 21.2L8.8 12.6h6.4z" fill="#F7F8F7" opacity=".9"/></symbol>
@@ -81,7 +83,8 @@
       <button class="key proj-btn" id="proj-btn" aria-haspopup="true" aria-expanded="false"><span class="nm" id="proj-name">Morning Tape</span><svg><use href="#i-chev"/></svg></button>
       <div class="proj-meta">
         <div class="proj-state" id="proj-state"><i></i><span>Saved</span></div>
-        <button class="key sm" id="b-settings" aria-haspopup="true" aria-expanded="false" title="Settings (Light mode for slower computers)"><svg><use href="#i-set"/></svg>Settings</button>
+        <button class="key sm" id="b-recipes" title="Recipes: starter projects that teach (Korean, Chinese, Japanese, ambient basics)"><svg><use href="#i-book"/></svg>Recipes</button>
+        <button class="key sm sq" id="b-settings" aria-label="Settings" aria-haspopup="true" aria-expanded="false" title="Settings (Light mode for slower computers)"><svg><use href="#i-set"/></svg></button>
       </div>
       <div class="proj-row">
         <button class="key sm" id="b-undo" aria-label="Undo (Ctrl+Z)" title="Undo (Ctrl+Z)"><svg><use href="#i-undo"/></svg></button>

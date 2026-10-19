@@ -1,4 +1,5 @@
 // theory.js - scales, chord stamps and note names for the piano roll, keys and pads.
+import { ASIAN_SCALES } from '../sound/asian.js';
 export const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 export const KEYS = NOTE_NAMES;
 
@@ -10,10 +11,14 @@ export const SCALES = [
   { id: 'mixolydian', name: 'Mixolydian', steps: [0, 2, 4, 5, 7, 9, 10] },
   { id: 'major-penta', name: 'Major pentatonic', steps: [0, 2, 4, 7, 9] },
   { id: 'minor-penta', name: 'Minor pentatonic', steps: [0, 3, 5, 7, 10] },
-  { id: 'in-sen', name: 'In-sen', steps: [0, 1, 5, 7, 10] },
-  { id: 'hirajoshi', name: 'Hirajoshi', steps: [0, 2, 3, 7, 8] },
   { id: 'chromatic', name: 'Chromatic', steps: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] },
+  { id: 'in-sen', name: 'In-sen', region: 'Japanese', steps: [0, 1, 5, 7, 10] },
 ];
+// East Asian scales (js/sound/asian.js), grouped by region after the ambient set. Hirajoshi lives there now.
+for (const sc of ASIAN_SCALES) if (!SCALES.some(x => x.id === sc.id)) SCALES.push({ id: sc.id, name: sc.name, region: sc.region, steps: [...sc.intervals] });
+export const SCALE_REGIONS = ['', 'Korean', 'Chinese', 'Japanese'];
+/** Scales grouped for a <select>: [{region, label, scales}] (region '' = the ambient set). */
+export const scaleGroups = () => SCALE_REGIONS.map(r => ({ region: r, label: r || 'Ambient', scales: SCALES.filter(s => (s.region || '') === r) })).filter(g => g.scales.length);
 
 // Chord stamps: intervals from the clicked note. Voiced open, the way pads like them.
 export const CHORDS = [

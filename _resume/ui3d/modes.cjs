@@ -1,0 +1,18 @@
+const fs=require('fs'),path=require('path'),http=require('http');const{chromium}=require('playwright');
+const ROOT='/home/user/nicofoxheart/studio';
+const srv=http.createServer((q,r)=>{let u=decodeURIComponent(q.url.split('?')[0]);if(u.endsWith('/'))u+='index.html';const f=path.join(ROOT,u);if(!fs.existsSync(f)||fs.statSync(f).isDirectory()){r.writeHead(404);return r.end();}let b=fs.readFileSync(f);if(f.endsWith('.html')&&!/^\s*<!doctype/i.test(b))b=Buffer.from('<!doctype html><html><head><meta charset="utf8"></head><body>'+b+'</body></html>');r.writeHead(200,{'Content-Type':{'.js':'text/javascript','.css':'text/css','.html':'text/html'}[path.extname(f)]||'application/octet-stream'});r.end(b);});
+srv.listen(0,async()=>{const b=await chromium.launch({args:['--use-gl=swiftshader','--enable-unsafe-swiftshader','--autoplay-policy=no-user-gesture-required']});
+ const run=async(qs,fn)=>{const p=await b.newPage({viewport:{width:1440,height:900}});const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('console',m=>{if(m.type()==='error'&&!/ERR_FAILED/.test(m.text()))errs.push(m.text());});
+  await p.route('**/*',r=>{const u=r.request().url();if(u.startsWith('http://127.0.0.1'))return r.continue();const j=u.match(/three@0\.160\.0\/(build\/[^?#]+)/);if(j)return r.fulfill({path:'/home/user/nicofoxheart/redesign/shared/three@0.160.0/'+j[1],contentType:'text/javascript',headers:{'Access-Control-Allow-Origin':'*'}});r.abort();});
+  await p.goto(`http://127.0.0.1:${srv.address().port}/teams/tape/${qs}`);await p.waitForTimeout(5000);
+  const out=await fn(p);console.log(qs||'(default)',JSON.stringify(out),errs.length?'ERRS '+errs.join('|'):'');await p.close();};
+ const cls=p=>p.evaluate(()=>document.documentElement.className);
+ await run('',async p=>{const a=await cls(p);await p.evaluate(()=>window.__studio.setLight(true));await p.waitForTimeout(500);const b1=await cls(p);await p.evaluate(()=>window.__studio.setLight(false));await p.waitForTimeout(5000);const c=await cls(p);
+   await p.click('#b-settings');const row=await p.evaluate(()=>!!document.getElementById('set-ui3d'));await p.click('#set-ui3d');await p.waitForTimeout(400);const off=await cls(p);await p.click('#set-ui3d');await p.waitForTimeout(5000);const on=await cls(p);
+   await p.keyboard.press('Escape');await p.focus('#m-atmosphere');await p.keyboard.press('ArrowUp');const v=await p.evaluate(()=>document.getElementById('m-atmosphere').getAttribute('aria-valuenow'));
+   await p.mouse.click(1040,60);const focused=await p.evaluate(()=>document.activeElement.id);
+   await p.click('#t-play');await p.waitForTimeout(1500);const st=await p.evaluate(()=>window.__studio.status().playing);
+   return{start:a,light:b1,lightOff:c,row,settingOff:off,settingOn:on,knobAfterArrow:v,clickFocus:focused,playingAfterClick:st};});
+ await run('?light=1',async p=>({cls:await cls(p)}));
+ await run('?ui3d=0',async p=>({cls:await cls(p)}));
+ await b.close();srv.close();});

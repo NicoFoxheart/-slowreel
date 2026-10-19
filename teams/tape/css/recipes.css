@@ -1,0 +1,111 @@
+/* Slowreel - Recipes browser and the "Tips while you play" panel (js/ui/recipes-panel.js).
+   Same chassis language as studio.css (uses its tokens): light painted panels and keycaps for what you touch,
+   dark glass for the facts (BPM / key / scale / length). Each region has a signal colour (--rc): Korea vermilion,
+   China saffron, Japan cobalt, Ambient basics leaf. Cards are built like clips: a solid colour strip on a light body. */
+
+/* ------------------------------------------------------------------ browser dialog */
+.rc-scrim { padding: 16px; }
+.rc-dialog { width: min(1180px, calc(100vw - 32px)); height: min(860px, calc(100vh - 32px)); display: flex; flex-direction: column; }
+.rc-dialog header { gap: 16px; flex-wrap: wrap; }
+.rc-head { display: grid; gap: 6px; min-width: 0; flex: 1 1 220px; }
+.rc-head .label { letter-spacing: .1em; }
+.rc-filter { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+.rc-dialog .rc-fk[aria-pressed="true"], .rc-dialog .rc-fk[aria-pressed="true"]:hover { background: linear-gradient(#3A3F43, #24282B); color: #F2F3F1; box-shadow: inset 0 1px 0 rgba(255,255,255,.14), inset 0 -2px 0 rgba(0,0,0,.35), 0 2px 4px rgba(20,24,26,.25); }
+.rc-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--rc, var(--ink-3)); box-shadow: 0 0 0 1px rgba(0,0,0,.12); flex: none; }
+
+.rc-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 340px; }
+.rc-list { overflow: auto; padding: 16px 18px 24px; display: grid; gap: 22px; align-content: start; background: var(--chassis); box-shadow: inset -1px 0 0 var(--seam); }
+
+/* ------------------------------------------------------------------ region groups + cards */
+.rc-region { display: grid; gap: 10px; }
+.rc-region-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.rc-region-head h3 { margin: 0; font: 800 15px/1.2 var(--f-sans); font-stretch: 108%; display: flex; align-items: center; gap: 8px; }
+.rc-region-head p { margin: 0; color: var(--ink-3); font: 500 12px/1.4 var(--f-sans); }
+.rc-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
+.rc-item { display: flex; min-width: 0; }
+.rc-card { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--panel-hi); border-radius: var(--r-panel); overflow: hidden;
+  box-shadow: inset 0 1px 0 var(--seam-hi), 0 0 0 1px var(--seam), 0 1px 2px rgba(20,24,26,.08); transition: box-shadow .15s var(--ease); }
+.rc-card.sel { box-shadow: 0 0 0 2px var(--ink), 0 4px 12px rgba(20,24,26,.16); }
+.rc-strip { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 5px 10px; background: var(--rc); color: #fff;
+  font: 700 10px/1.2 var(--f-sans); letter-spacing: .12em; text-transform: uppercase; }
+.rc-strip .mono { font: 500 10px/1.2 var(--f-mono); letter-spacing: 0; text-transform: none; opacity: .9; }
+.rc-card-in { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.rc-title { margin: 0; font: 800 15px/1.2 var(--f-sans); font-stretch: 105%; }
+.rc-mood { margin: 0; color: var(--ink-2); font: 500 12px/1.4 var(--f-sans); }
+.rc-layers { margin: 0; color: var(--ink-2); font: 500 11px/1.45 var(--f-sans); }
+.rc-layers .label { margin-right: 2px; }
+
+/* the facts behind dark glass, like the deck's LCD */
+.rc-lcd { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 7px 10px; }
+.rc-lcd .rc-f { display: inline-flex; align-items: baseline; gap: 5px; min-width: 0; }
+.rc-lcd .k { font: 600 9px/1 var(--f-sans); letter-spacing: .12em; color: var(--glass-dim); }
+.rc-lcd .v { font: 500 12px/1.2 var(--f-mono); font-variant-numeric: tabular-nums; color: var(--glass-ink); white-space: nowrap; }
+.rc-lcd.sm .v { font-size: 11px; }
+
+.rc-peek { border-radius: 8px; background: var(--panel); box-shadow: 0 0 0 1px var(--seam); }
+.rc-peek summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 10px; border-radius: 8px;
+  font: var(--t-label); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); }
+.rc-peek summary::-webkit-details-marker { display: none; }
+.rc-peek summary svg { width: 14px; height: 14px; transition: transform .15s var(--ease); }
+.rc-peek[open] summary svg { transform: rotate(180deg); }
+.rc-peek-list { margin: 0; padding: 0 12px 10px 28px; display: grid; gap: 6px; color: var(--ink-2); font: 500 12px/1.45 var(--f-sans); }
+.rc-actions { display: flex; gap: 6px; margin-top: auto; padding-top: 2px; }
+.rc-actions .rc-load { flex: 1; }
+.rc-card .rc-actions .key[aria-pressed="true"] { box-shadow: var(--key-shadow), inset 0 0 0 1.5px var(--ink); }
+
+/* ------------------------------------------------------------------ side panel: tips for the selected recipe */
+.rc-side { overflow: auto; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; background: var(--panel); border-top: 3px solid var(--rc, var(--seam)); }
+.rc-side > * { flex-shrink: 0; }
+.rc-side-title { margin: 0; font: 800 18px/1.15 var(--f-sans); font-stretch: 108%; }
+.rc-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.rc-steps > li { display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: start; font: 500 12.5px/1.5 var(--f-sans); color: var(--ink); }
+.rc-n { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--panel-hi); box-shadow: 0 0 0 1px var(--seam-strong);
+  font-size: 10px; color: var(--ink-2); margin-top: 1px; }
+.rc-side-foot { margin-top: auto; display: grid; gap: 8px; padding-top: 6px; }
+.rc-load-big { min-height: 40px; font-size: 12px; white-space: normal; text-align: center; line-height: 1.2; padding: 6px 12px; }
+.rc-note { margin: 0; color: var(--ink-3); font: 500 11px/1.4 var(--f-sans); }
+.rc-status { margin: 0; min-height: 16px; font: 600 12px/1.4 var(--f-sans); color: var(--ink-2); }
+.rc-status.err { color: var(--signal); }
+.rc-empty { color: var(--ink-3); }
+
+/* ------------------------------------------------------------------ floating "Tips while you play" (non-modal) */
+.rc-dock { position: fixed; z-index: 55; right: 16px; top: 128px; width: min(320px, calc(100vw - 32px)); max-height: min(calc(100vh - 150px), 470px); display: flex; flex-direction: column;
+  background: var(--panel-hi); border-radius: 12px; overflow: hidden; border-top: 3px solid var(--rc, var(--ink));
+  box-shadow: 0 0 0 1px var(--seam-strong), 0 18px 40px rgba(20,24,26,.25); }
+.rc-dock-head { display: flex; align-items: center; gap: 6px; padding: 10px 10px 8px 14px; border-bottom: 1px solid var(--seam); }
+.rc-dock-titles { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.rc-dock-titles h2 { margin: 0; font: 800 14px/1.2 var(--f-sans); font-stretch: 105%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rc-dock-titles h2:focus { outline: none; }
+.rc-count { margin-left: 6px; color: var(--ink-2); letter-spacing: 0; text-transform: none; font-size: 10px; }
+.rc-collapse svg { transform: rotate(180deg); transition: transform .15s var(--ease); }
+.rc-dock.collapsed .rc-collapse svg { transform: none; }
+.rc-dock.collapsed .rc-dock-head { border-bottom: 0; }
+.rc-dock-body { overflow: auto; padding: 10px 12px 12px; display: grid; gap: 10px; }
+.rc-dock-body[hidden] { display: none; }
+.rc-checks > li { grid-template-columns: 18px 1fr; padding: 6px 8px; border-radius: 8px; transition: background .15s var(--ease); }
+.rc-checks > li input { margin: 3px 0 0; width: 15px; height: 15px; accent-color: var(--leaf); }
+.rc-checks > li label { display: grid; grid-template-columns: 22px 1fr; gap: 6px; cursor: pointer; }
+.rc-checks > li.cur { background: color-mix(in srgb, var(--rc, var(--saffron)) 12%, var(--panel-hi)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rc, var(--saffron)) 45%, transparent); }
+.rc-checks > li.cur .rc-n { background: var(--rc, var(--ink)); color: #fff; box-shadow: none; }
+.rc-checks > li.done label > span:last-child { color: var(--ink-3); }
+.rc-dock-foot { display: flex; align-items: center; gap: 6px; }
+.rc-dock-foot .grow { flex: 1; }
+
+/* ------------------------------------------------------------------ smaller screens */
+@media (max-width: 900px) {
+  .rc-dialog { height: calc(100vh - 32px); }
+  .rc-body { grid-template-columns: 1fr; overflow: auto; }
+  .rc-list { overflow: visible; box-shadow: none; }
+  .rc-side { overflow: visible; }
+  .rc-filter { margin-left: 0; order: 3; width: 100%; }
+}
+@media (max-width: 760px) {
+  .rc-scrim { padding: 8px; }
+  .rc-dialog { height: calc(100vh - 16px); width: calc(100vw - 16px); }
+  .rc-list { padding: 12px; }
+  .rc-cards { grid-template-columns: 1fr; }
+  .rc-dock { top: auto; bottom: 12px; right: 12px; left: 12px; width: auto; max-height: 55vh; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rc-card, .rc-peek summary svg, .rc-collapse svg, .rc-checks > li { transition: none; }
+}

@@ -5,6 +5,7 @@ import { clamp, mtof, rng, wave, noiseBuffer, satCurve, hannCurve, disconnectAll
 import { SONGS, songBuffer, songGain } from './songs.js';
 import { nightBufferIfReady } from './nightrain.js';
 import { ensureNight } from './assets.js';
+import { ASIAN } from './asian.js';
 
 const P = (id, name, min, max, def, extra = {}) => ({ id, name, min, max, default: def, unit: '', ...extra });
 const ENUM = (id, name, options, def) => ({ id, name, min: 0, max: options.length - 1, default: def, unit: '', type: 'enum', options });
@@ -436,6 +437,15 @@ const cloud = {
 
 export const INSTRUMENTS = [felt, musicbox, strings, tapepad, drone, pluck, texture, cloud];
 export const INSTRUMENT_MAP = Object.fromEntries(INSTRUMENTS.map(i => [i.id, i]));
+
+// East Asian pack (js/sound/asian.js), registered here so every engine (live and offline) sees it. The region is the label
+// the UI shows on the track and uses to group the instrument pickers.
+export const INSTRUMENT_REGIONS = {
+  gayageum: 'Korean', haegeum: 'Korean', daegeum: 'Korean', janggu: 'Korean',
+  guzheng: 'Chinese', erhu: 'Chinese', dizi: 'Chinese', pipa: 'Chinese', templebells: 'Chinese',
+  koto: 'Japanese', shakuhachi: 'Japanese', shamisen: 'Japanese', taiko: 'Japanese', windchimes: 'Japanese',
+};
+for (const d of ASIAN) { d.region = d.region || INSTRUMENT_REGIONS[d.id] || ''; if (!INSTRUMENT_MAP[d.id]) { INSTRUMENTS.push(d); INSTRUMENT_MAP[d.id] = d; } }
 
 /** Full parameter values for an instrument: defaults <- preset <- overrides. */
 export function resolveParams(id, presetId, overrides = {}) {

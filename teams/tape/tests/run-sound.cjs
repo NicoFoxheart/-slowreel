@@ -37,7 +37,9 @@ const server = http.createServer((req, res) => {
   for (const r of res.instruments) {
     if (r.peakDb < -45) fails.push(`${r.inst}/${r.preset} silent (${r.peakDb})`);
     if (r.peakDb > -1 || r.clipped || r.nan) fails.push(`${r.inst}/${r.preset} peak ${r.peakDb} clipped ${r.clipped} nan ${r.nan}`);
-    if (r.lastDb > -60) fails.push(`${r.inst}/${r.preset} tail does not die (${r.lastDb} dB at end)`);
+    // temple bells / bowls ring on past this 14 s window by design; asian.cjs checks them dead below -60 dB over a long window.
+    // Here they must only keep falling (>= 25 dB below the end of the phrase, never rising).
+    if (r.inst === 'templebells' ? (r.tailDrop < 25 || r.tailRises > 1) : r.lastDb > -60) fails.push(`${r.inst}/${r.preset} tail does not die (${r.lastDb} dB at end)`);
     if (r.tailRises > 0) fails.push(`${r.inst}/${r.preset} tail rises ${r.tailRises}x`);
     if (r.stats && (r.stats.maxVoices > 64 || r.stats.maxNodes > 3000)) fails.push(`${r.inst}/${r.preset} voices ${r.stats.maxVoices} nodes ${r.stats.maxNodes}`);
   }

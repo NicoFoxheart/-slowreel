@@ -34,3 +34,4 @@ Old single run (stopped): wf_41114ea1-33c.
 - 17:32 BACKED UP to private repo NicoFoxheart/-slowreel commit 45c6eb7 (130 files). Clone at /home/user/-slowreel.
 - 10-16 10:23 Heart visualizer (fox-ear heart, 9:16/16:9/1:1, video+audio export): task wol94fr35 run wf_e597296e-335 (scratchpad/heart-visualizer.js). After: my fast QA -> publish -> push to -slowreel repo.
 - 10-16 10:27 Nico: add phone video maker -> stopped wol94fr35, relaunched: task wy73hzapn run wf_ca253eef-fcc (scratchpad/heart-visualizer.js, PC visual panel + phone 'Make a music video' page).
+- 10-16 12:10 Heart visualizer DONE; fast QA passed; published Version 4; pushed to -slowreel c701bb4.
