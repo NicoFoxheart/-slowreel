@@ -17,6 +17,8 @@ import { openProjects, autosave } from '../../lib/storage.js';
 import { measure } from '../../lib/export.js';
 import { initVisual, openVisual, isVisualOpen, exportVideoFor } from '../visual/visual-panel.js';
 import { mountStudio3D } from '../ui3d/studio3d.js';
+import { initSteps, renderSteps } from './steps.js';
+import { createLiveArp } from '../sound/arp.js';
 
 const $ = id => document.getElementById(id);
 const LAST_KEY = 'slowreel:last';
@@ -56,6 +58,7 @@ function demoCopy() { const d = clone(S.engine.demo); d.id = 'demo'; d.schema = 
 
 async function openProject(p, { fresh } = {}) {
   S.project = p; normalize(p);
+  S.autoOpen.clear(); S.autoSel = {};   // automation lanes are view state of one tape
   recipesMod?.then(m => m.closeTips()).catch(() => { });   // tips of an earlier recipe never stay over another tape (the panel reopens them for its own load)
   const firstClip = p.tracks.find(t => t.clips.some(c => !c.song));
   S.sel.trackId = firstClip?.id || p.tracks[0]?.id || null; S.sel.clipId = firstClip?.clips.find(c => !c.song)?.id || null; S.sel.notes.clear();
@@ -65,6 +68,8 @@ async function openProject(p, { fresh } = {}) {
   if (fresh) { fitZoom(); }
   syncHeader(); renderArrange(); renderTapes(); renderDock(); emit('project');
   try { await S.engine.load(p); } catch (e) { console.warn('[slowreel] load', e); }
+  const miss = S.engine.missingSamples?.() || [];
+  if (miss.length && S.project === p) toast(`Re-import ${miss[0].name} on the Chop Sampler track (Sound tab): it is not on this computer.`);
   S.engine.setLoop(!!p.loop?.on, p.loop?.startBeat || 0, p.loop?.endBeat || 16);
   S.engine.seek?.(0); setPlayhead(0); drawIdle();
 }
@@ -253,7 +258,7 @@ function addCloud(songId) {
 }
 
 // ---------------------------------------------------------------- dock (tabs, tools, context)
-const TABS = ['notes', 'sound', 'fx', 'mix', 'keys'];
+const TABS = ['notes', 'sound', 'fx', 'mix', 'keys', 'beats'];
 TABS.forEach((k, i) => { $(`tab-${k}`).onclick = () => gotoTab(k); $(`tab-${k}`).addEventListener('keydown', e => {
   if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); const n = TABS[(i + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length]; gotoTab(n); $(`tab-${n}`).focus(); } }); });
 function gotoTab(k) {
@@ -265,7 +270,7 @@ on('goto-tab', gotoTab);
 on('open-editor', id => { const f = clipOf(id); if (f) { selectClip(id, f.t.id); gotoTab('notes'); } });
 function renderDock() {
   renderDockCtx(); renderDockTools();
-  if (S.tab === 'notes') renderNotes(); else renderTab();
+  if (S.tab === 'notes') renderNotes(); else if (S.tab === 'beats') renderSteps(); else renderTab();
 }
 on('select', () => { renderDockCtx(); renderDockTools(); if (S.tab === 'notes') renderNotes(); });
 on('render', () => { renderDockCtx(); if (S.tab === 'notes') renderNotes(); });
@@ -312,23 +317,31 @@ function renderDockTools() {
     el.append(seg);
   } else if (S.tab === 'keys') {
     el.append(h('span', { class: 'label', text: 'Z X octave · C V velocity · R record' }));
+  } else if (S.tab === 'beats') {
+    el.append(h('span', { class: 'label', text: 'Step sequencer · Drum Machine, janggu, taiko' }));
   }
 }
 
 // ---------------------------------------------------------------- live keys + recording
 const held = new Map();       // midi -> {trackId, s}
 let recBuf = [], recTrack = null;
+// live arpeggiator per track (Sound tab > Arpeggiator): keys go through it while the track's arp is on
+const liveArps = new Map();
+const liveArp = id => { let a = liveArps.get(id); if (!a) { a = createLiveArp(S.engine, id, () => track(id)?.arp, () => S.project.bpm); liveArps.set(id, a); } return a; };
+on('project', () => { for (const a of liveArps.values()) { try { a.allOff(); a.dispose?.(); } catch { } } liveArps.clear(); });
 function keyOn(m) {
   const t = track(); if (!t || isSongTrack(t)) { if (!keyOn.warned) { toast('Pick an instrument track to play.'); keyOn.warned = true; } return; }
   if (S.ctx.state !== 'running') S.ctx.resume();
   if (held.has(m)) return;
-  S.engine.noteOn(t.id, m, S.vel);
-  held.set(m, { trackId: t.id, s: S.engine.position().beat, v: S.vel });
+  const arp = t.arp?.on && !S.engine.isMock ? liveArp(t.id) : null;
+  if (arp?.active()) arp.noteOn(m, S.vel); else S.engine.noteOn(t.id, m, S.vel);
+  held.set(m, { trackId: t.id, s: S.engine.position().beat, v: S.vel, arp: arp?.active() ? arp : null });
   markKbKey(m, true); startLoop();
 }
 function keyOff(m) {
   const k = held.get(m); if (!k) return; held.delete(m);
-  S.engine.noteOff(k.trackId, m); markKbKey(m, false);
+  if (k.arp) k.arp.noteOff(m); else S.engine.noteOff(k.trackId, m);
+  markKbKey(m, false);
   if (S.rec && S.playing && recTrack === k.trackId) {
     const e = S.engine.position().beat; let d = e - k.s; if (d < 0.1) d = 0.25;
     recBuf.push({ p: m, s: k.s, d: Math.round(d * 100) / 100, v: k.v });
@@ -377,7 +390,7 @@ window.addEventListener('keydown', e => {
   if (k === 'c' || k === 'v') { S.vel = clamp(Math.round((S.vel + (k === 'v' ? 0.1 : -0.1)) * 10) / 10, 0.1, 1); toast(`Velocity ${Math.round(S.vel * 100)}`); if (S.tab === 'keys') renderTab(); return; }
   if (k === 'r') { toggleRec(); return; }
   if (k === 'l') { toggleLoop(); return; }
-  if (/^[1-5]$/.test(k) && !e.target.closest?.('[role="slider"]')) { gotoTab(TABS[+k - 1]); return; }
+  if (/^[1-6]$/.test(k) && !e.target.closest?.('[role="slider"]')) { gotoTab(TABS[+k - 1]); return; }
 });
 window.addEventListener('keyup', e => { const k = e.key.toLowerCase(); for (const kk of [k]) if (kk in KEYMAP) { const m = 12 * (S.octave + 1) + KEYMAP[kk]; keyOff(m); } });
 window.addEventListener('blur', () => held.forEach((_, m) => keyOff(m)));
@@ -405,7 +418,8 @@ async function fillProj() {
     h('div', { class: 'row' },
       h('button', { class: 'key', id: 'proj-new', onclick: newProject }, icon('plus'), 'New'),
       h('button', { class: 'key', id: 'proj-dup', onclick: dupProject }, icon('dup'), 'Duplicate'),
-      h('button', { class: 'key', id: 'proj-demo', title: 'Open a fresh copy of the demo song', onclick: restoreDemo }, 'Original demo'),
+      h('button', { class: 'key', id: 'proj-demo', title: 'Open a fresh copy of the first demo, Rain on the Reel', onclick: restoreDemo }, 'Original demo'),
+      h('button', { class: 'key', id: 'proj-night', title: 'Open a fresh copy of the second demo: Night Garage, Antent-style future garage', onclick: openNightGarage }, 'Night Garage'),
       h('button', { class: 'key', id: 'proj-recipes', title: 'Starter projects that teach: Korean, Chinese, Japanese and ambient basics', onclick: () => { closeProj(); showRecipes(); } }, icon('book'), 'Recipes')));
   const ul = h('ul', { class: 'plist', 'data-scroll': '' });
   let list = [];
@@ -452,6 +466,19 @@ async function restoreDemo() {
   const d = demoCopy(); d.id = 'demo';
   try { await S.store?.save(d); } catch { }
   closeProj(); await openProject(d, { fresh: true }); toast('The original demo, fresh.');
+}
+// The second demo, "Night Garage" (Antent-style future garage: drums, 808, supersaw pad with pump, chops, arp, automation).
+// Fetched when asked for (demo-night-garage.json next to index.html); opening it always gives a fresh copy.
+async function nightGarageCopy() {
+  const r = await fetch('demo-night-garage.json', { cache: 'no-cache' }); if (!r.ok) throw new Error('HTTP ' + r.status);
+  const d = await r.json(); d.id = 'demo-night-garage'; d.schema = d.schema || 'nfx-studio/1'; d.updatedAt = Date.now(); return d;
+}
+async function openNightGarage() {
+  await S.saver?.flush();
+  let d; try { d = await nightGarageCopy(); } catch (e) { console.warn('[slowreel] night garage', e); toast('Night Garage could not be loaded.'); return null; }
+  try { await S.store?.save(d); } catch { }
+  closeProj(); await openProject(d, { fresh: true }); toast('Night Garage, fresh. Press play.');
+  return d;
 }
 // ---------------------------------------------------------------- recipes (js/recipes + js/ui/recipes-panel.js)
 let recipesMod = null;
@@ -664,6 +691,9 @@ window.__studio = {
   // extra test helpers (not in the contract): per-track meters, play from a beat, the live project and backend
   meters() { const o = {}; for (const t of S.project.tracks) o[t.name] = S.engine.meter(t.id); return o; },
   playFrom(beat) { play(beat); return true; },
+  async loadNightGarage() { const d = await openNightGarage(); return d ? { id: d.id, name: d.name, tracks: d.tracks.length } : null; },
+  async loadDemo() { await restoreDemo(); return { id: S.project.id, name: S.project.name }; },
+  gotoTab(k) { gotoTab(k); return S.tab; },
   info() { return { engine: S.engine.isMock ? 'mock' : 'real', backend: S.store?.backend || null, projectId: S.project?.id, stats: S.engine?.stats?.(), light: S.light, pcOnlyScreen: PC_ONLY_SCREEN }; },
   setLight(on) { setLight(on, { save: false }); return S.light; },
   speedProbe(seconds = 3) { return S.engine.speedProbe?.({ seconds }); },
@@ -677,6 +707,7 @@ else {
   initArrange($('arr-scroll'), $('arr'));
   initRoll($('pane-notes'));
   initPanels({ sound: $('pane-sound'), fx: $('pane-fx'), mix: $('pane-mix'), keys: $('pane-keys') });
+  initSteps($('pane-beats'));
   // pocket mode: only for a narrow window on a computer (phones get the made-for-your-computer screen instead)
   initVisual({ S, play: () => play(), stop, togglePreview, stopPreview, previewId: () => preview?.id || null, openAudioExport: openExport, toast });
   $('b-visual').onclick = () => openVisual({ kind: 'project' });

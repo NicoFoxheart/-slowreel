@@ -11,7 +11,8 @@ const imp = rel => import(pathToFileURL(path.join(ROOT, rel)).href);
   const [{ INSTRUMENTS }, { SYNTHS }, { DRUM_INSTRUMENTS, DRUM_MAP }, { SAMPLER, SLICE_BASE_MIDI }, { EFFECTS }, { FX2 }, arp, auto, theory, { SONGS }] =
     await Promise.all(['js/sound/instruments.js', 'js/sound/synths.js', 'js/sound/drums.js', 'js/sound/sampler.js', 'js/sound/effects.js',
       'js/sound/fx2.js', 'js/sound/arp.js', 'js/ui/automation.js', 'js/ui/theory.js', 'js/sound/songs.js'].map(imp));
-  const INST = [...INSTRUMENTS, ...SYNTHS, ...DRUM_INSTRUMENTS, SAMPLER];
+  // instruments.js registers the round-2 defs itself now (integration): add them only if they are not there yet
+  const INST = [...INSTRUMENTS, ...[...SYNTHS, ...DRUM_INSTRUMENTS, SAMPLER].filter(d => !INSTRUMENTS.includes(d))];
   const IMAP = Object.fromEntries(INST.map(i => [i.id, i]));
   const FXS = [...EFFECTS, ...FX2];
   const FMAP = Object.fromEntries(FXS.map(e => [e.id, e]));

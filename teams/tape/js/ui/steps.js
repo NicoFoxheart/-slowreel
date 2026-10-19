@@ -6,7 +6,7 @@
 //
 // Integrator: initSteps(document.getElementById('pane-beats')); call renderSteps() when the Beats tab opens.
 // It listens to 'render' / 'select' itself while isActive() (default: S.tab === 'beats').
-import { S, on, emit, begin, end, edit, clipOf, clamp, uid, bpb, track } from './state.js';
+import { S, on, emit, begin, end, edit, clipOf, clamp, uid, bpb, track, instDef } from './state.js';
 import { h, knob } from './controls.js';
 import { DRUM_MAP } from '../sound/drums.js';
 
@@ -17,7 +17,11 @@ export const DRUM_ROWS = DRUM_MAP.map(d => ({ midi: d.midi, name: d.name, short:
 const ROW_SET = new Set(DRUM_ROWS.map(r => r.midi));
 const VEL_STEPS = [1, 0.7, 0.4];                   // alt-click cycles accent -> normal -> ghost
 
-export const isDrumTrack = t => !!t && t.kind !== 'song' && t.instrument?.id === 'drums';
+// any drum kit: the Drum Machine, or an instrument of kind 'drums' with a drumMap (janggu, taiko)
+export const isDrumTrack = t => !!t && t.kind !== 'song' && (t.instrument?.id === 'drums' || (() => { const d = instDef(t.instrument?.id); return d?.kind === 'drums' && Array.isArray(d.drumMap) && d.drumMap.length > 0; })());
+// the rows the editor shows for a track: its kit's own drumMap (janggu / taiko: 5 named voices), else the Drum Machine's 16
+const rowsFor = t => { const d = t?.instrument?.id !== 'drums' ? instDef(t?.instrument?.id) : null; return d?.drumMap?.length ? d.drumMap.filter(r => ROW_SET.has(r.midi)).map(r => ({ midi: r.midi, name: r.name, short: r.short || r.name })) : DRUM_ROWS; };
+let ROWS = DRUM_ROWS;
 const r4 = x => Math.round(x * 10000) / 10000;
 
 // ---------------------------------------------------------------- pure helpers (no DOM; tested in tests/round2-beats.*)
@@ -130,7 +134,8 @@ export function renderSteps() {
   const f = clipOf();
   if (!f || !isDrumTrack(f.t) || f.c.song) { empty(); return false; }
   const { t, c } = f, g = readGrid(c);
-  const sig = `${c.id}|${g.steps}|${t.color}|${bpb()}|${g.mute.size}`;
+  ROWS = rowsFor(t);
+  const sig = `${c.id}|${g.steps}|${t.color}|${bpb()}|${g.mute.size}|${ROWS.length}`;
   if (sig !== built || !pane.contains(root)) build(t, c, g, sig);
   else refresh(t, c, g);
   tickPlayhead();
@@ -142,7 +147,7 @@ function empty() {
   const t = track(), drum = S.project?.tracks.find(isDrumTrack);
   const box = h('div', { class: 'stp-empty' },
     h('p', { class: 'label', text: 'Beats' }),
-    h('p', { text: isDrumTrack(t) ? 'Pick a pattern on this drum track, or start a new one.' : 'Select a clip on a Drum Machine track to edit its steps.' }));
+    h('p', { text: isDrumTrack(t) ? 'Pick a pattern on this drum track, or start a new one.' : 'Select a clip on a drum track (Drum Machine, janggu or taiko) to edit its steps.' }));
   const dt = isDrumTrack(t) ? t : drum;
   if (dt) {
     const acts = h('div', { class: 'stp-acts' });
@@ -161,8 +166,9 @@ function newPattern(trackId) {
     const start = Math.max(0, ...tr.clips.map(c => c.startBeat + c.lengthBeats));
     const c = { id, startBeat: Math.ceil(start / bpb()) * bpb(), lengthBeats: 4, notes: [], beat: { steps: 16, swing: 0, mute: [], muted: [] } };
     // a starting groove: kick 1 + 3, closed hats on 8ths
-    for (const k of [0, 8]) setStep(c, 36, k, 0.9);
-    for (let k = 2; k < 16; k += 4) setStep(c, 42, k, 0.6);
+    const kit = rowsFor(tr);
+    if (kit === DRUM_ROWS) { for (const k of [0, 8]) setStep(c, 36, k, 0.9); for (let k = 2; k < 16; k += 4) setStep(c, 42, k, 0.6); }
+    else { for (const k of [0, 8]) setStep(c, kit[0].midi, k, 0.9); for (const k of [4, 12]) setStep(c, (kit[1] || kit[0]).midi, k, 0.6); }
     tr.clips.push(c);
   }, { type: 'clips', trackId });
   S.sel.trackId = trackId; S.sel.clipId = id; S.sel.notes.clear(); emit('select');
@@ -197,7 +203,7 @@ function build(t, c, g, sig) {
   for (let k = 0; k < g.steps; k++) ruler.append(h('div', { class: 'stp-num-cell mono' + (k % 4 === 0 ? ' beat' : '') + (k % (4 * bpb()) === 0 ? ' bar' : ''), 'data-k': k,
     text: k % 4 === 0 ? (k % (4 * bpb()) === 0 ? String(Math.floor(k / (4 * bpb())) + 1) : '·') : '' }));
   gridEl.append(ruler);
-  DRUM_ROWS.forEach((r, ri) => {
+  ROWS.forEach((r, ri) => {
     const muted = g.mute.has(r.midi);
     const mk = h('button', { class: 'key sm stp-m led-saffron', id: `stp-mute-${r.midi}`, 'aria-pressed': String(muted), 'aria-label': `Mute ${r.name}`, title: 'Mute row', onclick: () => commit(cc => setRowMute(cc, r.midi, !beatInfo(cc).mute.includes(r.midi)), t) }, 'M', h('span', { class: 'led' }));
     const nm = h('button', { class: 'stp-name', id: `stp-name-${r.midi}`, title: `${r.name} · MIDI ${r.midi} · click to hear`, onpointerdown: e => { e.preventDefault(); audition(t, r.midi, 0.85); } },
@@ -226,7 +232,7 @@ function paintCell(cell, v, cur) {
   cell.classList.toggle('cur', !!cur);
 }
 function refresh(t, c, g) {
-  for (const r of DRUM_ROWS) { const a = g.rows.get(r.midi); for (let k = 0; k < g.steps; k++) { const cell = cells.get(r.midi + ':' + k); if (cell) paintCell(cell, a[k], cursor.r === DRUM_ROWS.indexOf(r) && cursor.k === k && root?.contains(document.activeElement) && document.activeElement.id === 'stp-scroll'); } }
+  for (const r of ROWS) { const a = g.rows.get(r.midi); for (let k = 0; k < g.steps; k++) { const cell = cells.get(r.midi + ':' + k); if (cell) paintCell(cell, a[k], cursor.r === ROWS.indexOf(r) && cursor.k === k && root?.contains(document.activeElement) && document.activeElement.id === 'stp-scroll'); } }
   const lv = root?.querySelector('#stp-len-val'); if (lv) lv.textContent = String(g.steps);
   root?.querySelectorAll('[id^="stp-len-"]').forEach(b => { const n = +b.id.slice(8); if (n) b.setAttribute('aria-pressed', String(n === g.steps)); });
   const k = root?.querySelector('#stp-swing'); if (k && k.get && Math.abs(k.get() - g.swing) > 1e-4 && document.activeElement !== k) k.set(g.swing);
@@ -278,8 +284,8 @@ function cellDown(e, t) {
 function keyDown(e, t) {
   const f = clipOf(); if (!f) return; const c = f.c, steps = beatInfo(c).steps;
   const mv = { ArrowLeft: [0, -1], ArrowRight: [0, 1], ArrowUp: [-1, 0], ArrowDown: [1, 0] }[e.key];
-  const r = DRUM_ROWS[cursor.r];
-  if (mv) { cursor = { r: clamp(cursor.r + mv[0], 0, DRUM_ROWS.length - 1), k: clamp(cursor.k + mv[1], 0, steps - 1) }; }
+  const r = ROWS[cursor.r];
+  if (mv) { cursor = { r: clamp(cursor.r + mv[0], 0, ROWS.length - 1), k: clamp(cursor.k + mv[1], 0, steps - 1) }; }
   else if (e.key === 'Home' || e.key === 'End') { cursor = { r: cursor.r, k: e.key === 'Home' ? 0 : steps - 1 }; }
   else if (e.key === ' ' || e.key === 'Enter') { commit(cc => { if (toggleStep(cc, r.midi, cursor.k, S.vel ?? 0.8)) audition(t, r.midi, S.vel ?? 0.8); }, t); }
   else if (e.key === 'a' || e.key === 'A') { commit(cc => setStep(cc, r.midi, cursor.k, nextVel(getStep(cc, r.midi, cursor.k))), t); }
@@ -288,7 +294,7 @@ function keyDown(e, t) {
   else return;
   e.preventDefault(); e.stopPropagation();
   const cc = clipOf()?.c; if (cc && root?.isConnected) refresh(t, cc, readGrid(cc));
-  cells.get(DRUM_ROWS[cursor.r].midi + ':' + cursor.k)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  cells.get(ROWS[cursor.r].midi + ':' + cursor.k)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
 // playhead: polls the engine while the transport runs; sleeps when the pane is hidden or stopped

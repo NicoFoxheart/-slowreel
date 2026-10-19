@@ -257,9 +257,23 @@ export const SAMPLER = {
       }
       if (v.endTime < Infinity) try { src.stop(v.endTime); } catch (e) { }
       // Slowed: more of the voice goes into a per-track hall
-      if (p.slowed > 0.02 && v.track) { const wet = v.node(ctx.createGain()); wet.gain.value = p.slowed * 0.55; amp.connect(wet); wet.connect(roomFor(ctx, v.track).input); }
+      // (Light mode: into the engine's one shared short room instead of a per-track convolver)
+      if (p.slowed > 0.02 && v.track) { const wet = v.node(ctx.createGain()); wet.gain.value = p.slowed * 0.55; amp.connect(wet); wet.connect(env.light && env.lightRoomInput ? env.lightRoomInput : roomFor(ctx, v.track).input); }
     };
     return v;
   },
 };
 export const SAMPLER_INSTRUMENTS = [SAMPLER];
+
+/**
+ * Integrator hook, called by the engine at load() after ensureSamples (never on play): does the heavy one-time work a Chop
+ * Sampler track needs before its first note - slices (transient detection), the level match, the reversed copy if a slice
+ * is reversed, and the "Slowed" hall impulse (skipped in Light mode, which uses the shared room). tr = engine track runtime.
+ */
+export function warmSampler(ctx, tr, env = {}) {
+  const spec = tr?.spec, p = tr?.params; if (!spec || !p) return;
+  const buf = sampleBuffer(trackSampleId(spec)); if (!buf) return;
+  computeSlices(buf, p); matchGain(buf);
+  if ((spec.instrument?.slices || []).some(e => e && e.reverse)) reversedOf(ctx, buf);
+  if (p.slowed > 0.02 && !env.light) roomFor(ctx, tr);
+}

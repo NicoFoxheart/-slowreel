@@ -14,6 +14,8 @@ export const S = {
   playing: false,
   audioReady: false,
   light: false,        // Light mode (weaker PCs): lighter sound engine, visuals at 20 fps
+  autoOpen: new Set(), // track ids whose automation lane is shown under the track (view state, not saved)
+  autoSel: {},         // trackId -> automation lane key shown
 };
 
 const subs = new Map();
@@ -77,8 +79,9 @@ export function resetHistory() { undo.length = 0; redo.length = 0; pending = nul
 export const optId = o => (o && typeof o === 'object' ? (o.id ?? o.value) : o);
 export const optName = o => (o && typeof o === 'object' ? (o.name ?? o.label ?? o.id ?? o.value) : String(o));
 export const instDef = id => S.engine?.instruments.find(i => i.id === id) || null;
-/** Instruments grouped for pickers: Slowreel's own first, then the East Asian pack by region. */
-export const INST_REGIONS = ['', 'Korean', 'Chinese', 'Japanese'];
+/** Instruments grouped for pickers: Slowreel's own first, the Antent pack (synths, bass, drums, samplers), then the
+ *  East Asian pack by region. */
+export const INST_REGIONS = ['', 'Pads & Synths', 'Bass', 'Drums', 'Samplers', 'Voices', 'Korean', 'Chinese', 'Japanese'];
 export const instGroups = () => INST_REGIONS.map(r => ({ region: r, label: r || 'Slowreel', items: (S.engine?.instruments || []).filter(d => (d.region || '') === r) })).filter(g => g.items.length);
 export const fxDef = id => S.engine?.effects.find(e => e.id === id) || null;
 export const isSongParam = p => Array.isArray(p.options) && p.options.length > 3 && p.options.every(o => /^[a-z0-9-]+$/.test(optId(o))) && p.options.some(o => optId(o) === 'sleepy-rain');

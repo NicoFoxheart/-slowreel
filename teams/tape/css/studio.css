@@ -574,3 +574,20 @@ html.pc-only .pconly { display: flex; flex-direction: column; align-items: cente
 .inst-pop .cart .sw { background: var(--c); }
 .unit .cart-groups { display: grid; gap: 8px; align-content: start; flex: 1; min-height: 0; overflow: auto; padding-right: 4px; scrollbar-width: thin; }
 .unit .cart-groups .label { display: block; margin-bottom: 4px; }
+
+/* ---- Round 2 "Antent pack": arpeggiator, Chop Sampler and automation lanes (same tokens, keys and knobs) ---- */
+.arp-unit { min-width: 300px; max-width: 420px; }
+.arp-unit .arp-top { display: flex; gap: 8px; align-items: center; }
+.arp-unit .arp-knobs.dim { opacity: .55; }
+.arp-unit .opt-row { max-width: 360px; }
+.chop-unit { width: 560px; }
+.chop-unit .sr-chop .label { font: var(--t-label); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.thead .key.a { font: 600 10px/1 var(--f-mono, ui-monospace, monospace); }
+.thead .key.a[aria-pressed="true"] { background: linear-gradient(#3A3F43, #24282B); color: #fff; }
+.auto-row { display: flex; }
+.auto-row .sr-auto { flex: none; }
+.thead .tbtns.three { grid-template-columns: 22px 22px 22px; }
+.thead .tbtns.three .mini { grid-column: 1 / 4; }
+.lcd-field input[type="number"]::-webkit-inner-spin-button, .lcd-field input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.lcd-field input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+.unit.chop-unit { overflow-y: auto; scrollbar-width: thin; }

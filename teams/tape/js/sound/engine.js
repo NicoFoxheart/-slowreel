@@ -7,10 +7,15 @@ import { INSTRUMENTS, INSTRUMENT_MAP, resolveParams } from './instruments.js';
 import { EFFECTS, createEffect, resolveFx } from './effects.js';
 import { SONGS, loadSong, songBuffer, songsInProject } from './songs.js';
 import { REVERB_TYPES } from './reverb.js';
-import { ensureBasics, ensureNight, assetMode } from './assets.js';
+import { ensureBasics, ensureNight, assetMode, ensureIR } from './assets.js';
 import { noiseBuffer } from './util.js';
 import { nightBuffer } from './nightrain.js';
 import { DEMO } from './demo.js';
+// Round 2 "Antent pack": new effects, the arpeggiator, the Chop Sampler's samples and automation lanes
+import { FX2, createFx2, resolveFx2, scheduleFx } from './fx2.js';
+import { arpNotes } from './arp.js';
+import { ensureSamples, setSampleSongBase, warmSampler } from './sampler.js';
+import { applyAutomation, resetAutomation } from '../ui/automation.js';
 
 const GLOBAL_VOICE_CAP = 64, GRAIN_CAP = 64;   // Light mode halves both (and every instrument's own voice cap)
 const DEFAULT_SPACE_FX = () => [{ id: 'reverb', params: { type: 'hall', mix: 1, size: 1.25, tone: 0.45, preDelay: 0.03 }, bypass: false }];
@@ -22,6 +27,7 @@ export const ENGINE_VERSION = 'tape-1';
 export async function createEngine({ context, songBaseUrl = 'audio/', light = false } = {}) {
   const ctx = context || new AudioContext();
   const offline = typeof OfflineAudioContext !== 'undefined' && ctx instanceof OfflineAudioContext;
+  setSampleSongBase(songBaseUrl);
   const stats = { voices: 0, grains: 0, nodes: 0, maxVoices: 0, maxGrains: 0, maxNodes: 0 };
   const bump = () => { stats.maxVoices = Math.max(stats.maxVoices, stats.voices); stats.maxGrains = Math.max(stats.maxGrains, stats.grains); stats.maxNodes = Math.max(stats.maxNodes, stats.nodes); };
 
@@ -108,7 +114,7 @@ export async function createEngine({ context, songBaseUrl = 'audio/', light = fa
     let node = input;
     for (const spec of list || []) {
       if (spec.bypass) { fx.push(null); continue; }
-      const f = createEffect(ctx, spec.id, spec.params || {}, env);
+      const f = createEffect(ctx, spec.id, spec.params || {}, env) || createFx2(ctx, spec.id, spec.params || {}, env);
       if (!f) { fx.push(null); continue; }
       node.connect(f.input); node = f.output; fx.push(f);
       if (playing && f.transport) f.transport(true, ctx.currentTime);
@@ -118,7 +124,7 @@ export async function createEngine({ context, songBaseUrl = 'audio/', light = fa
   }
   const sigOf = list => JSON.stringify((list || []).map(f => [f.id, !!f.bypass]));
   function syncFxParams(fx, list) {
-    (list || []).forEach((spec, i) => { const f = fx[i]; if (!f) return; const p = resolveFx(spec.id, spec.params || {}); for (const k in p) if (f.params[k] !== p[k]) f.set(k, p[k]); });
+    (list || []).forEach((spec, i) => { const f = fx[i]; if (!f) return; const p = resolveFx(spec.id, spec.params || {}) || resolveFx2(spec.id, spec.params || {}); if (!p) return; for (const k in p) if (f.params[k] !== p[k]) f.set(k, p[k]); });
   }
 
   function syncBusesAndMaster() {
@@ -180,7 +186,7 @@ export async function createEngine({ context, songBaseUrl = 'audio/', light = fa
     for (const spec of p?.tracks || []) {
       if (spec.kind === 'song' || (onlyTrackId && spec.id !== onlyTrackId)) continue;
       const tr = tracks.get(spec.id); if (!tr?.def?.prewarm || !tr.params) continue;
-      const ms = new Set(); for (const c of spec.clips || []) for (const n of c.notes || []) ms.add(n.p);
+      const ms = new Set(); for (const c of spec.clips || []) for (const n of notesOf(spec, c)) ms.add(n.p);
       for (const m of ms) jobs.push([tr.def, tr.params, m]);
     }
     let t0 = performance.now();
@@ -189,6 +195,20 @@ export async function createEngine({ context, songBaseUrl = 'audio/', light = fa
       if (!offline && performance.now() - t0 > 10) { await new Promise(r => setTimeout(r, 0)); if (gen !== warmGen && !onlyTrackId) return; t0 = performance.now(); }
     }
   }
+  // the notes a clip plays: through the track's arpeggiator when it is on (arpNotes is cached per clip + settings)
+  const notesOf = (spec, c) => (spec.arp?.on ? arpNotes(c, spec.arp, num(project?.bpm, 70)) : (c.notes || []));
+  // Chop Sampler tracks: decode their samples (Nico's songs or imported audio from IndexedDB) and do the slicing /
+  // level match / reversed copy / Slowed room now, so the first note never computes them. -> {missing}
+  let missingSamples = [];
+  async function warmSamples(p) {
+    if (!(p?.tracks || []).some(t => t.instrument?.id === 'chop')) { missingSamples = []; return; }
+    // the "Slowed" hall is made in the asset worker (same plan as sampler.js roomFor), not on the main thread
+    const [r] = await Promise.all([ensureSamples(ctx, p), env.light ? null : ensureIR(ctx.sampleRate, 'hall', { size: 1.5, tone: 0.35, preDelay: 0.04 }).catch(() => { })]);
+    missingSamples = r.missing;
+    for (const spec of p.tracks) if (spec.instrument?.id === 'chop') { const tr = tracks.get(spec.id); if (tr?.params) try { warmSampler(ctx, tr, env); } catch (e) { console.warn('[tape] sampler warm', e); } }
+  }
+  const automationCtx = { ctx, tracks };
+  function resetAllAutomation(beat) { for (const spec of project?.tracks || []) if (spec.automation?.length) try { resetAutomation(automationCtx, spec, beat); } catch (e) { console.warn('[tape] automation', e); } }
   function applyMixer(t = ctx.currentTime) {
     const anySolo = project.tracks.some(s => s.solo);
     for (const s of project.tracks) {
@@ -250,6 +270,9 @@ export async function createEngine({ context, songBaseUrl = 'audio/', light = fa
   let moreT = 0;
   function scheduleRange(fromB, toB, s, cutB, startSegment) {
     // fromB..toB in beats of segment s; notes released no later than cutB (loop end)
+    // beat-synced bus / master effects (pump, tape stop, auto filter); track effects go with their track in scheduleTrack
+    const tb = b => s.t + (b - s.b) * spb();
+    for (const list of [space.fx, echo.fx, masterFx]) if (list.length) scheduleFx(list, fromB, toB, tb, project);
     jobs.push({ fromB, toB, s, cutB, startSegment, list: project.tracks.slice(), i: 0 });
   }
   const urgent = j => j.s.t + (j.fromB - j.s.b) * spb() <= ctx.currentTime + 0.12;
@@ -279,7 +302,7 @@ export async function createEngine({ context, songBaseUrl = 'audio/', light = fa
           else if (startSegment && cs < fromB && ce > fromB + 0.05) startSongClip(tr, c, fromB, tb(fromB), Math.min(ce, cutB), tb);
           continue;
         }
-        for (const n of c.notes || []) {
+        for (const n of notesOf(spec, c)) {
           const ns = num(n.s, 0); if (ns < 0 || ns >= cl) continue;
           const b = cs + ns, d = Math.min(num(n.d, 1), cl - ns);
           let at = b;
@@ -292,6 +315,9 @@ export async function createEngine({ context, songBaseUrl = 'audio/', light = fa
           if (v) v.release(tb(off));
         }
       }
+      // round 2: beat-synced track effects and automation lanes, for the same beat range as the notes (live and offline)
+      if (tr.fx.length) scheduleFx(tr.fx, fromB, toB, tb, project);
+      if (spec.automation?.length) try { applyAutomation(automationCtx, spec, fromB, toB, tb); } catch (e) { console.warn('[tape] automation', e); }
     }
   }
 
@@ -364,6 +390,7 @@ export async function createEngine({ context, songBaseUrl = 'audio/', light = fa
   function startTransport(fromBeat, at) {
     jobs.length = 0;
     killAll(at);
+    resetAllAutomation(fromBeat);
     playing = true;
     segs = [{ t: at, b: fromBeat }];
     schedBeat = fromBeat; endBeat = projectBeats();
@@ -378,6 +405,7 @@ export async function createEngine({ context, songBaseUrl = 'audio/', light = fa
     stopBeat = playing ? beatAt(t) : stopBeat;
     playing = false; jobs.length = 0;
     if (kill) killAll(t);
+    resetAllAutomation(stopBeat);
     for (const f of allFx()) f.transport && f.transport(false, t);
     masterTape.transport(false, t);
   }
@@ -402,7 +430,7 @@ export async function createEngine({ context, songBaseUrl = 'audio/', light = fa
       macros: i.macros.map(id => { const p = i.params.find(x => x.id === id); return { id, name: p.name, min: p.min, max: p.max, default: p.default, unit: p.unit }; }),
       params: i.params.map(p => ({ ...p })),
     })),
-    effects: EFFECTS.map(e => ({ id: e.id, name: e.name, params: e.params.map(p => ({ ...p })) })),
+    effects: [...EFFECTS, ...FX2].map(e => ({ id: e.id, name: e.name, params: e.params.map(p => ({ ...p })) })),
 
     presetParams(instrumentId, presetId) { return resolveParams(instrumentId, presetId, {}); },
     trackParams(trackId) { const tr = tracks.get(trackId); return tr?.params ? { ...tr.params } : null; },
@@ -434,12 +462,17 @@ export async function createEngine({ context, songBaseUrl = 'audio/', light = fa
       const want = songsInProject(project);
       // songs are decoded and every buffer the graph needs is made here (worker / idle time), never on play()
       await Promise.all([...want.map(id => loadSong(ctx, id, songBaseUrl).catch(e => console.warn('[tape] song failed to load', id, e))),
-        assetsReady().catch(e => console.warn('[tape] assets', e)), prewarm(project).catch(e => console.warn('[tape] prewarm', e))]);
+        assetsReady().catch(e => console.warn('[tape] assets', e)), prewarm(project).catch(e => console.warn('[tape] prewarm', e)),
+        warmSamples(project).catch(e => console.warn('[tape] samples', e))]);
       if (!offline) ensureBasics(ctx.sampleRate).catch(() => { });   // night rain too, in the background, for later edits
       return engine;
     },
     /** Resolves when every impulse response / noise loop the current graph needs is in place. */
     ready() { return project ? assetsReady() : Promise.resolve(); },
+    /** Chop Sampler samples the project needs but this device does not have: [{trackId, sampleId, name}] ("re-import <name>"). */
+    missingSamples() { return missingSamples.slice(); },
+    /** Load / warm the Chop Sampler samples again (after an import). */
+    ensureSamples() { return project ? warmSamples(project).then(() => ({ missing: missingSamples.slice() })) : Promise.resolve({ missing: [] }); },
     get light() { return env.light; },
     /**
      * Light mode for weaker PCs (live playback only; render() and exports always use the full sound):
@@ -491,7 +524,7 @@ export async function createEngine({ context, songBaseUrl = 'audio/', light = fa
         if (playing) { const now = ctx.currentTime; segs.push({ t: now, b: beatAt(now) }); if (segs.length > 3) segs.shift(); }
         allFx().forEach(f => f.retime && f.retime()); return;
       }
-      if (type === 'track' && change.trackId) { const spec = p.tracks.find(t => t.id === change.trackId); if (spec) { syncTrack(spec); applyMixer(); if (!offline) prewarm(p, change.trackId).catch(() => { }); return; } }
+      if (type === 'track' && change.trackId) { const spec = p.tracks.find(t => t.id === change.trackId); if (spec) { syncTrack(spec); applyMixer(); if (!offline) { prewarm(p, change.trackId).catch(() => { }); if (spec.instrument?.id === 'chop') warmSamples(p).catch(() => { }); } return; } }
       if (type === 'master') { syncBusesAndMaster(); return; }
       return engine.load(p);
     },
@@ -560,6 +593,7 @@ export async function createEngine({ context, songBaseUrl = 'audio/', light = fa
         spec.instrument.params = spec.instrument.params || {}; spec.instrument.params[paramId] = value;
         tr.params = resolveParams(tr.def.id, spec.instrument.preset, spec.instrument.params);
         if (paramId === 'song') loadSong(ctx, value, songBaseUrl).catch(() => { });
+        if (tr.def.id === 'chop' && !offline) { clearTimeout(tr.warmT); tr.warmT = setTimeout(() => warmSamples(project).catch(() => { }), 120); }
       }
     },
 

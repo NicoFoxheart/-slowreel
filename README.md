@@ -25,15 +25,11 @@ Live (private): https://claude.ai/artifact/R3AWvYoSn5cr4kq6LS7uyX
   daegeum, janggu; Chinese guzheng, erhu, dizi, pipa, temple bells; Japanese koto, shakuhachi, shamisen, taiko, wind chimes) and 13
   scales in the scale lock. `js/recipes/` + `js/ui/recipes-panel.js`: 12 beginner recipes (3 Korea, 3 China, 3 Japan, 3 basics) with
   tips. `js/ui3d/` + `css/studio3d.css`: 3D clay tape-machine header drawn in a worker (Settings > 3D studio, off in Light mode).
-- **Round 2, the "Antent pack" (built and tested, NOT wired in yet, on hold):**
-  - `teams/tape/js/sound/synths.js` + `arp.js`: Supersaw Dream Pad, Analog Poly, FM E-Piano, Synth Lead, Synth Bass, Pluck Synth,
-    Vox Pad (30 presets) and an arpeggiator.
-  - `teams/tape/js/sound/drums.js` + `js/ui/steps.js`: Drum Machine (Future Garage, Phonk, Lo-fi Dust, Soft Ambient kits), 808 Bass with
-    glide, step sequencer with swing.
-  - `teams/tape/js/sound/sampler.js`, `fx2.js`, `js/ui/automation.js`, `js/ui/sampler-ui.js`: Chop Sampler (Nico's songs or imported
-    audio), Sidechain Pump, Tape Stop, Bitcrusher, Auto Filter, Stereo Widener, automation lanes.
-  - `teams/tape/demo-night-garage.json`: "Night Garage", an Antent-style demo (preview MP3 in `_resume/night-garage/`).
-  - To finish Round 2: run the integration step in `_resume/r2-integrate.js` (it lists every call to wire), then QA and publish.
+- **Round 2, the "Antent pack" + Voices (live, Version 6):** synths (Supersaw, Analog Poly, FM E-Piano, Synth Lead, Synth Bass,
+  Pluck Synth, Vox Pad) with an arpeggiator; Drum Machine + 808 Bass and a Beats tab step sequencer (also janggu/taiko); Chop Sampler;
+  Sidechain Pump, Tape Stop, Bitcrusher, Auto Filter, Stereo Widener; automation lanes ("A" on a track head); "Night Garage" demo
+  (projects menu). Voices (`js/sound/vocals.js`): Female Choir, Solo Female Voice, Vocal Chops, Breath & Whisper, Angel Pad
+  (formant synthesis, vowels only, no words). Preview: `_resume/vocals-preview.mp3`.
 
 ## Run it locally
 

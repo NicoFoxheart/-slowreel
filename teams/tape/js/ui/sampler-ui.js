@@ -82,7 +82,8 @@ export function createSamplerPanel(opts) {
   const sid = () => trackSampleId(o.track);
   const sliceEdits = () => (o.track.instrument.slices = o.track.instrument.slices || []);
   function refresh(note) {
-    const id = sid(), imp = o.track.instrument.sample;
+    // a sample that points at one of Nico's songs ('song:<id>') shows as that song, not as an import
+    const id = sid(), smp = o.track.instrument.sample, imp = smp && !String(smp.sampleId || '').startsWith('song:') ? smp : null;
     songSel.textContent = '';
     if (imp) songSel.append(h('option', { value: '__imp', text: 'Imported: ' + (imp.name || 'sample'), selected: true }));
     for (const s of SONGS) songSel.append(h('option', { value: s.id, text: s.title, selected: !imp && 'song:' + s.id === id }));

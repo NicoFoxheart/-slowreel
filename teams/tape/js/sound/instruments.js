@@ -6,6 +6,10 @@ import { SONGS, songBuffer, songGain } from './songs.js';
 import { nightBufferIfReady } from './nightrain.js';
 import { ensureNight } from './assets.js';
 import { ASIAN } from './asian.js';
+import { SYNTHS } from './synths.js';
+import { DRUM_INSTRUMENTS, DRUMS, DRUM_MAP } from './drums.js';
+import { SAMPLER } from './sampler.js';
+import { VOCALS } from './vocals.js';
 
 const P = (id, name, min, max, def, extra = {}) => ({ id, name, min, max, default: def, unit: '', ...extra });
 const ENUM = (id, name, options, def) => ({ id, name, min: 0, max: options.length - 1, default: def, unit: '', type: 'enum', options });
@@ -446,6 +450,17 @@ export const INSTRUMENT_REGIONS = {
   koto: 'Japanese', shakuhachi: 'Japanese', shamisen: 'Japanese', taiko: 'Japanese', windchimes: 'Japanese',
 };
 for (const d of ASIAN) { d.region = d.region || INSTRUMENT_REGIONS[d.id] || ''; if (!INSTRUMENT_MAP[d.id]) { INSTRUMENTS.push(d); INSTRUMENT_MAP[d.id] = d; } }
+
+// Round 2 "Antent pack": synths (synths.js), drum machine + 808 (drums.js) and the Chop Sampler (sampler.js), registered the
+// same way at module load. The Drum Machine gets a drumMap so the piano roll and the Beats tab show named rows.
+Object.assign(INSTRUMENT_REGIONS, {
+  supersaw: 'Pads & Synths', analog: 'Pads & Synths', fmkeys: 'Pads & Synths', lead: 'Pads & Synths', synthpluck: 'Pads & Synths', voxpad: 'Pads & Synths',
+  synthbass: 'Bass', bass808: 'Bass', drums: 'Drums', chop: 'Samplers',
+});
+if (!DRUMS.drumMap) DRUMS.drumMap = DRUM_MAP.map(d => ({ midi: d.midi, name: d.name, short: d.short }));
+// Voices pack (js/sound/vocals.js): choirs, solo voice, vocal chops, breath, angel pad
+for (const d of VOCALS) { d.region = d.region || 'Voices'; if (!INSTRUMENT_MAP[d.id]) { INSTRUMENTS.push(d); INSTRUMENT_MAP[d.id] = d; } }
+for (const d of [...SYNTHS, ...DRUM_INSTRUMENTS, SAMPLER]) { d.region = d.region || INSTRUMENT_REGIONS[d.id] || ''; if (!INSTRUMENT_MAP[d.id]) { INSTRUMENTS.push(d); INSTRUMENT_MAP[d.id] = d; } }
 
 /** Full parameter values for an instrument: defaults <- preset <- overrides. */
 export function resolveParams(id, presetId, overrides = {}) {

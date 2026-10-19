@@ -8,6 +8,8 @@ import { TRACK_COLORS } from './sample-project.js';
 import { NOTE_NAMES, noteName, isBlack, inScale } from './theory.js';
 import { removeTrack } from './arrange.js';
 import { canvasSize } from './deck.js';
+import { ARP_PARAMS, arpSettings } from '../sound/arp.js';
+import { createSamplerPanel } from './sampler-ui.js';
 
 const panes = {};
 let mixRefs = { meters: {}, master: null }, cloudRef = null;
@@ -63,17 +65,49 @@ function renderSound() {
       def.macros.forEach(m => { const full = def.params.find(p => p.id === m.id) || m; mk.append(paramControl(t, full, 'lg')); });
       rack.append(unit(['Macros', h('span', { class: 'label', text: 'drag · wheel · arrows' })], 'macros', mk));
       const songP = def.params.find(isSongParam);
-      if (songP) rack.append(cloudUnit(t, def, songP));
+      if (def.id === 'chop') rack.append(chopUnit(t));
+      else if (songP) rack.append(cloudUnit(t, def, songP));
       const rest = def.params.filter(p => !macroIds.has(p.id) && p !== songP);
       if (rest.length) {
         const kn = h('div', { class: 'knobs' }); rest.forEach(p => kn.append(paramControl(t, p, 'sm')));
         rack.append(unit('Shape', 'shape', kn));
       }
+      if (!['drums', 'texture', 'granular'].includes(def.kind)) rack.append(arpUnit(t));
     }
   }
   rack.append(trackUnit(t));
   el.append(rack);
 }
+// ---------------------------------------------------------------- Arpeggiator (track.arp; clip playback and live keys)
+function arpUnit(t) {
+  const a = arpSettings(t.arp || {});
+  const set = (id, v) => { const x = S.project.tracks.find(x => x.id === t.id); x.arp = { ...arpSettings(x.arp || {}), [id]: v }; };
+  const change = { type: 'notes', trackId: t.id };
+  const onP = ARP_PARAMS.find(p => p.id === 'on');
+  const onBtn = h('button', { class: 'key sm led-green', id: 'arp-on', 'aria-pressed': String(a.on), title: 'Arpeggiate this track: its clips and the keys you play',
+    onclick: () => edit(() => set('on', !a.on), change) }, h('span', { class: 'led' }), onP.name);
+  const row = h('div', { class: 'knobs arp-knobs' + (a.on ? '' : ' dim') });
+  for (const p of ARP_PARAMS) {
+    if (p.id === 'on') continue;
+    if (isEnum(p)) row.append(optionKeys(p, a[p.id], v => edit(() => set(p.id, v), change), 'arp'));
+    else row.append(knob(p, { value: a[p.id], size: 'sm', idPrefix: 'arp', color: 'var(--saffron)', ...live(v => set(p.id, v), change) }));
+  }
+  return unit(['Arpeggiator', h('span', { class: 'label', text: a.on ? 'on · clips + keys' : 'off' })], 'arp-unit', h('div', { class: 'arp-top' }, onBtn), row);
+}
+
+// ---------------------------------------------------------------- Chop Sampler (source, waveform + slices, per-slice edits)
+let chopRef = null;
+function chopUnit(t) {
+  const live = S.project.tracks.find(x => x.id === t.id);
+  const panel = createSamplerPanel({ track: live, ctx: S.ctx, engine: S.engine, color: t.color,
+    onBegin: () => begin(),
+    onChange: () => { },
+    onEnd: kind => { end({ type: 'track', trackId: t.id }, { render: false }); if (kind === 'sample') S.engine.ensureSamples?.(); },
+    audition: m => { S.engine.noteOn(t.id, m, 0.85); setTimeout(() => S.engine.noteOff(t.id, m), 450); } });
+  chopRef = { panel, id: t.id };
+  return unit(['Chop Sampler', h('span', { class: 'label', text: 'slices from C3 up · drop audio here' })], 'chop-unit', panel);
+}
+
 function setInstrument(t, d) {
   edit(p => {
     const x = p.tracks.find(x => x.id === t.id), old = instDef(x.instrument.id);
@@ -88,7 +122,9 @@ function paramControl(t, p, size) {
     return h('div', { class: 'toggle-wrap' }, h('button', { class: 'key sm', id: `ip-${p.id}`, 'aria-pressed': String(value >= 0.5), onclick: e => { const on = e.currentTarget.getAttribute('aria-pressed') !== 'true'; e.currentTarget.setAttribute('aria-pressed', String(on)); edit(() => apply(on ? 1 : 0), { type: 'track', trackId: t.id }, { render: false }); } }, h('span', { class: 'led' }), p.name));
   }
   if (isEnum(p)) return optionKeys(p, value, v => edit(() => apply(v), { type: 'track', trackId: t.id }, { render: false }), 'ip');
-  return knob(p, { value, size, idPrefix: 'ip', ...live(apply, { type: 'track', trackId: t.id }) });
+  const lv = live(apply, { type: 'track', trackId: t.id });
+  if (t.instrument?.id === 'chop') { const c0 = lv.onCommit; lv.onCommit = v => { c0(v); if (chopRef?.id === t.id && chopRef.panel.isConnected) chopRef.panel.update(S.project.tracks.find(x => x.id === t.id)); }; }
+  return knob(p, { value, size, idPrefix: 'ip', ...lv });
 }
 function optionKeys(p, value, onPick, prefix) {
   const wrap = h('div', { class: 'optwrap' }, h('span', { class: 'label', text: p.name }));

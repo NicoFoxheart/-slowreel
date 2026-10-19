@@ -4,6 +4,7 @@ import { S, on, emit, edit, begin, end, track, clipOf, snapTo, songBeats, bpb, u
 import { h } from './controls.js';
 import { SONGS, getSong } from '../../lib/songs.js';
 import { TRACK_COLORS } from './sample-project.js';
+import { createAutomationEditor, automationTargets } from './automation.js';
 
 const HEAD = 196, ROW = 50, RULER = 30, MAX_TRACKS = 16;
 let root, scroller, overlay = {}, laneW = 0, totalBeats = 0;
@@ -72,10 +73,11 @@ export function render() {
 
   // rows
   const rows = h('div', { class: 'rows' });
-  p.tracks.forEach((t, i) => rows.append(trackRow(t, i)));
+  p.tracks.forEach((t, i) => { rows.append(trackRow(t, i)); if (S.autoOpen.has(t.id)) rows.append(autoRow(t, B)); });
   // add row
   const canAdd = p.tracks.length < MAX_TRACKS;
-  rows.append(h('div', { class: 'add-row' },
+  let addRow;
+  rows.append(addRow = h('div', { class: 'add-row' },
     h('div', { class: 'thead' }, h('div', { class: 'add-btns' },
       h('button', { class: 'key sm', id: 'add-inst-track', disabled: !canAdd, 'aria-haspopup': 'true', 'aria-expanded': 'false', onclick: e => openInstPicker(e.currentTarget) }, '+ Instrument'),
       h('button', { class: 'key sm', id: 'add-song-track', disabled: !canAdd, onclick: () => addTrack('song') }, '+ Song track'))),
@@ -83,7 +85,8 @@ export function render() {
   root.append(rows);
 
   // overlays (in lane coordinates)
-  const hgt = RULER + p.tracks.length * ROW;
+  // automation lanes make rows taller than ROW: measure where the add row starts (render only, never per frame)
+  const hgt = S.autoOpen.size ? Math.round(addRow.getBoundingClientRect().top - root.getBoundingClientRect().top) : RULER + p.tracks.length * ROW;
   root.append(
     overlay.loop = h('div', { class: 'loopshade', hidden: !lp.on, style: { left: HEAD + xOf(lp.startBeat) + 'px', width: xOf(lp.endBeat - lp.startBeat) + 'px', top: RULER + 'px', height: (hgt - RULER) + 'px' } }),
     h('div', { class: 'endshade', style: { left: HEAD + xOf(songBeats()) + 'px', width: Math.max(0, laneW - xOf(songBeats())) + 'px', top: RULER + 'px', height: (hgt - RULER) + 'px' } }),
@@ -107,8 +110,12 @@ function trackRow(t, i) {
     onclick: e => { e.stopPropagation(); setMS(t, 'mute'); } });
   const solo = h('button', { class: 'key s', id: `solo-${t.id}`, 'aria-pressed': String(!!t.solo), 'aria-label': `Solo ${t.name}`, title: 'Solo', text: 'S',
     onclick: e => { e.stopPropagation(); setMS(t, 'solo'); } });
+  const nAuto = (t.automation || []).filter(l => l.points?.length).length;
+  const auto = h('button', { class: 'key a', id: `auto-${t.id}`, 'aria-pressed': String(S.autoOpen.has(t.id)), 'aria-label': `Automation lane for ${t.name}`,
+    title: nAuto ? `Automation (${nAuto} lane${nAuto > 1 ? 's' : ''})` : 'Automation: show a lane under this track', text: nAuto ? 'A•' : 'A',
+    onclick: e => { e.stopPropagation(); if (S.autoOpen.has(t.id)) S.autoOpen.delete(t.id); else S.autoOpen.add(t.id); render(); } });
   const head = h('div', { class: 'thead' + (sel ? ' sel' : ''), style: { '--c': t.color }, 'data-track': t.id },
-    h('span', { class: 'chip' }), nameBtn, h('div', { class: 'tbtns' }, mute, solo, h('div', { class: 'mini', 'data-meter': t.id }, h('i'))),
+    h('span', { class: 'chip' }), nameBtn, h('div', { class: 'tbtns three' }, mute, solo, auto, h('div', { class: 'mini', 'data-meter': t.id }, h('i'))),
     h('span', { class: 'tinst', text: sub }));
   head.addEventListener('pointerdown', e => { if (e.target.closest('input')) return; selectTrack(t.id); });
   const lane = h('div', { class: 'lane' + (sel ? ' sel' : '') + (t.instrument?.id && /cloud/.test(t.instrument.id) ? ' cloud-lane' : ''), style: { width: laneW + 'px', '--c': t.color }, 'data-track': t.id });
@@ -116,6 +123,18 @@ function trackRow(t, i) {
   lane.addEventListener('pointerdown', e => laneDown(e, t));
   lane.addEventListener('dblclick', e => { if (e.target === lane) createClipAt(t, (e.clientX - lane.getBoundingClientRect().left) / S.zoom); });
   return h('div', { class: 'track-row', 'data-track': t.id, style: { '--c': t.color } }, head, lane);
+}
+
+// Automation lane under a track: breakpoints for volume, pan, sends, instrument params and effect params. The editor
+// mutates the live track; every gesture is one undo step (begin / end), the engine reads the lanes while it schedules.
+function autoRow(t, B) {
+  const live = S.project.tracks.find(x => x.id === t.id);
+  const targets = automationTargets(live, { instruments: S.engine?.instruments || [], effects: S.engine?.effects || [] });
+  const used = (live.automation || []).find(l => l.points?.length);
+  const selected = S.autoSel[t.id] || (used ? `${used.target}|${used.param}` : 'track|volumeDb');
+  const ed = createAutomationEditor({ track: live, targets, pxPerBeat: S.zoom, beats: totalBeats, beatsPerBar: B, headWidth: HEAD, height: 84, color: t.color, snap: S.snap ? Math.min(S.snap, 1) : 0.25, selected,
+    onBegin: () => begin(), onChange: () => { }, onEnd: () => end({ type: 'notes', trackId: t.id }, { render: false }), onSelect: k => { S.autoSel[t.id] = k; } });
+  return h('div', { class: 'auto-row', 'data-auto': t.id, style: { '--c': t.color } }, ed);
 }
 
 function clipEl(t, c) {

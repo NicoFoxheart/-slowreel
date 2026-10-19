@@ -310,6 +310,8 @@ const synthpluck = {
     { id: 'soft-harp-synth', name: 'Soft Harp', params: { wave: 'string', bright: 0.3, decay: 0.75, body: 0.35, width: 0.3 } },
     { id: 'square-pluck', name: 'Square Pluck', params: { wave: 'square', bright: 0.4, decay: 0.25, body: 0.55, width: 0.6, detune: 0.1, level: 0.85 } },
   ],
+  // engine hook (integrator): the Karplus string buffer for each pitch is made at load(), never when play() starts
+  prewarm(ctx, p, midi) { if (p.wave === 'string') ksBuffer(ctx, midi, p.decay, p.bright); },
   voice(ctx, env, p, midi, vel, t) {
     const v = new Voice(ctx, env, t), f = mtof(midi), a = vel2amp(vel), ks = keyScale(midi, 22);
     const amp = v.gain(0); v.amps.push(amp.gain);
