@@ -1,10 +1,10 @@
 // arrange.js - the multitrack timeline: track heads, lanes, clips (move / resize / duplicate / delete, also by keyboard),
 // ruler with seek + loop strip, playhead, zoom, snap. All edits go through state.edit / begin+end (undoable).
-import { S, on, emit, edit, begin, end, track, clipOf, snapTo, songBeats, bpb, uid, clamp, isSongTrack, instDef, optName, instGroups } from './state.js?v=7';
-import { h } from './controls.js?v=7';
-import { SONGS, getSong } from '../../lib/songs.js?v=7';
-import { TRACK_COLORS } from './sample-project.js?v=7';
-import { createAutomationEditor, automationTargets } from './automation.js?v=7';
+import { S, on, emit, edit, begin, end, track, clipOf, snapTo, songBeats, bpb, uid, clamp, isSongTrack, instDef, optName, instGroups } from './state.js?v=8';
+import { h, icon } from './controls.js?v=8';
+import { SONGS, getSong } from '../../lib/songs.js?v=8';
+import { TRACK_COLORS } from './sample-project.js?v=8';
+import { createAutomationEditor, automationTargets } from './automation.js?v=8';
 
 const HEAD = 196, ROW = 50, RULER = 30, MAX_TRACKS = 16;
 let root, scroller, overlay = {}, laneW = 0, totalBeats = 0;
@@ -73,7 +73,7 @@ export function render() {
 
   // rows
   const rows = h('div', { class: 'rows' });
-  p.tracks.forEach((t, i) => { rows.append(trackRow(t, i)); if (S.autoOpen.has(t.id)) rows.append(autoRow(t, B)); });
+  p.tracks.forEach((t, i) => { rows.append(trackRow(t, i)); if (S.autoOpen.has(t.id) && !S.simple) rows.append(autoRow(t, B)); });
   // add row
   const canAdd = p.tracks.length < MAX_TRACKS;
   let addRow;
@@ -82,11 +82,18 @@ export function render() {
       h('button', { class: 'key sm', id: 'add-inst-track', disabled: !canAdd, 'aria-haspopup': 'true', 'aria-expanded': 'false', onclick: e => openInstPicker(e.currentTarget) }, '+ Instrument'),
       h('button', { class: 'key sm', id: 'add-song-track', disabled: !canAdd, onclick: () => addTrack('song') }, '+ Song track'))),
     h('div', { class: 'lane empty-lane', style: { width: laneW + 'px' } })));
+  // a blank tape: no tracks yet, one friendly way in (the same instrument picker as "+ Instrument")
+  if (!p.tracks.length) {
+    addRow.hidden = true;
+    rows.append(h('div', { class: 'arr-empty', id: 'arr-empty', style: { width: Math.max(320, viewW || scroller.clientWidth) + 'px' } },
+      h('button', { class: 'key dark first-inst', id: 'first-inst', 'aria-haspopup': 'true', 'aria-expanded': 'false', onclick: e => openInstPicker(e.currentTarget) }, icon('plus'), 'Add your first instrument'),
+      h('p', {}, 'Pick a sound, then play it on your computer keys: ', h('span', { class: 'kbd', text: 'A S D F' }), ' white, ', h('span', { class: 'kbd', text: 'W E T Y U' }), ' black.')));
+  }
   root.append(rows);
 
   // overlays (in lane coordinates)
   // automation lanes make rows taller than ROW: measure where the add row starts (render only, never per frame)
-  const hgt = S.autoOpen.size ? Math.round(addRow.getBoundingClientRect().top - root.getBoundingClientRect().top) : RULER + p.tracks.length * ROW;
+  const hgt = S.autoOpen.size && !S.simple && p.tracks.length ? Math.round(addRow.getBoundingClientRect().top - root.getBoundingClientRect().top) : RULER + p.tracks.length * ROW;
   root.append(
     overlay.loop = h('div', { class: 'loopshade', hidden: !lp.on, style: { left: HEAD + xOf(lp.startBeat) + 'px', width: xOf(lp.endBeat - lp.startBeat) + 'px', top: RULER + 'px', height: (hgt - RULER) + 'px' } }),
     h('div', { class: 'endshade', style: { left: HEAD + xOf(songBeats()) + 'px', width: Math.max(0, laneW - xOf(songBeats())) + 'px', top: RULER + 'px', height: (hgt - RULER) + 'px' } }),
@@ -115,7 +122,7 @@ function trackRow(t, i) {
     title: nAuto ? `Automation (${nAuto} lane${nAuto > 1 ? 's' : ''})` : 'Automation: show a lane under this track', text: nAuto ? 'A•' : 'A',
     onclick: e => { e.stopPropagation(); if (S.autoOpen.has(t.id)) S.autoOpen.delete(t.id); else S.autoOpen.add(t.id); render(); } });
   const head = h('div', { class: 'thead' + (sel ? ' sel' : ''), style: { '--c': t.color }, 'data-track': t.id },
-    h('span', { class: 'chip' }), nameBtn, h('div', { class: 'tbtns three' }, mute, solo, auto, h('div', { class: 'mini', 'data-meter': t.id }, h('i'))),
+    h('span', { class: 'chip' }), nameBtn, h('div', { class: S.simple ? 'tbtns' : 'tbtns three' }, mute, solo, S.simple ? null : auto, h('div', { class: 'mini', 'data-meter': t.id }, h('i'))),
     h('span', { class: 'tinst', text: sub }));
   head.addEventListener('pointerdown', e => { if (e.target.closest('input')) return; selectTrack(t.id); });
   const lane = h('div', { class: 'lane' + (sel ? ' sel' : '') + (t.instrument?.id && /cloud/.test(t.instrument.id) ? ' cloud-lane' : ''), style: { width: laneW + 'px', '--c': t.color }, 'data-track': t.id });

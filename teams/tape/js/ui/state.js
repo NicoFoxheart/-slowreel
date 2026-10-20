@@ -13,6 +13,7 @@ export const S = {
   tab: 'notes', fxTarget: 'track',
   playing: false,
   audioReady: false,
+  simple: true,        // Simple mode (view only): Notes / Sound / Keys, no automation keys, a shorter clip toolbar
   light: false,        // Light mode (weaker PCs): lighter sound engine, visuals at 20 fps
   autoOpen: new Set(), // track ids whose automation lane is shown under the track (view state, not saved)
   autoSel: {},         // trackId -> automation lane key shown

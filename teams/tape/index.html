@@ -2,9 +2,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500&family=Dela+Gothic+One&family=M+PLUS+Rounded+1c:wght@500&display=swap">
-<link rel="stylesheet" href="css/studio.css?v=7">
-<link rel="stylesheet" href="css/visual.css?v=7">
-<link rel="stylesheet" href="css/studio3d.css?v=7">
+<link rel="stylesheet" href="css/studio.css?v=8">
+<link rel="stylesheet" href="css/visual.css?v=8">
+<link rel="stylesheet" href="css/studio3d.css?v=8">
+<link rel="stylesheet" href="css/starters.css?v=8">
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <defs>
@@ -84,6 +85,7 @@
       <div class="proj-meta">
         <div class="proj-state" id="proj-state"><i></i><span>Saved</span></div>
         <button class="key sm" id="b-recipes" title="Recipes: starter projects that teach (Korean, Chinese, Japanese, ambient basics)"><svg><use href="#i-book"/></svg>Recipes</button>
+        <button class="key sm" id="b-guide" title="Style guide: how to make this tape sound authentic and flow">Guide</button>
         <button class="key sm sq" id="b-settings" aria-label="Settings" aria-haspopup="true" aria-expanded="false" title="Settings (Light mode for slower computers)"><svg><use href="#i-set"/></svg></button>
       </div>
       <div class="proj-row">
@@ -103,10 +105,10 @@
         <button class="key sm" id="a-dup" title="Duplicate clip (Ctrl+D)"><svg><use href="#i-dup"/></svg>Duplicate</button>
         <button class="key sm" id="a-del" title="Delete clip (Delete)"><svg><use href="#i-trash"/></svg>Delete</button>
         <span class="sep"></span>
-        <label class="field"><span class="label">Snap</span><select class="sel" id="a-snap" aria-label="Snap"><option value="0">Off</option><option value="0.25">1/16</option><option value="0.5">1/8</option><option value="1" selected>Beat</option><option value="4">Bar</option></select></label>
+        <label class="field adv"><span class="label">Snap</span><select class="sel" id="a-snap" aria-label="Snap"><option value="0">Off</option><option value="0.25">1/16</option><option value="0.5">1/8</option><option value="1" selected>Beat</option><option value="4">Bar</option></select></label>
         <label class="field"><span class="label">Bars</span><input class="sel mono" id="a-len" type="number" min="4" max="256" style="width:58px;padding-right:6px" aria-label="Song length in bars"></label>
         <span class="grow"></span>
-        <button class="key sm sq" id="a-follow" aria-pressed="true" title="Follow the playhead" aria-label="Follow the playhead"><span class="led"></span><svg><use href="#i-follow"/></svg></button>
+        <button class="key sm sq adv" id="a-follow" aria-pressed="true" title="Follow the playhead" aria-label="Follow the playhead"><span class="led"></span><svg><use href="#i-follow"/></svg></button>
         <button class="key sm sq" id="a-zout" aria-label="Zoom out" title="Zoom out"><svg><use href="#i-zout"/></svg></button>
         <button class="key sm sq" id="a-zin" aria-label="Zoom in" title="Zoom in"><svg><use href="#i-zin"/></svg></button>
         <button class="key sm sq" id="a-tapes" aria-pressed="true" aria-label="Show Nico's tapes" title="Show Nico's tapes"><svg><use href="#i-panel"/></svg></button>
@@ -129,6 +131,10 @@
         <button class="key tab" role="tab" id="tab-mix" aria-controls="pane-mix" aria-selected="false"><span class="num">4</span>Mixer</button>
         <button class="key tab" role="tab" id="tab-keys" aria-controls="pane-keys" aria-selected="false"><span class="num">5</span>Keys</button>
         <button class="key tab" role="tab" id="tab-beats" aria-controls="pane-beats" aria-selected="false"><span class="num">6</span>Beats</button>
+      </div>
+      <div class="segk mode-seg" role="group" aria-label="How many tools to show">
+        <button class="key sm" id="mode-simple" aria-pressed="true" title="Simple: Notes, Sound and Keys only, less to think about">Simple</button>
+        <button class="key sm" id="mode-all" aria-pressed="false" title="All tools: Effects, Mixer, Beats, automation and every editing option">All tools</button>
       </div>
       <span class="sep"></span>
       <div class="dock-ctx" id="dock-ctx"></div>
@@ -207,4 +213,4 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
-<script type="module" src="js/ui/app.js?v=7"></script>
+<script type="module" src="js/ui/app.js?v=8"></script>

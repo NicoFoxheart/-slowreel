@@ -13,9 +13,9 @@
 //   The floating, non-modal tips panel (keeps the steps visible while you play): tick each tip as you try it (remembered
 //   per recipe in this browser), Prev / Next highlights one tip at a time, collapse to a small bar, "All recipes" reopens.
 // closeRecipes(), closeTips(), isRecipesOpen()
-import { RECIPES, REGIONS, SCALE_LABELS, recipeProject } from '../recipes/recipes.js?v=7';
+import { RECIPES, REGIONS, SCALE_LABELS, recipeProject } from '../recipes/recipes.js?v=8';
 
-const REGION_COLOR = { korea: 'var(--signal)', china: 'var(--saffron)', japan: 'var(--cobalt)', ambient: 'var(--leaf)' };
+const REGION_COLOR = { korea: 'var(--signal)', china: 'var(--saffron)', japan: 'var(--cobalt)', ambient: 'var(--leaf)', garage: '#7A63C8' };
 let modal = null, dock = null, uidN = 0;
 const uid = p => `${p}-${++uidN}`;
 
@@ -41,7 +41,7 @@ const I = { close: 'M4 4l8 8M12 4l-8 8', chevron: 'M4 6l4 4 4-4', book: 'M3 3h4a
 function ensureCss() {
   if (document.querySelector('link[data-recipes-css]')) return;
   const l = document.createElement('link');
-  l.rel = 'stylesheet'; l.href = new URL('../../css/recipes.css?v=7', import.meta.url).href; l.setAttribute('data-recipes-css', '');
+  l.rel = 'stylesheet'; l.href = new URL('../../css/recipes.css?v=8', import.meta.url).href; l.setAttribute('data-recipes-css', '');
   // after the page's own stylesheets (in the published artifact they sit in <body>), so recipes.css wins the cascade
   const sheets = document.querySelectorAll('link[rel="stylesheet"], style');
   const last = sheets[sheets.length - 1];
@@ -61,7 +61,7 @@ const layers = r => r.project.tracks.map(t => t.name);
 function lcd(r, small = false) {
   const f = (k, v) => h('span', { class: 'rc-f' }, h('span', { class: 'k', text: k }), h('span', { class: 'v', text: v }));
   return h('div', { class: 'glass rc-lcd' + (small ? ' sm' : '') },
-    f('BPM', String(r.bpm)), f('KEY', r.key), f('SCALE', scaleName(r.scale)), f('LEN', `${r.project.lengthBars} bars · ${fmtLen(seconds(r))}`));
+    f('BPM', String(r.bpm)), f('KEY', r.key), f('SCALE', r.scaleName || scaleName(r.scale)), f('LEN', `${r.project.lengthBars} bars · ${fmtLen(seconds(r))}`));
 }
 
 // keeps keystrokes inside a panel from reaching the studio's global shortcuts (Space = play, letters = QWERTY piano)
@@ -208,7 +208,7 @@ function trapTab(e, root) {
 }
 
 // ---------------------------------------------------------------- "Tips while you play" (floating, non-modal)
-export function openTips(recipeOrId, { onReopen } = {}) {
+export function openTips(recipeOrId, { onReopen, label = 'Tips while you play' } = {}) {
   ensureCss();
   const r = typeof recipeOrId === 'string' ? RECIPES.find(x => x.id === recipeOrId) : recipeOrId;
   if (!r) return null;
@@ -236,7 +236,7 @@ export function openTips(recipeOrId, { onReopen } = {}) {
   const el = h('aside', { class: 'rc-dock', 'aria-labelledby': titleId, style: { '--rc': REGION_COLOR[r.region] } },
     h('header', { class: 'rc-dock-head' },
       h('div', { class: 'rc-dock-titles' },
-        h('p', { class: 'label' }, 'Tips while you play ', count),
+        h('p', { class: 'label' }, label + ' ', count),
         h('h2', { id: titleId, tabindex: '-1', text: r.title })),
       collapseBtn,
       h('button', { class: 'key sm sq', type: 'button', 'aria-label': 'Close tips', onclick: () => close() }, svgIcon(I.close))),

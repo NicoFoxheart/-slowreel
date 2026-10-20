@@ -2,8 +2,8 @@
 // WebGL work (and a slow GPU) never sits on the main thread next to the studio's audio scheduler. Same interface as
 // createHeartScene: {canvas, busy, setSize, setMood, setIntensity, setText, render(t, f), dispose}. Falls back to drawing
 // on the page (also with ?preview=page). The text layer is drawn here, where the page fonts are, and sent as a bitmap.
-import { loadHeart } from './common.js?v=7';
-import { drawTextLayer } from './heart-scene.js?v=7';
+import { loadHeart } from './common.js?v=8';
+import { drawTextLayer } from './heart-scene.js?v=8';
 
 export async function createPreview(opts) {
   if (typeof OffscreenCanvas !== 'undefined' && typeof Worker !== 'undefined' && HTMLCanvasElement.prototype.transferControlToOffscreen && !/[?&]preview=page/.test(location.search)) {
@@ -25,7 +25,7 @@ async function workerPreview({ width, height, pixelRatio = 1, mood = 'sakura', i
     return { bitmap: await createImageBitmap(tc, { imageOrientation: 'flipY' }), layout };
   };
   const off = canvas.transferControlToOffscreen();
-  const w = new Worker(new URL('./preview-worker.js?v=7', import.meta.url), { type: 'module' });
+  const w = new Worker(new URL('./preview-worker.js?v=8', import.meta.url), { type: 'module' });
   let busy = false, dead = false, seq = 0;
   await new Promise(async (resolve, reject) => {
     const tm = setTimeout(() => reject(new Error('the preview worker did not start')), 20000);

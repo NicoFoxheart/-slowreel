@@ -1,8 +1,8 @@
 // phone.js - "Slowreel pocket": listen (transport + track mutes) and play pads (scale pads on any instrument track).
-import { S, on, edit, clamp, isSongTrack, fmtTime, songBeats } from './state.js?v=7';
-import { h } from './controls.js?v=7';
-import { createDeck } from './deck.js?v=7';
-import { scaleRun, noteName, keyIndex, scaleById } from './theory.js?v=7';
+import { S, on, edit, clamp, isSongTrack, fmtTime, songBeats } from './state.js?v=8';
+import { h } from './controls.js?v=8';
+import { createDeck } from './deck.js?v=8';
+import { scaleRun, noteName, keyIndex, scaleById } from './theory.js?v=8';
 
 const $ = id => document.getElementById(id);
 let api, deck, padOct = 4, padTrack = null;

@@ -2,12 +2,12 @@
 // opens this simple page: pick one of Nico's songs or a file from the phone (kept in memory only, never stored or
 // uploaded), title, mood, 9:16 or 1:1, a light preview, and the same frame-exact renderer + WebCodecs export as the PC.
 // No studio engine here; an AudioContext is made only if you press Listen.
-import { h, icon } from '../ui/controls.js?v=7';
-import { SONGS, songUrl } from '../../lib/songs.js?v=7';
-import { makeVideo, decodeAudio, saveVideo, pickCodecs } from './video.js?v=7';
-import { computeFeatures, frameAt, idleFeatures } from './features.js?v=7';
-import { MOOD_LIST, fmtEta, kbmb, previewPacer } from './common.js?v=7';
-import { createPreview } from './preview.js?v=7';
+import { h, icon } from '../ui/controls.js?v=8';
+import { SONGS, songUrl } from '../../lib/songs.js?v=8';
+import { makeVideo, decodeAudio, saveVideo, pickCodecs } from './video.js?v=8';
+import { computeFeatures, frameAt, idleFeatures } from './features.js?v=8';
+import { MOOD_LIST, fmtEta, kbmb, previewPacer } from './common.js?v=8';
+import { createPreview } from './preview.js?v=8';
 
 const SIZES = { '9:16': { 720: [720, 1280], 1080: [1080, 1920] }, '1:1': { 720: [720, 720], 1080: [1080, 1080] } };
 const st = { format: '9:16', size: 720, mood: 'sakura', artist: 'Nicofoxheart', title: '' };

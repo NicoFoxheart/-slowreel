@@ -1,7 +1,7 @@
 // preview-worker.js - draws the live fox-heart preview off the main thread (OffscreenCanvas from transferControlToOffscreen),
 // so a slow GPU never blocks the studio's audio scheduling. The page sends one {cmd:'frame'} at a time and waits for 'drawn'.
 // Messages: init {canvas, opts, text} | size {w, h, pr, text} | mood {id, text} | intensity {v} | text {text} | frame {t, f} | dispose.
-import { setThree, createHeartScene } from './heart-scene.js?v=7';
+import { setThree, createHeartScene } from './heart-scene.js?v=8';
 
 const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 let scene = null, shown = null;

@@ -80,7 +80,7 @@
 .rc-collapse svg { transform: rotate(180deg); transition: transform .15s var(--ease); }
 .rc-dock.collapsed .rc-collapse svg { transform: none; }
 .rc-dock.collapsed .rc-dock-head { border-bottom: 0; }
-.rc-dock-body { overflow: auto; padding: 10px 12px 12px; display: grid; gap: 10px; }
+.rc-dock-body { overflow: auto; padding: 10px 12px 12px; display: grid; grid-auto-rows: max-content; gap: 10px; }
 .rc-dock-body[hidden] { display: none; }
 .rc-checks > li { grid-template-columns: 18px 1fr; padding: 6px 8px; border-radius: 8px; transition: background .15s var(--ease); }
 .rc-checks > li input { margin: 3px 0 0; width: 15px; height: 15px; accent-color: var(--leaf); }

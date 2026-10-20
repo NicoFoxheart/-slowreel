@@ -1,24 +1,25 @@
 // app.js - Slowreel boot + the deck (transport, counter, master), Nico's tapes, projects, export dialog, the dock,
 // QWERTY playing / recording, keyboard shortcuts, the visual loop and the test hook window.__studio.
 import { S, on, emit, edit, track, clipOf, clamp, uid, clone, bpb, songBeats, fmtTime, isSongTrack, instDef, isSongParam,
-  doUndo, doRedo, canUndo, canRedo, resetHistory } from './state.js?v=7';
-import { h, icon, knob } from './controls.js?v=7';
-import { loadEngine } from './engine.js?v=7';
-import { initArrange, render as renderArrange, fitZoom, zoomBy, setPlayhead, updateLoop, updateMeters, addClipHere, duplicateClip, deleteClip, addTrack, createClipAt, selectClip } from './arrange.js?v=7';
-import { initRoll, render as renderRoll, setRollHead, zoom as rollZoom } from './pianoroll.js?v=7';
-import { initPanels, renderTab, renderSongClip, updateMixMeters, animateCloud, KEYMAP, markKbKey } from './panels.js?v=7';
-import { createDeck, createVU } from './deck.js?v=7';
-import { exportMaster, renderProject, songSeconds, kb } from './exporter.js?v=7';
-import { initPhone, phoneFrame } from './phone.js?v=7';
-import { KEYS, CHORDS, scaleGroups } from './theory.js?v=7';
-import { TRACK_COLORS } from './sample-project.js?v=7';
-import { SONGS, loadSong } from '../../lib/songs.js?v=7';
-import { openProjects, autosave } from '../../lib/storage.js?v=7';
-import { measure } from '../../lib/export.js?v=7';
-import { initVisual, openVisual, isVisualOpen, exportVideoFor } from '../visual/visual-panel.js?v=7';
-import { mountStudio3D } from '../ui3d/studio3d.js?v=7';
-import { initSteps, renderSteps } from './steps.js?v=7';
-import { createLiveArp } from '../sound/arp.js?v=7';
+  doUndo, doRedo, canUndo, canRedo, resetHistory } from './state.js?v=8';
+import { h, icon, knob } from './controls.js?v=8';
+import { loadEngine } from './engine.js?v=8';
+import { initArrange, render as renderArrange, fitZoom, zoomBy, setPlayhead, updateLoop, updateMeters, addClipHere, duplicateClip, deleteClip, addTrack, createClipAt, selectClip } from './arrange.js?v=8';
+import { initRoll, render as renderRoll, setRollHead, zoom as rollZoom } from './pianoroll.js?v=8';
+import { initPanels, renderTab, renderSongClip, updateMixMeters, animateCloud, KEYMAP, markKbKey } from './panels.js?v=8';
+import { createDeck, createVU } from './deck.js?v=8';
+import { exportMaster, renderProject, songSeconds, kb } from './exporter.js?v=8';
+import { initPhone, phoneFrame } from './phone.js?v=8';
+import { KEYS, CHORDS, scaleGroups } from './theory.js?v=8';
+import { TRACK_COLORS } from './sample-project.js?v=8';
+import { SONGS, loadSong } from '../../lib/songs.js?v=8';
+import { openProjects, autosave } from '../../lib/storage.js?v=8';
+import { measure } from '../../lib/export.js?v=8';
+import { initVisual, openVisual, isVisualOpen, exportVideoFor } from '../visual/visual-panel.js?v=8';
+import { mountStudio3D } from '../ui3d/studio3d.js?v=8';
+import { initSteps, renderSteps, isDrumTrack } from './steps.js?v=8';
+import { openChooser, closeChooser, blankProject, starterProject as styleStarter, guideFor, starterById } from './starters.js?v=8';
+import { createLiveArp } from '../sound/arp.js?v=8';
 
 const $ = id => document.getElementById(id);
 const LAST_KEY = 'slowreel:last';
@@ -66,7 +67,7 @@ async function openProject(p, { fresh } = {}) {
   resetHistory();
   lsSet(LAST_KEY, p.id);
   if (fresh) { fitZoom(); }
-  syncHeader(); renderArrange(); renderTapes(); renderDock(); emit('project');
+  syncTabs(); syncHeader(); renderArrange(); renderTapes(); renderDock(); emit('project');
   try { await S.engine.load(p); } catch (e) { console.warn('[slowreel] load', e); }
   const miss = S.engine.missingSamples?.() || [];
   if (miss.length && S.project === p) toast(`Re-import ${miss[0].name} on the Chop Sampler track (Sound tab): it is not on this computer.`);
@@ -260,8 +261,36 @@ function addCloud(songId) {
 // ---------------------------------------------------------------- dock (tabs, tools, context)
 const TABS = ['notes', 'sound', 'fx', 'mix', 'keys', 'beats'];
 TABS.forEach((k, i) => { $(`tab-${k}`).onclick = () => gotoTab(k); $(`tab-${k}`).addEventListener('keydown', e => {
-  if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); const n = TABS[(i + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length]; gotoTab(n); $(`tab-${n}`).focus(); } }); });
+  if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); const vis = TABS.filter(tabShown), j = vis.indexOf(k); const n = vis[(j + (e.key === 'ArrowRight' ? 1 : vis.length - 1)) % vis.length]; gotoTab(n); $(`tab-${n}`).focus(); } }); });
+// ---------------------------------------------------------------- Simple / All tools (view only: sound and export never change)
+// Simple shows Notes, Sound and Keys (plus Beats when the tape has a drum kit), hides the automation A keys, the
+// Arpeggiator (unless a track uses it) and the advanced clip tools. Remembered per viewer; on by default.
+const SIMPLE_KEY = 'slowreel:simple';
+const tabShown = k => !S.simple || k === 'notes' || k === 'sound' || k === 'keys' || (k === 'beats' && !!S.project?.tracks.some(isDrumTrack));
+let shownSig = '';
+function syncTabs() {
+  const sig = TABS.map(k => (tabShown(k) ? 1 : 0)).join('');
+  if (sig === shownSig) return; shownSig = sig;
+  TABS.forEach(k => { $(`tab-${k}`).hidden = !tabShown(k); });
+  if (!tabShown(S.tab)) gotoTab('notes');
+}
+function setSimple(on, { save = true } = {}) {
+  S.simple = !!on;
+  document.documentElement.classList.toggle('simple', S.simple);
+  $('mode-simple').setAttribute('aria-pressed', String(S.simple)); $('mode-all').setAttribute('aria-pressed', String(!S.simple));
+  if (S.simple) S.chord = 'off';   // the chord stamp is hidden in Simple: drawing places single notes
+  if (save) lsSet(SIMPLE_KEY, S.simple ? 'on' : 'off');
+  if (!S.project) return;
+  shownSig = ''; syncTabs(); renderArrange(); renderDock();
+  if (!$('set-pop').hidden) fillSettings();
+}
+$('mode-simple').onclick = () => setSimple(true);
+$('mode-all').onclick = () => setSimple(false);
+on('render', syncTabs);
+{ const q = new URLSearchParams(location.search).get('tools'), saved = lsGet(SIMPLE_KEY);
+  setSimple(q === 'all' ? false : q === 'simple' ? true : saved !== 'off', { save: false }); }
 function gotoTab(k) {
+  if (!tabShown(k)) k = 'notes';
   S.tab = k;
   TABS.forEach(x => { $(`tab-${x}`).setAttribute('aria-selected', String(x === k)); $(`tab-${x}`).tabIndex = x === k ? 0 : -1; $(`pane-${x}`).hidden = x !== k; });
   renderDock();
@@ -276,6 +305,11 @@ on('select', () => { renderDockCtx(); renderDockTools(); if (S.tab === 'notes') 
 on('render', () => { renderDockCtx(); if (S.tab === 'notes') renderNotes(); });
 function renderNotes() {
   const pane = $('pane-notes'), f = clipOf();
+  if (!f && !S.project.tracks.length) {
+    pane.textContent = '';
+    pane.append(h('div', { class: 'empty' }, h('strong', { text: 'Nothing on this tape yet' }), h('span', { text: 'Add your first instrument above. Then press R and play to record a clip.' })));
+    return;
+  }
   if (!f) {
     pane.textContent = '';
     pane.append(h('div', { class: 'empty' }, h('strong', { text: 'Pick a clip to edit' }),
@@ -307,7 +341,10 @@ function renderDockTools() {
     const chord = h('select', { class: 'sel', id: 'pr-chord', 'aria-label': 'Chord stamp' }, ...CHORDS.map(c => h('option', { value: c.id, selected: c.id === S.chord }, c.id === 'off' ? 'Single note' : 'Chord: ' + c.name)));
     chord.onchange = () => { S.chord = chord.value; };
     const lock = h('button', { class: 'key sm led-green', id: 'pr-lock', 'aria-pressed': String(S.lock), title: 'Keep new and moved notes in the scale', onclick: e => { S.lock = !S.lock; e.currentTarget.setAttribute('aria-pressed', String(S.lock)); } }, h('span', { class: 'led' }), 'Scale lock');
-    el.append(seg, h('label', { class: 'field' }, h('span', { class: 'label', text: 'Snap' }), snap), chord, lock,
+    if (S.simple) el.append(seg, lock,
+      h('button', { class: 'key sm sq', id: 'pr-zout', 'aria-label': 'Zoom out', onclick: () => rollZoom(1 / 1.3) }, icon('zout')),
+      h('button', { class: 'key sm sq', id: 'pr-zin', 'aria-label': 'Zoom in', onclick: () => rollZoom(1.3) }, icon('zin')));
+    else el.append(seg, h('label', { class: 'field' }, h('span', { class: 'label', text: 'Snap' }), snap), chord, lock,
       h('button', { class: 'key sm sq', id: 'pr-zout', 'aria-label': 'Zoom out', onclick: () => rollZoom(1 / 1.3) }, icon('zout')),
       h('button', { class: 'key sm sq', id: 'pr-zin', 'aria-label': 'Zoom in', onclick: () => rollZoom(1.3) }, icon('zin')));
   } else if (S.tab === 'fx') {
@@ -390,7 +427,7 @@ window.addEventListener('keydown', e => {
   if (k === 'c' || k === 'v') { S.vel = clamp(Math.round((S.vel + (k === 'v' ? 0.1 : -0.1)) * 10) / 10, 0.1, 1); toast(`Velocity ${Math.round(S.vel * 100)}`); if (S.tab === 'keys') renderTab(); return; }
   if (k === 'r') { toggleRec(); return; }
   if (k === 'l') { toggleLoop(); return; }
-  if (/^[1-6]$/.test(k) && !e.target.closest?.('[role="slider"]')) { gotoTab(TABS[+k - 1]); return; }
+  if (/^[1-6]$/.test(k) && !e.target.closest?.('[role="slider"]')) { if (tabShown(TABS[+k - 1])) gotoTab(TABS[+k - 1]); return; }
 });
 window.addEventListener('keyup', e => { const k = e.key.toLowerCase(); for (const kk of [k]) if (kk in KEYMAP) { const m = 12 * (S.octave + 1) + KEYMAP[kk]; keyOff(m); } });
 window.addEventListener('blur', () => held.forEach((_, m) => keyOff(m)));
@@ -444,17 +481,29 @@ async function openById(id) {
   const p = await S.store?.load(id); if (!p) { toast('That project could not be opened.'); return; }
   closeProj(); await openProject(p, { fresh: true });
 }
-function starterProject() {
-  const I = S.engine.instruments, cloudDef = I.find(i => i.params.some(isSongParam));
-  const tracks = I.filter(i => i !== cloudDef).slice(0, 6).map((d, i) => ({ id: uid('t'), name: d.name, color: TRACK_COLORS[i], kind: 'instrument', instrument: { id: d.id, preset: d.presets[0]?.id || '', params: {} },
-    volumeDb: -6, pan: 0, mute: false, solo: false, sends: { space: 0.45, echo: 0.12 }, fx: [], clips: [] }));
-  tracks.push({ id: uid('t'), name: 'Songs', color: TRACK_COLORS[6], kind: 'song', instrument: { id: 'song', preset: '', params: {} }, volumeDb: -6, pan: 0, mute: false, solo: false, sends: { space: 0.3, echo: 0 }, fx: [], clips: [] });
-  if (cloudDef) tracks.push({ id: uid('t'), name: cloudDef.name, color: TRACK_COLORS[7], kind: 'instrument', instrument: { id: cloudDef.id, preset: cloudDef.presets[0]?.id || '', params: {} }, volumeDb: -8, pan: 0, mute: false, solo: false, sends: { space: 0.6, echo: 0.1 }, fx: [], clips: [] });
-  const demo = S.engine.demo;
-  return { schema: 'nfx-studio/1', id: 'p-' + Date.now().toString(36), name: 'Untitled tape', bpm: 70, beatsPerBar: 4, key: 'C', scale: 'major', lengthBars: 16,
-    loop: { on: false, startBeat: 0, endBeat: 16 }, tracks, buses: clone(demo.buses), master: { volumeDb: 0, atmosphere: 0.5, fx: [] }, createdAt: Date.now(), updatedAt: Date.now() };
+// "New": the calm "Start a new tape" chooser (js/ui/starters.js). Blank tape = zero tracks; a style starter sets the
+// tempo, key, scale and room and adds a few named, empty tracks, then opens its style guide. Nico plays every note.
+function newProject() { closeProj(); openChooser({ onPick: c => startTape(c) }); }
+async function startTape(c) {
+  await S.saver?.flush();
+  const base = { instruments: S.engine.instruments, buses: S.engine.demo.buses, colors: TRACK_COLORS, uid };
+  const p = c.kind === 'starter' ? styleStarter(typeof c.starter === 'string' ? starterById(c.starter) : c.starter, base) : blankProject(base);
+  try { await S.store?.save(p); } catch (e) { console.warn('[slowreel] new tape save', e); }
+  closeChooser(); await openProject(p, { fresh: true });
+  if (p.starter) { await showGuide(); toast(`${p.name}: ${p.bpm} BPM, ${p.key}. The tracks are empty - play them on your keys.`); }
+  else toast('A blank tape. Add your first instrument.');
+  return p;
 }
-async function newProject() { await S.saver?.flush(); const p = starterProject(); await S.store?.save(p); closeProj(); await openProject(p, { fresh: true }); toast('A blank tape with eight empty tracks.'); }
+// The style guide (a starter's tips + the flow tips), shown in the recipes tips panel; a recipe tape shows its own tips.
+async function showGuide() {
+  try {
+    const m = await recipesPanel(), p = S.project;
+    if (p.recipe && !p.starter && m.openTips(p.recipe, { onReopen: () => showRecipes({ selected: p.recipe }) })) return;
+    const sc = id => scaleGroups().flatMap(g => g.scales).find(s => s.id === id)?.name || id;
+    m.openTips(guideFor(p, sc), { label: p.starter ? 'Style guide' : 'Flow guide' });
+  } catch (e) { console.error('[slowreel] guide', e); toast('The guide could not open.'); }
+}
+$('b-guide').onclick = () => showGuide();
 async function dupProject() {
   await S.saver?.flush();
   let p = clone(S.project); p.id = 'p-' + Date.now().toString(36); p.name = S.project.name + ' copy';
@@ -470,7 +519,7 @@ async function restoreDemo() {
 // The second demo, "Night Garage" (Antent-style future garage: drums, 808, supersaw pad with pump, chops, arp, automation).
 // Fetched when asked for (demo-night-garage.json next to index.html); opening it always gives a fresh copy.
 async function nightGarageCopy() {
-  const r = await fetch('demo-night-garage.json?v=7', { cache: 'no-cache' }); if (!r.ok) throw new Error('HTTP ' + r.status);
+  const r = await fetch('demo-night-garage.json?v=8', { cache: 'no-cache' }); if (!r.ok) throw new Error('HTTP ' + r.status);
   const d = await r.json(); d.id = 'demo-night-garage'; d.schema = d.schema || 'nfx-studio/1'; d.updatedAt = Date.now(); return d;
 }
 async function openNightGarage() {
@@ -482,7 +531,7 @@ async function openNightGarage() {
 }
 // ---------------------------------------------------------------- recipes (js/recipes + js/ui/recipes-panel.js)
 let recipesMod = null;
-const recipesPanel = () => (recipesMod ||= import('./recipes-panel.js?v=7'));
+const recipesPanel = () => (recipesMod ||= import('./recipes-panel.js?v=8'));
 /** Load a recipe project the way opening a project or the demo does: the current tape is saved first, the recipe becomes
  *  the current project (its own id, saved, autosaved from here on) and starts with a clean undo history. */
 async function loadRecipeProject(project, recipe) {
@@ -664,7 +713,12 @@ function fillSettings() {
   setPop.textContent = '';
   const btn = h('button', { class: 'key led-green', id: 'set-light', 'aria-pressed': String(S.light), onclick: () => setLight(!S.light, { why: S.light ? 'Light mode is off: the full sound.' : 'Light mode is on.' }) }, h('span', { class: 'led' }), 'Light mode');
   const speed = probeInfo ? `This computer renders the busiest part of a song at ${probeInfo.rtf.toFixed(1)}x real time${probeInfo.rtf < PROBE_MIN_RTF ? ', so Light mode helps here.' : ', so the full sound should play smoothly.'}` : 'Slowreel checks once whether this computer keeps up with the full sound.';
+  const mode = h('div', { class: 'segk', role: 'group', 'aria-label': 'How many tools to show' },
+    h('button', { class: 'key sm', id: 'set-simple', 'aria-pressed': String(S.simple), text: 'Simple', onclick: () => setSimple(true) }),
+    h('button', { class: 'key sm', id: 'set-all', 'aria-pressed': String(!S.simple), text: 'All tools', onclick: () => setSimple(false) }));
   setPop.append(h('h2', { text: 'Settings' }),
+    h('div', { class: 'set-row mode-row' }, mode),
+    h('p', { class: 'pm-note', text: 'Simple shows Notes, Sound and Keys (and Beats when the tape has drums). All tools adds Effects, Mixer, automation and every editing option. Your tapes sound and export the same either way.' }),
     h('div', { class: 'set-row' }, btn),
     h('p', { class: 'pm-note', text: 'For slower computers: one shared short room instead of every reverb, no shimmer, half the voices and grains, calmer visuals. Your project and your exports keep the full sound.' }),
     h('p', { class: 'pm-note', id: 'set-speed', text: speed }), ui3d.settingsRow());
@@ -694,11 +748,14 @@ window.__studio = {
   async loadNightGarage() { const d = await openNightGarage(); return d ? { id: d.id, name: d.name, tracks: d.tracks.length } : null; },
   async loadDemo() { await restoreDemo(); return { id: S.project.id, name: S.project.name }; },
   gotoTab(k) { gotoTab(k); return S.tab; },
+  async newTape(kind = 'blank') { const p = await startTape(kind === 'blank' ? { kind: 'blank' } : { kind: 'starter', starter: kind }); return { id: p.id, name: p.name, tracks: p.tracks.length, bpm: p.bpm, key: p.key, scale: p.scale }; },
+  setSimple(on) { setSimple(on, { save: false }); return S.simple; },
+  tabs() { return TABS.filter(k => !$(`tab-${k}`).hidden); },
   info() { return { engine: S.engine.isMock ? 'mock' : 'real', backend: S.store?.backend || null, projectId: S.project?.id, stats: S.engine?.stats?.(), light: S.light, pcOnlyScreen: PC_ONLY_SCREEN }; },
   setLight(on) { setLight(on, { save: false }); return S.light; },
   speedProbe(seconds = 3) { return S.engine.speedProbe?.({ seconds }); },
   // load a recipe by id through the same path as the Recipes panel (tests)
-  async loadRecipe(id) { const m = await import('../recipes/recipes.js?v=7'); const r = m.recipeById?.(id) || m.RECIPES.find(x => x.id === id); if (!r) return null; const p = await loadRecipeProject(m.recipeProject ? m.recipeProject(r) : clone(r.project), r); return { id: p.id, name: p.name, tracks: p.tracks.length }; },
+  async loadRecipe(id) { const m = await import('../recipes/recipes.js?v=8'); const r = m.recipeById?.(id) || m.RECIPES.find(x => x.id === id); if (!r) return null; const p = await loadRecipeProject(m.recipeProject ? m.recipeProject(r) : clone(r.project), r); return { id: p.id, name: p.name, tracks: p.tracks.length }; },
 };
 
 // ---------------------------------------------------------------- go
@@ -722,6 +779,6 @@ function showPcOnly() {
   const draw = () => d.draw({ playing: false, frac: 0.38, level: 0, analyser: null, dt: 0, still: true });
   requestAnimationFrame(draw); new ResizeObserver(() => requestAnimationFrame(draw)).observe(cv);
   // the studio stays PC only, but a phone can make a music video of one of Nico's songs (or a file from the phone)
-  $('pc-video').onclick = () => import('../visual/phone-maker.js?v=7').then(m => m.openPhoneMaker()).catch(e => { console.error('[slowreel] video maker', e); });
+  $('pc-video').onclick = () => import('../visual/phone-maker.js?v=8').then(m => m.openPhoneMaker()).catch(e => { console.error('[slowreel] video maker', e); });
 }
 void renderTab; void instDef; void kb;
