@@ -3,7 +3,7 @@
 // glows, the camera settling after the mouse), at most 30 fps (20 on a software renderer), and sleeps otherwise.
 // Messages in:  init {canvas, w, h, dpr, layout, state} | layout {w, h, dpr, layout} | state {...} | visible {v} | stats | dispose
 // Messages out: ready {soft, renderer} | error {message, init} | lost | stats {frames, awake, fps}
-import { setThree, createStudioScene } from './scene3d.js?v=9a';
+import { setThree, createStudioScene } from './scene3d.js?v=9b';
 
 const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 let scene = null, visible = true, awake = false, last = 0, fps = 30, dead = false, frames = 0;

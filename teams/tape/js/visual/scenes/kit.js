@@ -5,13 +5,13 @@
 // createMirror, createWater, patchWet, patchFog, bakeTexture, noiseTexture, normalMapFromHeight, canvasTexture,
 // dataTexture, heightfield, createPass, cached, createBag. CPU pieces (this file): rng, hashSeed, math, noise2/3, fbm2,
 // ridged2, audio smoothing, flicker, lightning, camera paths, aspect framing, quality presets, GLSL chunks.
-import * as GLSL from './kit-glsl.js?v=9a';
+import * as GLSL from './kit-glsl.js?v=9b';
 export { GLSL };
-export { createPass, PASS_VS, halfFloatOK, cached, disposeCached, bakeTexture, noiseTexture, normalMapFromHeight, canvasTexture, dataTexture, createBag } from './kit-gpu.js?v=9a';
-export { createPost, defaultGrade, POST_Q } from './kit-post.js?v=9a';
-export { createSky, patchFog, defaultSky, defaultFog, sunFromHour, SKY_Q } from './kit-sky.js?v=9a';
-export { createParticles, windDrift, windAt } from './kit-fx.js?v=9a';
-export { createMirror, createWater, patchWet, heightfield } from './kit-surface.js?v=9a';
+export { createPass, PASS_VS, halfFloatOK, cached, disposeCached, bakeTexture, noiseTexture, normalMapFromHeight, canvasTexture, dataTexture, createBag } from './kit-gpu.js?v=9b';
+export { createPost, defaultGrade, POST_Q } from './kit-post.js?v=9b';
+export { createSky, patchFog, defaultSky, defaultFog, sunFromHour, SKY_Q } from './kit-sky.js?v=9b';
+export { createParticles, windDrift, windAt } from './kit-fx.js?v=9b';
+export { createMirror, createWater, patchWet, heightfield } from './kit-surface.js?v=9b';
 
 // ------------------------------------------------------------------------------------------------ quality
 /**

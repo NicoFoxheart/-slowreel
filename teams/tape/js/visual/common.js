@@ -7,7 +7,7 @@ export const MOOD_LIST = [
 export const fmtEta = s => (!isFinite(s) ? '' : s < 60 ? `about ${Math.max(1, Math.round(s))} s left` : `about ${Math.round(s / 60)} min left`);
 export const kbmb = n => (n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.round(n / 1024) + ' KB');
 /** The heart scene module with three.js plugged in (the page's import map resolves 'three'). */
-export async function loadHeart() { const [m, T] = await Promise.all([import('./heart-scene.js?v=9a'), import('three')]); m.setThree(T); return m; }
+export async function loadHeart() { const [m, T] = await Promise.all([import('./heart-scene.js?v=9b'), import('three')]); m.setThree(T); return m; }
 /**
  * Preview pacing: at most `fps` frames a second, and if the computer cannot keep up (frames arrive late for a while,
  * i.e. the GPU is the bottleneck) the preview drops its resolution step by step (then its frame rate), so the
