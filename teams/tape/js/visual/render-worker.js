@@ -1,8 +1,8 @@
 // render-worker.js - renders and encodes the music video off the main thread (OffscreenCanvas + WebCodecs), so the
 // page stays responsive however slow the GPU is (phones). Messages: {cmd:'start', ...} / {cmd:'cancel'}.
 // Replies: {type:'ready'} | {type:'progress', stage, f, info} | {type:'done', buffer} | {type:'error', message, name, init}.
-import { setThree, createHeartScene } from './heart-scene.js?v=8';
-import { encodeVideo } from './video-core.js?v=8';
+import { setThree, createHeartScene } from './heart-scene.js?v=8p';
+import { encodeVideo } from './video-core.js?v=8p';
 
 const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 let cancelled = false;

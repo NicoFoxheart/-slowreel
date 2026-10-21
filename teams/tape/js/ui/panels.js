@@ -1,15 +1,15 @@
 // panels.js - the dock's Sound (instrument), Effects, Mixer and Keys panes, the song-clip editor and the
 // glowing Song Cloud window. Knob drags are live (engine.setParam) and land in undo history on release.
 import { S, on, emit, edit, begin, end, track, clipOf, clamp, bpb, isSongTrack, instDef, fxDef, optId, optName,
-  isSongParam, isEnum, isToggle, instValue, fxValue, songBeats, instGroups } from './state.js?v=8';
-import { h, icon, knob, fader, meter, fmt } from './controls.js?v=8';
-import { SONGS, getSong } from '../../lib/songs.js?v=8';
-import { TRACK_COLORS } from './sample-project.js?v=8';
-import { NOTE_NAMES, noteName, isBlack, inScale } from './theory.js?v=8';
-import { removeTrack } from './arrange.js?v=8';
-import { canvasSize } from './deck.js?v=8';
-import { ARP_PARAMS, arpSettings } from '../sound/arp.js?v=8';
-import { createSamplerPanel } from './sampler-ui.js?v=8';
+  isSongParam, isEnum, isToggle, instValue, fxValue, songBeats, instGroups } from './state.js?v=8p';
+import { h, icon, knob, fader, meter, fmt } from './controls.js?v=8p';
+import { SONGS, getSong } from '../../lib/songs.js?v=8p';
+import { TRACK_COLORS } from './sample-project.js?v=8p';
+import { NOTE_NAMES, noteName, isBlack, inScale } from './theory.js?v=8p';
+import { removeTrack } from './arrange.js?v=8p';
+import { canvasSize } from './deck.js?v=8p';
+import { ARP_PARAMS, arpSettings } from '../sound/arp.js?v=8p';
+import { createSamplerPanel } from './sampler-ui.js?v=8p';
 
 const panes = {};
 let mixRefs = { meters: {}, master: null }, cloudRef = null;

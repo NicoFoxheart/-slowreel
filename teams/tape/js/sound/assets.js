@@ -2,9 +2,9 @@
 // and the night-rain loops. Jobs run in a module Worker (js/sound/gen-worker.js) when the page allows one; otherwise
 // (or if the worker does not answer) they run on the main thread one job per idle slot. Results are cached per sample
 // rate by util.js / reverb.js / nightrain.js, which then only copy them into an AudioBuffer (about 1 ms).
-import { noiseFloats, hasNoiseFloats, putNoiseFloats } from './util.js?v=8';
-import { irPlan, irFloats, hasIR, putIRFloats } from './reverb.js?v=8';
-import { nightFloats, hasNightFloats, putNightFloats } from './nightrain.js?v=8';
+import { noiseFloats, hasNoiseFloats, putNoiseFloats } from './util.js?v=8p';
+import { irPlan, irFloats, hasIR, putIRFloats } from './reverb.js?v=8p';
+import { nightFloats, hasNightFloats, putNightFloats } from './nightrain.js?v=8p';
 
 const NOISE_TYPES = ['white', 'pink', 'brown', 'crackle'];
 let worker = null, state = 'none';     // none | starting | ready | broken
@@ -16,7 +16,7 @@ function startWorker() {
   if (state !== 'none') return;
   if (typeof Worker === 'undefined') { state = 'broken'; return; }
   try {
-    worker = new Worker(new URL('./gen-worker.js?v=8', import.meta.url), { type: 'module' });
+    worker = new Worker(new URL('./gen-worker.js?v=8p', import.meta.url), { type: 'module' });
     state = 'starting';
   } catch (e) { state = 'broken'; return; }
   const fail = () => {

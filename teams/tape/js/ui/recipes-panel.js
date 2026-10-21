@@ -13,7 +13,7 @@
 //   The floating, non-modal tips panel (keeps the steps visible while you play): tick each tip as you try it (remembered
 //   per recipe in this browser), Prev / Next highlights one tip at a time, collapse to a small bar, "All recipes" reopens.
 // closeRecipes(), closeTips(), isRecipesOpen()
-import { RECIPES, REGIONS, SCALE_LABELS, recipeProject } from '../recipes/recipes.js?v=8';
+import { RECIPES, REGIONS, SCALE_LABELS, recipeProject } from '../recipes/recipes.js?v=8p';
 
 const REGION_COLOR = { korea: 'var(--signal)', china: 'var(--saffron)', japan: 'var(--cobalt)', ambient: 'var(--leaf)', garage: '#7A63C8' };
 let modal = null, dock = null, uidN = 0;
@@ -41,7 +41,7 @@ const I = { close: 'M4 4l8 8M12 4l-8 8', chevron: 'M4 6l4 4 4-4', book: 'M3 3h4a
 function ensureCss() {
   if (document.querySelector('link[data-recipes-css]')) return;
   const l = document.createElement('link');
-  l.rel = 'stylesheet'; l.href = new URL('../../css/recipes.css?v=8', import.meta.url).href; l.setAttribute('data-recipes-css', '');
+  l.rel = 'stylesheet'; l.href = new URL('../../css/recipes.css?v=8p', import.meta.url).href; l.setAttribute('data-recipes-css', '');
   // after the page's own stylesheets (in the published artifact they sit in <body>), so recipes.css wins the cascade
   const sheets = document.querySelectorAll('link[rel="stylesheet"], style');
   const last = sheets[sheets.length - 1];

@@ -2,10 +2,10 @@
 // target size and encoded with WebCodecs (H.264 + AAC in .mp4; else VP9 + Opus in .webm), frame-exact 30 fps.
 // Without WebCodecs it falls back to lib/export.js recordVideo (real time). The audio is never changed: it is the
 // rendered mix, or Nico's song (or a phone file) decoded as it is.
-import { recordVideo, saveFile, trimTail } from '../../lib/export.js?v=8';
-import { computeFeatures, frameAt } from './features.js?v=8';
-import { encodeVideo, abortErr } from './video-core.js?v=8';
-import { loadHeart } from './common.js?v=8';
+import { recordVideo, saveFile, trimTail } from '../../lib/export.js?v=8p';
+import { computeFeatures, frameAt } from './features.js?v=8p';
+import { encodeVideo, abortErr } from './video-core.js?v=8p';
+import { loadHeart } from './common.js?v=8p';
 
 export const FORMATS = {
   '9:16': { id: '9:16', w: 1080, h: 1920, use: 'TikTok · Reels · Shorts' },
@@ -73,13 +73,13 @@ export async function makeVideo({ audio, width, height, fps = 30, seconds, mood,
 
 async function viaWorker({ audio, total, F, frames, fps, width, height, codecs, sceneOpts, onProgress, signal }) {
   // the text layer is drawn here, where the page fonts are, and handed over as a bitmap
-  const { drawTextLayer } = await import('./heart-scene.js?v=8');
+  const { drawTextLayer } = await import('./heart-scene.js?v=8p');
   try { await Promise.race([Promise.all([document.fonts?.load('64px "Dela Gothic One"'), document.fonts?.load('500 32px "M PLUS Rounded 1c"')]), new Promise(r => setTimeout(r, 1500))]); } catch { }
   const tc = document.createElement('canvas'); tc.width = width; tc.height = height;
   const layout = drawTextLayer(tc, { title: sceneOpts.title, artist: sceneOpts.artist, mood: sceneOpts.mood });
   const bitmap = await createImageBitmap(tc, { imageOrientation: 'flipY' });
   const left = audio.getChannelData(0).slice(0, total), right = (audio.numberOfChannels > 1 ? audio.getChannelData(1) : audio.getChannelData(0)).slice(0, total);
-  const w = new Worker(new URL('./render-worker.js?v=8', import.meta.url), { type: 'module' });
+  const w = new Worker(new URL('./render-worker.js?v=8p', import.meta.url), { type: 'module' });
   return new Promise((resolve, reject) => {
     const fail = e => { cleanup(); reject(e); };
     const onAbort = () => w.postMessage({ cmd: 'cancel' });

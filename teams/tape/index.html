@@ -2,10 +2,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500&family=Dela+Gothic+One&family=M+PLUS+Rounded+1c:wght@500&display=swap">
-<link rel="stylesheet" href="css/studio.css?v=8">
-<link rel="stylesheet" href="css/visual.css?v=8">
-<link rel="stylesheet" href="css/studio3d.css?v=8">
-<link rel="stylesheet" href="css/starters.css?v=8">
+<link rel="stylesheet" href="css/studio.css?v=8p">
+<link rel="stylesheet" href="css/visual.css?v=8p">
+<link rel="stylesheet" href="css/studio3d.css?v=8p">
+<link rel="stylesheet" href="css/starters.css?v=8p">
+<link rel="stylesheet" href="css/phone-export.css?v=8p">
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <defs>
@@ -197,6 +198,8 @@
   <div class="module pc-window"><div class="glass"><canvas id="pc-reels" role="img" aria-label="The Slowreel tape reels, resting"></canvas></div></div>
   <h1 id="pc-title">Slowreel is made for your computer.</h1>
   <p>Open this link on your PC.</p>
+  <button class="key signal pc-audio" id="pc-audio"><svg aria-hidden="true"><use href="#i-export"/></svg>Your tapes</button>
+  <p class="pm-note">Make the audio file of a tape from your PC and save it to this phone.</p>
   <button class="key dark pc-video" id="pc-video"><svg aria-hidden="true"><use href="#i-heart"/></svg>Make a music video</button>
   <p class="pm-note">Turn one of your songs, or a song on this phone, into a video with the fox heart.</p>
   <p class="label">An ambient tape studio for Nicofoxheart</p>
@@ -213,4 +216,4 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
-<script type="module" src="js/ui/app.js?v=8"></script>
+<script type="module" src="js/ui/app.js?v=8p"></script>

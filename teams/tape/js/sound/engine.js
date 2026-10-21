@@ -2,20 +2,20 @@
 //   import { createEngine } from './js/sound/engine.js';
 //   const engine = await createEngine({ context: new AudioContext() });
 //   await engine.load(engine.demo); engine.play(0);
-import { clamp, dbToGain, gainToDb, num, safetyCurve, disconnectAll } from './util.js?v=8';
-import { INSTRUMENTS, INSTRUMENT_MAP, resolveParams } from './instruments.js?v=8';
-import { EFFECTS, createEffect, resolveFx } from './effects.js?v=8';
-import { SONGS, loadSong, songBuffer, songsInProject } from './songs.js?v=8';
-import { REVERB_TYPES } from './reverb.js?v=8';
-import { ensureBasics, ensureNight, assetMode, ensureIR } from './assets.js?v=8';
-import { noiseBuffer } from './util.js?v=8';
-import { nightBuffer } from './nightrain.js?v=8';
-import { DEMO } from './demo.js?v=8';
+import { clamp, dbToGain, gainToDb, num, safetyCurve, disconnectAll } from './util.js?v=8p';
+import { INSTRUMENTS, INSTRUMENT_MAP, resolveParams } from './instruments.js?v=8p';
+import { EFFECTS, createEffect, resolveFx } from './effects.js?v=8p';
+import { SONGS, loadSong, songBuffer, songsInProject } from './songs.js?v=8p';
+import { REVERB_TYPES } from './reverb.js?v=8p';
+import { ensureBasics, ensureNight, assetMode, ensureIR } from './assets.js?v=8p';
+import { noiseBuffer } from './util.js?v=8p';
+import { nightBuffer } from './nightrain.js?v=8p';
+import { DEMO } from './demo.js?v=8p';
 // Round 2 "Antent pack": new effects, the arpeggiator, the Chop Sampler's samples and automation lanes
-import { FX2, createFx2, resolveFx2, scheduleFx } from './fx2.js?v=8';
-import { arpNotes } from './arp.js?v=8';
-import { ensureSamples, setSampleSongBase, warmSampler } from './sampler.js?v=8';
-import { applyAutomation, resetAutomation } from '../ui/automation.js?v=8';
+import { FX2, createFx2, resolveFx2, scheduleFx } from './fx2.js?v=8p';
+import { arpNotes } from './arp.js?v=8p';
+import { ensureSamples, setSampleSongBase, warmSampler } from './sampler.js?v=8p';
+import { applyAutomation, resetAutomation } from '../ui/automation.js?v=8p';
 
 const GLOBAL_VOICE_CAP = 64, GRAIN_CAP = 64;   // Light mode halves both (and every instrument's own voice cap)
 const DEFAULT_SPACE_FX = () => [{ id: 'reverb', params: { type: 'hall', mix: 1, size: 1.25, tone: 0.45, preDelay: 0.03 }, bypass: false }];

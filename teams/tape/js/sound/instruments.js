@@ -1,15 +1,15 @@
 // instruments.js - the tape studio's synthesized instruments (Web Audio only, no samples).
 // Each instrument: {id, name, kind, maxVoices, params:[...], macros:[ids], presets:[{id, name, params}], voice(ctx, env, P, midi, vel, t)}
 // A voice: {out, release(t), stop(t), endTime, tick?(until)}. The engine owns scheduling, polyphony and cleanup.
-import { clamp, mtof, rng, wave, noiseBuffer, satCurve, hannCurve, disconnectAll, krate, krateFilter, release as relParam } from './util.js?v=8';
-import { SONGS, songBuffer, songGain } from './songs.js?v=8';
-import { nightBufferIfReady } from './nightrain.js?v=8';
-import { ensureNight } from './assets.js?v=8';
-import { ASIAN } from './asian.js?v=8';
-import { SYNTHS } from './synths.js?v=8';
-import { DRUM_INSTRUMENTS, DRUMS, DRUM_MAP } from './drums.js?v=8';
-import { SAMPLER } from './sampler.js?v=8';
-import { VOCALS } from './vocals.js?v=8';
+import { clamp, mtof, rng, wave, noiseBuffer, satCurve, hannCurve, disconnectAll, krate, krateFilter, release as relParam } from './util.js?v=8p';
+import { SONGS, songBuffer, songGain } from './songs.js?v=8p';
+import { nightBufferIfReady } from './nightrain.js?v=8p';
+import { ensureNight } from './assets.js?v=8p';
+import { ASIAN } from './asian.js?v=8p';
+import { SYNTHS } from './synths.js?v=8p';
+import { DRUM_INSTRUMENTS, DRUMS, DRUM_MAP } from './drums.js?v=8p';
+import { SAMPLER } from './sampler.js?v=8p';
+import { VOCALS } from './vocals.js?v=8p';
 
 const P = (id, name, min, max, def, extra = {}) => ({ id, name, min, max, default: def, unit: '', ...extra });
 const ENUM = (id, name, options, def) => ({ id, name, min: 0, max: options.length - 1, default: def, unit: '', type: 'enum', options });
