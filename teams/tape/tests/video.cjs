@@ -52,7 +52,7 @@ const check = (r, want) => { const p = r.probe, ok = p.video && p.video.width ==
     results.pc.previewCanvas = await page.$eval('#vz-canvas canvas', c => ({ px: [c.width, c.height], css: [c.clientWidth, c.clientHeight] }));
     await page.screenshot({ path: path.join(OUT, 'video-panel-playing.png') });
     await page.evaluate(() => window.__studio.stop());
-    await page.click('#vz-fmt-16x9'); await page.click('#vz-mood-kitsune'); await page.waitForTimeout(800);
+    await page.click('#vz-fmt-16x9'); await page.click('#vz-var-kitsune'); await page.waitForTimeout(800);
     await page.screenshot({ path: path.join(OUT, 'video-panel-16x9.png') });
     await page.click('#vz-close'); results.pc.closedPanel = await page.evaluate(() => !document.getElementById('visual-scrim'));
     // the tape list entry point

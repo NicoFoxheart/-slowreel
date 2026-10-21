@@ -1,6 +1,9 @@
-// features.js - what the heart listens to. One set of numbers per video frame, all 0..~1.2:
+// features.js - what the scenes listen to. One set of numbers per video frame, all 0..~1.2:
 //   pulse (low end, beat-weighted: heart scale), low (bass level: halo), mid / high (colour breathing, rim, sparks),
-//   level (overall), slow (3 s energy: camera), accent (onset envelope: ear twitch).
+//   level (overall), slow (3 s energy: camera), accent (onset envelope: ear twitch), accentLag (accent 3 frames ago).
+//   Added for the scene kit (scenes/SCENES-API.md): energy (about 12 s section energy), bass / bright (1.5 s smoothed
+//   low / high), big (rare big-accent envelope, at most one per 8 s: lightning), onset (1 on the frame of an onset),
+//   flow (running integral of energy in seconds: drive audio-dependent speeds as phase = k * flow, never jumps).
 // computeFeatures() reads a whole AudioBuffer offline (deterministic, normalised per song so quiet ambient mixes still move
 // the heart, time-sliced so the page never freezes). createLiveFeatures() does the same from an AnalyserNode for the preview.
 
@@ -76,12 +79,15 @@ function shape(raw, frames, fps) {
   }
   const lowAvg = movingAvg(norm.low, Math.round(fps * 0.75)), fluxAvg = movingAvg(norm.flux, Math.round(fps * 0.75));
   const out = { fps, frames, pulse: new Float32Array(frames), low: new Float32Array(frames), mid: new Float32Array(frames), high: new Float32Array(frames),
-    level: new Float32Array(frames), slow: new Float32Array(frames), accent: new Float32Array(frames), onsets: 0 };
+    level: new Float32Array(frames), slow: new Float32Array(frames), accent: new Float32Array(frames), onsets: 0,
+    energy: new Float32Array(frames), bass: new Float32Array(frames), bright: new Float32Array(frames), big: new Float32Array(frames),
+    onset: new Float32Array(frames), flow: new Float32Array(frames) };
   const env = { low: 0, rel: 0, mid: 0, high: 0, level: 0, slow: 0, acc: 0 };
   const C = { la: coef(fps, 0.04), lr: coef(fps, 0.32), ma: coef(fps, 0.15), mr: coef(fps, 0.8), ha: coef(fps, 0.05), hr: coef(fps, 0.35), va: coef(fps, 0.1), vr: coef(fps, 0.5), s: coef(fps, 3) };
   const accDecay = Math.exp(-1 / (fps * 0.17)), refractory = Math.round(fps * 0.22);
   const follow = (cur, x, a, r) => cur + (x - cur) * (x > cur ? a : r);
   let last = -1e9;
+  const strengths = [];
   for (let i = 0; i < frames; i++) {
     env.low = follow(env.low, norm.low[i], C.la, C.lr);
     env.rel = follow(env.rel, Math.max(0, norm.low[i] - lowAvg[i] * 0.85) * 2.2, C.la, C.lr);
@@ -93,23 +99,55 @@ function shape(raw, frames, fps) {
     const fx = norm.flux[i];
     if (fx > fluxAvg[i] * 1.45 + 0.22 && fx >= (norm.flux[i - 1] || 0) && fx >= (norm.flux[i + 1] || 0) && i - last >= refractory) {
       env.acc = Math.max(env.acc, clamp((fx - fluxAvg[i]) / 1.2, 0.35, 1)); last = i; out.onsets++;
+      out.onset[i] = 1; strengths.push([i, (fx - fluxAvg[i]) / 1.2]);
     }
     out.pulse[i] = clamp(env.low * 0.55 + env.rel * 0.8, 0, 1.25); out.low[i] = env.low; out.mid[i] = env.mid; out.high[i] = env.high;
     out.level[i] = env.level; out.slow[i] = env.slow; out.accent[i] = env.acc;
   }
+  extras(out, norm, strengths, fps);
   return out;
+}
+
+// the scene-kit fields (scenes/SCENES-API.md). Separate from the heart's numbers above, which stay exactly as they were.
+function extras(out, norm, strengths, fps) {
+  const n = out.frames, sec = movingAvg(norm.level, Math.round(fps * 6));
+  const c = s => coef(fps, s), follow = (cur, x, a, r) => cur + (x - cur) * (x > cur ? a : r);
+  let e = sec[0] || 0, b = 0, h = 0, flow = 0;
+  for (let i = 0; i < n; i++) {
+    e += (sec[i] - e) * c(1.5); b = follow(b, norm.low[i], c(0.4), c(1.5)); h = follow(h, norm.high[i], c(0.4), c(1.5));
+    out.energy[i] = clamp(e, 0, 1.2); out.bass[i] = clamp(b, 0, 1.2); out.bright[i] = clamp(h, 0, 1.2);
+    flow += out.energy[i] / fps; out.flow[i] = flow;
+  }
+  // big accents: the strongest onsets of the song (top ~10%, strength >= 0.75) while the music is up, at most one per 8 s
+  const sorted = strengths.map(x => x[1]).sort((a, b2) => a - b2), th = Math.max(0.75, sorted[Math.floor(sorted.length * 0.9)] || 1e9);
+  const decay = Math.exp(-1 / (fps * 0.5)), gap = Math.round(fps * 8);
+  let lastBig = -1e9, env = 0, k = 0;
+  for (let i = 0; i < n; i++) {
+    env *= decay;
+    while (k < strengths.length && strengths[k][0] < i) k++;
+    if (k < strengths.length && strengths[k][0] === i && strengths[k][1] >= th && out.level[i] > 0.45 && i - lastBig >= gap) { env = clamp(strengths[k][1], 0.6, 1); lastBig = i; }
+    out.big[i] = env;
+  }
 }
 
 /** The numbers for one frame (index clamped). */
 export function frameAt(F, i) {
   i = clamp(i | 0, 0, F.frames - 1);
-  return { pulse: F.pulse[i], low: F.low[i], mid: F.mid[i], high: F.high[i], level: F.level[i], slow: F.slow[i], accent: F.accent[i], accentLag: F.accent[Math.max(0, i - 3)] };
+  const x = k => (F[k] ? F[k][i] : 0);
+  return { pulse: F.pulse[i], low: F.low[i], mid: F.mid[i], high: F.high[i], level: F.level[i], slow: F.slow[i], accent: F.accent[i], accentLag: F.accent[Math.max(0, i - 3)],
+    energy: x('energy'), bass: x('bass'), bright: x('bright'), big: x('big'), onset: x('onset'), flow: F.flow ? F.flow[i] : i / F.fps * 0.3 };
 }
+
+/** Every per-frame field (for scenes and tests): all zero = silence. */
+export const FEATURE_KEYS = ['pulse', 'low', 'mid', 'high', 'level', 'slow', 'accent', 'accentLag', 'energy', 'bass', 'bright', 'big', 'onset', 'flow'];
+/** Silence: every field 0 (flow 0 too). */
+export function silentFeatures() { const o = {}; for (const k of FEATURE_KEYS) o[k] = 0; return o; }
 
 /** A calm breathing heart when nothing plays. */
 export function idleFeatures(t) {
   const b = Math.pow(Math.max(0, Math.sin(t * 1.9)), 10);
-  return { pulse: 0.18 + b * 0.35, low: 0.25 + b * 0.2, mid: 0.3 + 0.12 * Math.sin(t * 0.4), high: 0.25 + 0.1 * Math.sin(t * 0.63 + 1), level: 0.3, slow: 0.3, accent: 0, accentLag: 0 };
+  return { pulse: 0.18 + b * 0.35, low: 0.25 + b * 0.2, mid: 0.3 + 0.12 * Math.sin(t * 0.4), high: 0.25 + 0.1 * Math.sin(t * 0.63 + 1), level: 0.3, slow: 0.3, accent: 0, accentLag: 0,
+    energy: 0.3, bass: 0.25, bright: 0.25, big: 0, onset: 0, flow: t * 0.3 };
 }
 
 /** Live: an AnalyserNode -> the same kind of numbers, per animation frame (dt in seconds). */
@@ -118,7 +156,8 @@ export function createLiveFeatures(analyser) {
   const rng = ([a, b]) => [Math.max(1, Math.round(a * fftN / sr)), Math.min(n - 1, Math.round(b * fftN / sr))];
   const R = { low: rng(BANDS.low), mid: rng(BANDS.mid), high: rng(BANDS.high), flux: rng(FLUX) };
   const peak = { low: 1e-4, mid: 1e-4, high: 1e-4, level: 1e-4, flux: 1e-2 };
-  const st = { pulse: 0, low: 0, mid: 0, high: 0, level: 0, slow: 0, accent: 0, accentLag: 0, avgLow: 0, avgFlux: 0, since: 1 };
+  const st = { pulse: 0, low: 0, mid: 0, high: 0, level: 0, slow: 0, accent: 0, accentLag: 0, avgLow: 0, avgFlux: 0, since: 1,
+    energy: 0, bass: 0, bright: 0, big: 0, onset: 0, flow: 0, sinceBig: 99 };
   const lag = [];
   return {
     update(dt) {
@@ -137,7 +176,14 @@ export function createLiveFeatures(analyser) {
       st.rel = f(st.rel || 0, Math.max(0, nv.low - st.avgLow * 0.85) * 2.2, 0.04, 0.32);
       st.pulse = clamp(st.low * 0.55 + st.rel * 0.8, 0, 1.25);
       st.accent *= Math.exp(-dt / 0.17); st.since += dt;
-      if (nv.flux > st.avgFlux * 1.45 + 0.22 && st.since > 0.22) { st.accent = Math.max(st.accent, clamp((nv.flux - st.avgFlux) / 1.2, 0.35, 1)); st.since = 0; }
+      st.onset = 0; st.big *= Math.exp(-dt / 0.5); st.sinceBig += dt;
+      if (nv.flux > st.avgFlux * 1.45 + 0.22 && st.since > 0.22) {
+        const strength = (nv.flux - st.avgFlux) / 1.2;
+        st.accent = Math.max(st.accent, clamp(strength, 0.35, 1)); st.since = 0; st.onset = 1;
+        if (strength > 0.9 && st.level > 0.45 && st.sinceBig > 8) { st.big = clamp(strength, 0.6, 1); st.sinceBig = 0; }
+      }
+      st.energy += (nv.level - st.energy) * c(6); st.bass = f(st.bass, nv.low, 0.4, 1.5); st.bright = f(st.bright, nv.high, 0.4, 1.5);
+      st.flow += st.energy * dt;
       lag.push(st.accent); if (lag.length > 3) st.accentLag = lag.shift();
       return st;
     },

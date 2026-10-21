@@ -1,0 +1,48 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>scene check</title>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
+</head><body style="margin:0;background:#111">
+<script type="module">
+// The browser half of tests/scene-check.cjs: talks to the REAL preview worker (js/visual/preview-worker.js, the scene
+// host + registry) with 'snap' messages, and runs real makeVideo exports (render-worker.js).
+import { computeFeatures, frameAt, silentFeatures } from '../js/visual/features.js?v=8';
+import { makeVideo, decodeAudio, videoSize, pickCodecs } from '../js/visual/video.js?v=8';
+const w = new Worker(new URL('../js/visual/preview-worker.js?v=8', import.meta.url), { type: 'module' });
+const pending = new Map(); let rid = 0;
+w.onmessage = ({ data: m }) => { const p = pending.get(m.id); if (!p) return; pending.delete(m.id); if (m.type === 'error') p.rej(new Error(m.message)); else p.res(m); };
+w.onerror = e => { for (const p of pending.values()) p.rej(new Error('worker: ' + (e.message || 'failed'))); pending.clear(); };
+const ask = msg => new Promise((res, rej) => { const id = ++rid; pending.set(id, { res, rej }); w.postMessage({ ...msg, id }); });
+const b64 = buf => { const u = new Uint8Array(buf); let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); };
+let audio = null, F = null;
+window.__sc = {
+  async loadSong(url) {
+    const r = await fetch(url); audio = await decodeAudio(await r.arrayBuffer());
+    const t0 = performance.now(); F = await computeFeatures(audio, { fps: 30 });
+    return { duration: audio.duration, frames: F.frames, onsets: F.onsets, featuresMs: Math.round(performance.now() - t0) };
+  },
+  feat(t, silent) { return silent || !F ? silentFeatures() : frameAt(F, Math.round(t * 30)); },
+  async snap({ opts, size, shots, png = true, pixels = false, measure = false }) {
+    const s = shots.map(x => ({ ...x, f: this.feat(x.t, x.silent), fps: 30 }));
+    const r = await ask({ cmd: 'snap', opts, size, shots: s, png, pixels, measure });
+    for (const sh of r.shots) { if (sh.png) sh.png = b64(sh.png); if (sh.pixels) sh.pixels = Array.from(new Uint8Array(sh.pixels)); }
+    return r;
+  },
+  async compare({ opts, size, t, between }) {
+    const one = async tt => (await ask({ cmd: 'snap', opts, size, shots: [{ t: tt, f: this.feat(tt), fps: 30 }], pixels: true })).shots[0].pixels;
+    const a = new Uint8Array(await one(t)); await one(between); const b = new Uint8Array(await one(t));
+    let diff = 0, max = 0; for (let i = 0; i < a.length; i += 4) { const d = Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2])); if (d) { diff++; if (d > max) max = d; } }
+    return { identical: diff === 0, diffPixels: diff, maxDiff: max, pixels: a.length / 4 };
+  },
+  release() { w.postMessage({ cmd: 'release' }); },
+  async video({ seconds, aspect, res, scene, variant, quality, showText = true, fps = 30 }) {
+    const [width, height] = videoSize(aspect, res);
+    const codecs = await pickCodecs(width, height, { fps });
+    const t0 = performance.now(); let last = null;
+    const v = await makeVideo({ audio, seconds, width, height, fps, scene, variant, quality, showText, title: 'Scene check', artist: 'Nicofoxheart',
+      onProgress: (st, f, info) => { if (st === 'frames' && info) { last = { frame: info.frame, fps: +info.fps.toFixed(2), eta: +info.eta.toFixed(1), settled: info.settled, still: !!info.still }; info.still?.close?.(); } } });
+    return { ms: Math.round(performance.now() - t0), ext: v.ext, codec: v.codec, where: v.where, width: v.width, height: v.height, frames: v.frames, bytes: v.blob.size, last,
+      codecConfig: codecs && { video: codecs.video.codec, bitrate: codecs.video.bitrate, audio: codecs.audio.codec }, data: b64(await v.blob.arrayBuffer()) };
+  },
+};
+window.__scReady = true;
+</script></body></html>

@@ -6,9 +6,9 @@
 //
 // Integrator: initSteps(document.getElementById('pane-beats')); call renderSteps() when the Beats tab opens.
 // It listens to 'render' / 'select' itself while isActive() (default: S.tab === 'beats').
-import { S, on, emit, begin, end, edit, clipOf, clamp, uid, bpb, track, instDef } from './state.js?v=8p';
-import { h, knob } from './controls.js?v=8p';
-import { DRUM_MAP } from '../sound/drums.js?v=8p';
+import { S, on, emit, begin, end, edit, clipOf, clamp, uid, bpb, track, instDef } from './state.js?v=9a';
+import { h, knob } from './controls.js?v=9a';
+import { DRUM_MAP } from '../sound/drums.js?v=9a';
 
 export const STEP_BEATS = 0.25;                    // one step = a 16th note
 export const MIN_STEPS = 4, MAX_STEPS = 128;       // 128 steps = 8 bars of 4/4

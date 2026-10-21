@@ -5,12 +5,12 @@
 // Saves: .mp4 (AAC, audio only) where WebCodecs has an AAC encoder, and the PC's .zip (24-bit WAV + 320 kbps MP3).
 // Opened from the "made for your computer" screen (#pc-audio, wired in phone.js). Read-only: it never saves a tape.
 // Look: a dark-glass hero for the tape (the reels wind the tape over while it records), a waveform scrubber, three steps.
-import { h, icon } from './controls.js?v=8p';
-import { createDeck, canvasSize } from './deck.js?v=8p';
-import { songSeconds, kb } from './exporter.js?v=8p';
-import { scaleById } from './theory.js?v=8p';
-import { openProjects } from '../../lib/storage.js?v=8p';
-import { trimTail, encodeWav, encodeMp3, makeZip, saveFile } from '../../lib/export.js?v=8p';
+import { h, icon } from './controls.js?v=9a';
+import { createDeck, canvasSize } from './deck.js?v=9a';
+import { songSeconds, kb } from './exporter.js?v=9a';
+import { scaleById } from './theory.js?v=9a';
+import { openProjects } from '../../lib/storage.js?v=9a';
+import { trimTail, encodeWav, encodeMp3, makeZip, saveFile } from '../../lib/export.js?v=9a';
 
 const MP4_MUXER = 'https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.2/build/mp4-muxer.mjs';   // same pin as js/visual/video-core.js
 const SAMPLE_RATE = 44100;          // the PC export's rate (engine.render default)
@@ -90,8 +90,8 @@ const isTape = p => !!p && typeof p === 'object' && Array.isArray(p.tracks) && (
 const hasSound = p => p.tracks.some(t => (t.clips || []).length);
 
 async function demoTapes() {
-  const [{ DEMO }, ng] = await Promise.all([import('../sound/demo.js?v=8p'),
-    fetch('demo-night-garage.json?v=8p', { cache: 'no-cache' }).then(r => (r.ok ? r.json() : null)).catch(() => null)]);
+  const [{ DEMO }, ng] = await Promise.all([import('../sound/demo.js?v=9a'),
+    fetch('demo-night-garage.json?v=9a', { cache: 'no-cache' }).then(r => (r.ok ? r.json() : null)).catch(() => null)]);
   const out = [{ id: 'demo', name: DEMO.name, project: Object.assign(clone(DEMO), { id: 'demo' }), demo: true }];
   if (ng) out.push({ id: 'demo-night-garage', name: ng.name, project: Object.assign(ng, { id: 'demo-night-garage' }), demo: true });
   return out;
@@ -294,7 +294,7 @@ async function renderTape(project, { seconds, tailSeconds = TAIL_SECONDS, onProg
   if (seconds) p.lengthBars = Math.max(1, Math.ceil(seconds * p.bpm / 60 / bpb));
   const toBeat = p.lengthBars * bpb;
   // --- engine.render(p, {tailSeconds, toBeat})
-  const { createEngine } = await import('../sound/engine.js?v=8p');
+  const { createEngine } = await import('../sound/engine.js?v=9a');
   if (j.cancelled) throw cancelErr();
   const pr = clone(p);
   pr.loop = { ...(pr.loop || {}), on: false };

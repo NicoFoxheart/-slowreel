@@ -7,8 +7,8 @@
 //   blankProject(base)                 zero tracks
 //   starterProject(starter, base)      the set-up tape (base = { instruments, buses, colors, uid })
 //   guideFor(project)                  a recipe-shaped object for recipes-panel openTips (style guide or flow tips)
-import { h, icon } from './controls.js?v=8p';
-import { KEYMAP } from './panels.js?v=8p';
+import { h, icon } from './controls.js?v=9a';
+import { KEYMAP } from './panels.js?v=9a';
 
 // ---------------------------------------------------------------- notes, keys and the home note
 const NOTE = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];

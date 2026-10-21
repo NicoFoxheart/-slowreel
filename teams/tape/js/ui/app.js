@@ -1,25 +1,25 @@
 // app.js - Slowreel boot + the deck (transport, counter, master), Nico's tapes, projects, export dialog, the dock,
 // QWERTY playing / recording, keyboard shortcuts, the visual loop and the test hook window.__studio.
 import { S, on, emit, edit, track, clipOf, clamp, uid, clone, bpb, songBeats, fmtTime, isSongTrack, instDef, isSongParam,
-  doUndo, doRedo, canUndo, canRedo, resetHistory } from './state.js?v=8p';
-import { h, icon, knob } from './controls.js?v=8p';
-import { loadEngine } from './engine.js?v=8p';
-import { initArrange, render as renderArrange, fitZoom, zoomBy, setPlayhead, updateLoop, updateMeters, addClipHere, duplicateClip, deleteClip, addTrack, createClipAt, selectClip } from './arrange.js?v=8p';
-import { initRoll, render as renderRoll, setRollHead, zoom as rollZoom } from './pianoroll.js?v=8p';
-import { initPanels, renderTab, renderSongClip, updateMixMeters, animateCloud, KEYMAP, markKbKey } from './panels.js?v=8p';
-import { createDeck, createVU } from './deck.js?v=8p';
-import { exportMaster, renderProject, songSeconds, kb } from './exporter.js?v=8p';
-import { initPhone, phoneFrame } from './phone.js?v=8p';
-import { KEYS, CHORDS, scaleGroups } from './theory.js?v=8p';
-import { TRACK_COLORS } from './sample-project.js?v=8p';
-import { SONGS, loadSong } from '../../lib/songs.js?v=8p';
-import { openProjects, autosave } from '../../lib/storage.js?v=8p';
-import { measure } from '../../lib/export.js?v=8p';
-import { initVisual, openVisual, isVisualOpen, exportVideoFor } from '../visual/visual-panel.js?v=8p';
-import { mountStudio3D } from '../ui3d/studio3d.js?v=8p';
-import { initSteps, renderSteps, isDrumTrack } from './steps.js?v=8p';
-import { openChooser, closeChooser, blankProject, starterProject as styleStarter, guideFor, starterById } from './starters.js?v=8p';
-import { createLiveArp } from '../sound/arp.js?v=8p';
+  doUndo, doRedo, canUndo, canRedo, resetHistory } from './state.js?v=9a';
+import { h, icon, knob } from './controls.js?v=9a';
+import { loadEngine } from './engine.js?v=9a';
+import { initArrange, render as renderArrange, fitZoom, zoomBy, setPlayhead, updateLoop, updateMeters, addClipHere, duplicateClip, deleteClip, addTrack, createClipAt, selectClip } from './arrange.js?v=9a';
+import { initRoll, render as renderRoll, setRollHead, zoom as rollZoom } from './pianoroll.js?v=9a';
+import { initPanels, renderTab, renderSongClip, updateMixMeters, animateCloud, KEYMAP, markKbKey } from './panels.js?v=9a';
+import { createDeck, createVU } from './deck.js?v=9a';
+import { exportMaster, renderProject, songSeconds, kb } from './exporter.js?v=9a';
+import { initPhone, phoneFrame } from './phone.js?v=9a';
+import { KEYS, CHORDS, scaleGroups } from './theory.js?v=9a';
+import { TRACK_COLORS } from './sample-project.js?v=9a';
+import { SONGS, loadSong } from '../../lib/songs.js?v=9a';
+import { openProjects, autosave } from '../../lib/storage.js?v=9a';
+import { measure } from '../../lib/export.js?v=9a';
+import { initVisual, openVisual, isVisualOpen, exportVideoFor } from '../visual/visual-panel.js?v=9a';
+import { mountStudio3D } from '../ui3d/studio3d.js?v=9a';
+import { initSteps, renderSteps, isDrumTrack } from './steps.js?v=9a';
+import { openChooser, closeChooser, blankProject, starterProject as styleStarter, guideFor, starterById } from './starters.js?v=9a';
+import { createLiveArp } from '../sound/arp.js?v=9a';
 
 const $ = id => document.getElementById(id);
 const LAST_KEY = 'slowreel:last';
@@ -519,7 +519,7 @@ async function restoreDemo() {
 // The second demo, "Night Garage" (Antent-style future garage: drums, 808, supersaw pad with pump, chops, arp, automation).
 // Fetched when asked for (demo-night-garage.json next to index.html); opening it always gives a fresh copy.
 async function nightGarageCopy() {
-  const r = await fetch('demo-night-garage.json?v=8p', { cache: 'no-cache' }); if (!r.ok) throw new Error('HTTP ' + r.status);
+  const r = await fetch('demo-night-garage.json?v=9a', { cache: 'no-cache' }); if (!r.ok) throw new Error('HTTP ' + r.status);
   const d = await r.json(); d.id = 'demo-night-garage'; d.schema = d.schema || 'nfx-studio/1'; d.updatedAt = Date.now(); return d;
 }
 async function openNightGarage() {
@@ -531,7 +531,7 @@ async function openNightGarage() {
 }
 // ---------------------------------------------------------------- recipes (js/recipes + js/ui/recipes-panel.js)
 let recipesMod = null;
-const recipesPanel = () => (recipesMod ||= import('./recipes-panel.js?v=8p'));
+const recipesPanel = () => (recipesMod ||= import('./recipes-panel.js?v=9a'));
 /** Load a recipe project the way opening a project or the demo does: the current tape is saved first, the recipe becomes
  *  the current project (its own id, saved, autosaved from here on) and starts with a clean undo history. */
 async function loadRecipeProject(project, recipe) {
@@ -738,9 +738,10 @@ window.__studio = {
   async renderOffline(seconds = 8) { const { buf } = await renderProject({ seconds, tailSeconds: 0 }); const m = measure(buf); return { ...m, seconds: +buf.duration.toFixed(2) }; },
   async exportMaster({ seconds = 6 } = {}) { return exportMaster({ seconds }); },
   // music video (test hook): source 'project' or a song id; returns {bytes, mime, width, height, frames, hasAudio, codec, saveStatus}
-  async exportVideo({ format = '9:16', seconds = 4, source = 'project', mood, intensity } = {}) {
-    const r = await exportVideoFor({ source: source === 'project' ? { kind: 'project' } : { kind: 'song', id: source }, format, seconds, mood, intensity });
-    return { bytes: r.bytes, mime: r.mime, width: r.width, height: r.height, frames: r.frames, hasAudio: r.hasAudio, codec: r.codec, note: r.note, where: r.where, saveStatus: r.saveStatus };
+  // (also scene, variant, res '720'|'1080'|'1440'|'2160', quality, showText, fps: see visual-panel.js exportVideoFor)
+  async exportVideo({ format = '9:16', seconds = 4, source = 'project', mood, intensity, ...more } = {}) {
+    const r = await exportVideoFor({ source: source === 'project' ? { kind: 'project' } : { kind: 'song', id: source }, format, seconds, mood, intensity, ...more });
+    return { bytes: r.bytes, mime: r.mime, width: r.width, height: r.height, frames: r.frames, hasAudio: r.hasAudio, codec: r.codec, note: r.note, where: r.where, saveStatus: r.saveStatus, scene: r.scene, variant: r.variant };
   },
   // extra test helpers (not in the contract): per-track meters, play from a beat, the live project and backend
   meters() { const o = {}; for (const t of S.project.tracks) o[t.name] = S.engine.meter(t.id); return o; },
@@ -755,7 +756,7 @@ window.__studio = {
   setLight(on) { setLight(on, { save: false }); return S.light; },
   speedProbe(seconds = 3) { return S.engine.speedProbe?.({ seconds }); },
   // load a recipe by id through the same path as the Recipes panel (tests)
-  async loadRecipe(id) { const m = await import('../recipes/recipes.js?v=8p'); const r = m.recipeById?.(id) || m.RECIPES.find(x => x.id === id); if (!r) return null; const p = await loadRecipeProject(m.recipeProject ? m.recipeProject(r) : clone(r.project), r); return { id: p.id, name: p.name, tracks: p.tracks.length }; },
+  async loadRecipe(id) { const m = await import('../recipes/recipes.js?v=9a'); const r = m.recipeById?.(id) || m.RECIPES.find(x => x.id === id); if (!r) return null; const p = await loadRecipeProject(m.recipeProject ? m.recipeProject(r) : clone(r.project), r); return { id: p.id, name: p.name, tracks: p.tracks.length }; },
 };
 
 // ---------------------------------------------------------------- go
@@ -779,6 +780,6 @@ function showPcOnly() {
   const draw = () => d.draw({ playing: false, frac: 0.38, level: 0, analyser: null, dt: 0, still: true });
   requestAnimationFrame(draw); new ResizeObserver(() => requestAnimationFrame(draw)).observe(cv);
   // the studio stays PC only, but a phone can make a music video of one of Nico's songs (or a file from the phone)
-  $('pc-video').onclick = () => import('../visual/phone-maker.js?v=8p').then(m => m.openPhoneMaker()).catch(e => { console.error('[slowreel] video maker', e); });
+  $('pc-video').onclick = () => import('../visual/phone-maker.js?v=9a').then(m => m.openPhoneMaker()).catch(e => { console.error('[slowreel] video maker', e); });
 }
 void renderTab; void instDef; void kb;

@@ -137,9 +137,10 @@ export function drawTextLayer(canvas, { title = '', artist = '', mood = 'sakura'
  * -> { canvas, renderer, setSize(w, h, pr), setMood(id), setIntensity(v), setText({title, artist}), render(t, features, {duration}), dispose() }
  */
 export function createHeartScene({ canvas, width = 1080, height = 1920, pixelRatio = 1, mood = 'sakura', intensity = 0.6, light = false, antialias = true,
-  preserve = false, title = '', artist = 'Nicofoxheart', textLayer = null } = {}) {
-  canvas = canvas || mkCanvas(width, height);
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias, alpha: false, preserveDrawingBuffer: preserve, powerPreference: 'high-performance' });
+  preserve = false, title = '', artist = 'Nicofoxheart', textLayer = null, renderer: shared = null, hideBar = false } = {}) {
+  canvas = canvas || shared?.domElement || mkCanvas(width, height);
+  // a shared renderer (the scene host's, scenes/host.js) is used as it is and never disposed here
+  const renderer = shared || new THREE.WebGLRenderer({ canvas, antialias, alpha: false, preserveDrawingBuffer: preserve, powerPreference: 'high-performance' });
   renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.NoToneMapping;
   // HDR scene target with mipmaps: the composite pass reads blurred mip levels for a single-pass bloom
   const gl2 = renderer.capabilities.isWebGL2, halfOk = gl2 && !!renderer.extensions.get('EXT_color_buffer_float');
@@ -276,6 +277,7 @@ export function createHeartScene({ canvas, width = 1080, height = 1920, pixelRat
     Promise.all([f.load('64px "Dela Gothic One"'), f.load('500 32px "M PLUS Rounded 1c"')]).then(() => drawText()).catch(() => { });
   }
   function applyLayout(l) {
+    if (l && hideBar) l = { ...l, hideBar: true };
     layout = l; if (!l) return;
     barTrack.position.set(l.x0 + l.w / 2, l.y, 0); barTrack.scale.set(l.w, l.h, 1);
     vigU.uText.value = l.hasText ? 1 : 0.4;
@@ -300,7 +302,7 @@ export function createHeartScene({ canvas, width = 1080, height = 1920, pixelRat
     const k = 0.45 + inten * 0.9, still = 1;
     // camera: slow drift and breathing dolly
     camera.position.set(Math.sin(t * 0.071) * 0.32 * still, Math.sin(t * 0.053 + 1) * 0.2 + 0.05, baseDist * (1 - 0.022 * Math.sin(t * 0.037) - f.slow * 0.025 * inten));
-    camera.lookAt(0, lookY, 0);
+    camera.lookAt(0, lookY, 0); camera.updateMatrixWorld();   // project() below needs this frame's camera (pure function of t)
     // heart: sway, float, pulse
     const breath = Math.pow(Math.max(0, Math.sin(t * 1.9)), 10) * 0.012;
     const s = 1 + breath + f.pulse * 0.085 * k + f.accent * 0.012 * k;
@@ -365,7 +367,7 @@ export function createHeartScene({ canvas, width = 1080, height = 1920, pixelRat
     if (duration > 0) { fade = Math.max(1 - smooth(0, 1.2, t), smooth(duration - 1.6, duration - 0.05, t)); }
     vigU.uFade.value = fade;
     const prog = duration > 0 ? Math.min(1, t / duration) : 0;
-    barTrack.visible = barFill.visible = duration > 0 && !!layout;
+    barTrack.visible = barFill.visible = duration > 0 && !!layout && !layout.hideBar;
     if (layout && prog > 0) { barFill.scale.set(Math.max(1e-4, layout.w * prog), layout.h, 1); barFill.position.set(layout.x0 + layout.w * prog / 2, layout.y, 0); }
     postU.uTime.value = t; postU.uBloom.value = 0.75 + f.pulse * 0.45 * k + f.level * 0.25;
     renderer.setRenderTarget(rt); renderer.clear(); renderer.render(scene, camera);
@@ -373,9 +375,9 @@ export function createHeartScene({ canvas, width = 1080, height = 1920, pixelRat
   }
 
   function dispose() {
-    rt.dispose(); post.traverse(o => { o.geometry?.dispose?.(); o.material?.dispose?.(); }); renderer.dispose(); geo.dispose(); earGeo.dispose(); innerGeo.dispose(); haloTex.dispose(); textTex?.dispose(); petalMat.map?.dispose();
+    rt.dispose(); post.traverse(o => { o.geometry?.dispose?.(); o.material?.dispose?.(); }); if (!shared) renderer.dispose(); geo.dispose(); earGeo.dispose(); innerGeo.dispose(); haloTex.dispose(); textTex?.dispose(); petalMat.map?.dispose();
     scene.traverse(o => { o.geometry?.dispose?.(); o.material?.dispose?.(); }); overlay.traverse(o => { o.geometry?.dispose?.(); o.material?.dispose?.(); });
-    try { renderer.forceContextLoss(); } catch { }
+    if (!shared) try { renderer.forceContextLoss(); } catch { }
   }
 
   setSize(width, height, pixelRatio); setMood(mood); fontsReady();
