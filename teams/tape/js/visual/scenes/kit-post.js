@@ -2,8 +2,8 @@
 // a proper mip chain (13-tap Karis prefilter + soft knee, tent upsample, energy-normalised), optional depth-of-field-lite,
 // sun light shafts and lens dirt, white balance / tint / saturation / contrast / lift-gamma-gain, ACES or AgX, natural
 // vignette, subtle chromatic aberration, resolution-independent film grain, dither (no banding in H.264), letterbox.
-import * as G from './kit-glsl.js?v=9b';
-import { createPass, halfFloatOK, bakeTexture, cached } from './kit-gpu.js?v=9b';
+import * as G from './kit-glsl.js?v=9c';
+import { createPass, halfFloatOK, bakeTexture, cached } from './kit-gpu.js?v=9c';
 
 const DOWN_FS = /* glsl */`
 uniform sampler2D tSrc; uniform vec2 uTexel; uniform float uThreshold, uKnee, uClamp;

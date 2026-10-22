@@ -1,13 +1,13 @@
 // phone.js - "Slowreel pocket": listen (transport + track mutes) and play pads (scale pads on any instrument track).
-import { S, on, edit, clamp, isSongTrack, fmtTime, songBeats } from './state.js?v=9b';
-import { h } from './controls.js?v=9b';
-import { createDeck } from './deck.js?v=9b';
-import { scaleRun, noteName, keyIndex, scaleById } from './theory.js?v=9b';
+import { S, on, edit, clamp, isSongTrack, fmtTime, songBeats } from './state.js?v=9c';
+import { h } from './controls.js?v=9c';
+import { createDeck } from './deck.js?v=9c';
+import { scaleRun, noteName, keyIndex, scaleById } from './theory.js?v=9c';
 
 const $ = id => document.getElementById(id);
 let api, deck, padOct = 4, padTrack = null;
 // Phones: "Your tapes" on the made-for-your-computer screen makes a tape's audio file offline (js/ui/phone-export.js).
-$('pc-audio')?.addEventListener('click', () => import('./phone-export.js?v=9b').then(m => m.openPhoneExport()).catch(e => console.error('[slowreel] phone export', e)));
+$('pc-audio')?.addEventListener('click', () => import('./phone-export.js?v=9c').then(m => m.openPhoneExport()).catch(e => console.error('[slowreel] phone export', e)));
 
 export function initPhone(a) {
   api = a;

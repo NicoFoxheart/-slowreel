@@ -20,7 +20,7 @@
 //
 // Integrator:  import { VOCALS } from './vocals.js';
 //              for (const d of VOCALS) { d.region = d.region || 'Voices'; if (!INSTRUMENT_MAP[d.id]) { INSTRUMENTS.push(d); INSTRUMENT_MAP[d.id] = d; } }
-import { clamp, mtof, rng, noiseBuffer, disconnectAll, krate, krateFilter, cached, release as relParam } from './util.js?v=9b';
+import { clamp, mtof, rng, noiseBuffer, disconnectAll, krate, krateFilter, cached, release as relParam } from './util.js?v=9c';
 
 const P = (id, name, min, max, def, extra = {}) => ({ id, name, min, max, default: def, unit: '', ...extra });
 const ENUM = (id, name, options, def) => ({ id, name, min: 0, max: options.length - 1, default: def, unit: '', type: 'enum', options });

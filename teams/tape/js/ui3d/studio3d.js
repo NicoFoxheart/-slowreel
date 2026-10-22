@@ -7,7 +7,7 @@
 // deck if the browser has no OffscreenCanvas / module workers / WebGL, or if the worker fails or loses its context.
 //
 // API: mountStudio3D({ S, pcOnly }) -> { frame({playing, frac, level, beat}), setLight(on), settingsRow(), get active() }
-import { h } from '../ui/controls.js?v=9b';
+import { h } from '../ui/controls.js?v=9c';
 
 const PREF = 'slowreel:ui3d';
 const lsGet = k => { try { return localStorage.getItem(k); } catch { return null; } };
@@ -88,7 +88,7 @@ export function mountStudio3D({ S, pcOnly = false } = {}) {
     let off;
     try {
       off = canvas.transferControlToOffscreen();
-      worker = new Worker(new URL('./worker3d.js?v=9b', import.meta.url), { type: 'module' });
+      worker = new Worker(new URL('./worker3d.js?v=9c', import.meta.url), { type: 'module' });
     } catch (e) { fail(e); return; }
     const me = worker;   // messages from a worker that was already disposed (Light mode, setting off) are ignored
     worker.onerror = ev => { ev.preventDefault?.(); if (me === worker) fail(new Error(ev.message || 'the 3D worker failed to load')); };

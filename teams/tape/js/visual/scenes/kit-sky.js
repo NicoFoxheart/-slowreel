@@ -4,8 +4,8 @@
 // anti-aliased stars and a faint milky way + a curved, domain-warped cloud layer lit by the sun/moon), exponential
 // height fog with aerial perspective (fog colour = the sky in that direction + forward-scattered sun), a CPU copy of the
 // model for light colours (sun / moon / ambient), PMREM environment baking and a fog patch for three's materials.
-import * as G from './kit-glsl.js?v=9b';
-import { createPass, halfFloatOK } from './kit-gpu.js?v=9b';
+import * as G from './kit-glsl.js?v=9c';
+import { createPass, halfFloatOK } from './kit-gpu.js?v=9c';
 
 // ------------------------------------------------------------------------------------------------ CPU model (km)
 const RE = 6360, RA = 6460, BR = [5.802e-3, 13.558e-3, 33.1e-3], BO = [0.650e-3, 1.881e-3, 0.085e-3], BM_S = 3.996e-3, BM_E = 4.4e-3 + 3.996e-3;

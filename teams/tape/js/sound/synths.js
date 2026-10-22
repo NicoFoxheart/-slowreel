@@ -2,7 +2,7 @@
 // Same definition format as instruments.js: {id, name, kind:'synth', maxVoices, params:[...], macros:[ids], presets:[{id,name,params}],
 // voice(ctx, env, P, midi, vel, t)} -> voice {out, release(t), stop(t), kill(t), endTime, nodes, dead}.
 // Integrator: INSTRUMENTS.push(...SYNTHS) and INSTRUMENT_MAP[d.id] = d (or spread both lists) - nothing else is needed.
-import { clamp, mtof, rng, noiseBuffer, satCurve, cached, disconnectAll, release as relParam } from './util.js?v=9b';
+import { clamp, mtof, rng, noiseBuffer, satCurve, cached, disconnectAll, release as relParam } from './util.js?v=9c';
 
 const P = (id, name, min, max, def, extra = {}) => ({ id, name, min, max, default: def, unit: '', ...extra });
 const ENUM = (id, name, options, def) => ({ id, name, min: 0, max: options.length - 1, default: def, unit: '', type: 'enum', options });
