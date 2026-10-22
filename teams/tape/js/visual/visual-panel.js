@@ -3,12 +3,12 @@
 // export with the audio inside. Everything 3D happens in workers: the live hero preview and the scene-card thumbnails
 // in preview-worker.js (cards are rendered lazily, one at a time, when they scroll into view), the export in
 // render-worker.js. The page only draws DOM, so the studio's audio never waits on the GPU.
-import { h, icon } from '../ui/controls.js?v=9d';
-import { SONGS, songUrl } from '../../lib/songs.js?v=9d';
-import { FORMATS, RESOLUTIONS, DEFAULT_RES, videoSize, videoBitrate, pickCodecs, encodeSupport, makeVideo, renderProjectAudio, decodeAudio, saveVideo } from './video.js?v=9d';
-import { kbmb, previewPacer } from './common.js?v=9d';
-import { createPreview } from './preview.js?v=9d';
-import { listScenes, GROUPS, DEFAULT_SCENE } from './scenes/index.js?v=9d';
+import { h, icon } from '../ui/controls.js?v=9e';
+import { SONGS, songUrl } from '../../lib/songs.js?v=9e';
+import { FORMATS, RESOLUTIONS, DEFAULT_RES, videoSize, videoBitrate, pickCodecs, encodeSupport, makeVideo, renderProjectAudio, decodeAudio, saveVideo } from './video.js?v=9e';
+import { kbmb, previewPacer } from './common.js?v=9e';
+import { createPreview } from './preview.js?v=9e';
+import { listScenes, GROUPS, DEFAULT_SCENE } from './scenes/index.js?v=9e';
 
 let H = null;            // hooks from app.js
 let ui = null;           // open window state
@@ -196,7 +196,7 @@ export async function openVisual(source = { kind: 'project' }) {
       const buf = await decodeAudio(await file.arrayBuffer());
       if (!ui) return;
       note.textContent = 'Listening for the beats…';
-      const { computeFeatures } = await import('./features.js?v=9d');
+      const { computeFeatures } = await import('./features.js?v=9e');
       const F = await computeFeatures(buf, { fps: 30 });
       if (!ui) return;
       if (imported?.url) URL.revokeObjectURL(imported.url);
@@ -475,7 +475,7 @@ function fitPreview() {
 function startLoop() { if (ui && !ui.raf && !document.hidden && !ui.exporting) { ui.pacer?.reset(); ui.raf = requestAnimationFrame(frame); } }
 function stopLoop() { if (ui?.raf) { cancelAnimationFrame(ui.raf); ui.raf = 0; } }
 let featMod = null;
-import('./features.js?v=9d').then(m => { featMod = m; });
+import('./features.js?v=9e').then(m => { featMod = m; });
 function frame(now) {
   if (!ui) return;
   ui.raf = 0;

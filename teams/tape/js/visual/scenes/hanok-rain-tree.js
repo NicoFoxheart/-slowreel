@@ -3,8 +3,8 @@
 // clusters (instanced alpha-tested cards baked with five/seven-lobed palmate leaves). Colour per variant (deep summer
 // green at blue hour, crimson-orange in autumn, red with a dusting of snow for the first snow). A wind sway in the
 // vertex shader, driven only by uniforms set from t, keeps it deterministic.
-import * as kit from './kit.js?v=9d';
-import { createBuilder } from './hanok-rain-geo.js?v=9d';
+import * as kit from './kit.js?v=9e';
+import { createBuilder } from './hanok-rain-geo.js?v=9e';
 
 // one card = a loose cluster of 7 palmate leaves on a transparent background; rgb = albedo factor, a = coverage
 const LEAF_FS = `

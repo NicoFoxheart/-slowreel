@@ -1,6 +1,6 @@
 // kit-gpu.js - GPU plumbing for the scene kit: full-screen passes, baked procedural textures (noise, normal maps,
 // canvas / data textures), a per-renderer texture cache and a disposal bag. Core THREE only, passed in.
-import * as G from './kit-glsl.js?v=9d';
+import * as G from './kit-glsl.js?v=9e';
 
 const quads = new WeakMap();   // THREE module -> {geo, cam, scene, mesh}
 function quadFor(THREE) {

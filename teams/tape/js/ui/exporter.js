@@ -1,6 +1,6 @@
 // exporter.js - master export: offline render with the reverb tail -> WAV 24-bit + MP3 320 kbps -> one .zip -> downloads.
-import { trimTail, measure, encodeWav, encodeMp3, makeZip, saveFile } from '../../lib/export.js?v=9d';
-import { S, clone, bpb } from './state.js?v=9d';
+import { trimTail, measure, encodeWav, encodeMp3, makeZip, saveFile } from '../../lib/export.js?v=9e';
+import { S, clone, bpb } from './state.js?v=9e';
 
 const safeName = s => (s || 'Slowreel').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').slice(0, 60) || 'Slowreel';
 export const songSeconds = p => (p.lengthBars * (p.beatsPerBar || 4)) * 60 / p.bpm;

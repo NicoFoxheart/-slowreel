@@ -1,5 +1,5 @@
 // theory.js - scales, chord stamps and note names for the piano roll, keys and pads.
-import { ASIAN_SCALES } from '../sound/asian.js?v=9d';
+import { ASIAN_SCALES } from '../sound/asian.js?v=9e';
 export const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 export const KEYS = NOTE_NAMES;
 

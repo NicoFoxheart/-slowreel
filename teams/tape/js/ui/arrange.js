@@ -1,10 +1,10 @@
 // arrange.js - the multitrack timeline: track heads, lanes, clips (move / resize / duplicate / delete, also by keyboard),
 // ruler with seek + loop strip, playhead, zoom, snap. All edits go through state.edit / begin+end (undoable).
-import { S, on, emit, edit, begin, end, track, clipOf, snapTo, songBeats, bpb, uid, clamp, isSongTrack, instDef, optName, instGroups } from './state.js?v=9d';
-import { h, icon } from './controls.js?v=9d';
-import { SONGS, getSong } from '../../lib/songs.js?v=9d';
-import { TRACK_COLORS } from './sample-project.js?v=9d';
-import { createAutomationEditor, automationTargets } from './automation.js?v=9d';
+import { S, on, emit, edit, begin, end, track, clipOf, snapTo, songBeats, bpb, uid, clamp, isSongTrack, instDef, optName, instGroups } from './state.js?v=9e';
+import { h, icon } from './controls.js?v=9e';
+import { SONGS, getSong } from '../../lib/songs.js?v=9e';
+import { TRACK_COLORS } from './sample-project.js?v=9e';
+import { createAutomationEditor, automationTargets } from './automation.js?v=9e';
 
 const HEAD = 196, ROW = 50, RULER = 30, MAX_TRACKS = 16;
 let root, scroller, overlay = {}, laneW = 0, totalBeats = 0;

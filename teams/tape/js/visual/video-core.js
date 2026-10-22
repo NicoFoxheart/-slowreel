@@ -1,7 +1,7 @@
 // video-core.js - the frame loop + WebCodecs encoders + muxer, shared by the render worker and the main-thread fallback.
 // No DOM here. Every frame: render the heart at time i/fps with that frame's audio numbers, wrap the canvas in a
 // VideoFrame, encode; the audio is fed in 1 s AudioData chunks a second ahead of the picture.
-import { frameAt } from './features.js?v=9d';
+import { frameAt } from './features.js?v=9e';
 
 export const MUXERS = { mp4: 'https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.2/build/mp4-muxer.mjs', webm: 'https://cdn.jsdelivr.net/npm/webm-muxer@5.1.4/build/webm-muxer.mjs' };
 export const yieldTask = () => new Promise(r => { const c = new MessageChannel(); c.port1.onmessage = () => r(); c.port2.postMessage(0); });

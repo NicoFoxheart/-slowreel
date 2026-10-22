@@ -4,10 +4,10 @@
 // leaves, then a clearing with a vermilion myojin torii, mossy kasuga stone lanterns, a cherry tree and the forested hill behind the shrine.
 // Variants: misty morning, golden afternoon, cherry blossom, lantern night (Hanatouro andon + up-lit bamboo, fireflies).
 // Geometry: bamboo-temple-geo.js. Shaders and material patches: bamboo-temple-glsl.js.
-import * as kit from './kit.js?v=9d';
-import { btPatch, btCulmDepth, btShaftDome, LITTER_FS, PATH_FS, CULM_TEX_FS } from './bamboo-temple-glsl.js?v=9d';
+import * as kit from './kit.js?v=9e';
+import { btPatch, btCulmDepth, btShaftDome, LITTER_FS, PATH_FS, CULM_TEX_FS } from './bamboo-temple-glsl.js?v=9e';
 import { pathX, GROVE_END, TORII_Z, FENCE_X, culmGeometry, layoutGrove, chunked, culmInstances, cardInstances, fenceGeometry, railGeometry, tieGeometry,
-  toriiGeometry, lanternGeometry, sakuraTree, drawLeafCard, drawBlossomCard } from './bamboo-temple-geo.js?v=9d';
+  toriiGeometry, lanternGeometry, sakuraTree, drawLeafCard, drawBlossomCard } from './bamboo-temple-geo.js?v=9e';
 
 export const meta = {
   id: 'bamboo-temple', name: 'Kyoto bamboo & torii', group: 'Japan',

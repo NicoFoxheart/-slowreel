@@ -1,9 +1,9 @@
 // mock-engine.js - a small stand-in for the real sound engine (js/sound/), same API as "Sound engine API" in BRIEF.md.
 // Simple Web Audio tones, a convolver "Space" bus, a tape "Echo" bus, a soft limiter. The UI is built against this;
 // the integrator swaps in the real engine (see js/ui/engine.js). Not meant to sound finished.
-import { makeImpulse, REVERB_PRESETS } from '../../lib/reverb.js?v=9d';
-import { SONGS, loadSong } from '../../lib/songs.js?v=9d';
-import { SAMPLE_PROJECT } from './sample-project.js?v=9d';
+import { makeImpulse, REVERB_PRESETS } from '../../lib/reverb.js?v=9e';
+import { SONGS, loadSong } from '../../lib/songs.js?v=9e';
+import { SAMPLE_PROJECT } from './sample-project.js?v=9e';
 
 const dbToGain = db => (db <= -60 ? 0 : Math.pow(10, db / 20));
 const mtof = m => 440 * Math.pow(2, (m - 69) / 12);

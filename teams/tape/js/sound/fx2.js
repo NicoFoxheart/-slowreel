@@ -3,7 +3,7 @@
 //   schedule?(fromBeat, toBeat, timeAt, project), ap?: {paramId: {param: AudioParam, map(v)}}}   (env: {bpm()}).
 // Beat-synced effects (pump, tape stop, auto filter phase) need the engine to call schedule() for each scheduled range,
 // the same place it schedules notes: scheduleFx(fxList, fromBeat, toBeat, timeAt, project). Native nodes only (no worklets).
-import { clamp, disconnectAll, cached, sp } from './util.js?v=9d';
+import { clamp, disconnectAll, cached, sp } from './util.js?v=9e';
 
 const P = (id, name, min, max, def, unit = '', extra = {}) => ({ id, name, min, max, default: def, unit, ...extra });
 const E = (id, name, options, def) => ({ id, name, min: 0, max: options.length - 1, default: def, unit: '', type: 'enum', options });

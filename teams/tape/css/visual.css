@@ -204,3 +204,48 @@ html.vmaker-on .pconly { display: none !important; }
 .vm-go { justify-content: flex-end; }
 .vm-go .key.signal { min-height: 48px; padding: 0 20px; font-size: 14px; flex: 1; }
 .vmaker .key.off { opacity: .45; }
+
+/* ---- phone maker: worlds (js/visual/phone-maker.js). What you touch is light and matte; the pictures sit behind dark glass. */
+.vm-stage { position: relative; }
+.vm-stage canvas { border-radius: 10px; box-shadow: 0 0 0 1px rgba(255,255,255,.06), 0 18px 40px -16px rgba(0,0,0,.7); transition: opacity .35s var(--ease); }
+.vm-stage.loading canvas { opacity: .55; }
+.vm-stage.loading::after { content: ""; position: absolute; left: 50%; bottom: 18px; width: 36px; height: 3px; margin-left: -18px; border-radius: 2px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.75), transparent); background-size: 200% 100%; animation: vz-shim 1.1s linear infinite; }
+.vm-now { display: grid; gap: 4px; padding: 2px 2px 0; min-width: 0; }
+.vm-now strong { font: 750 18px/1.1 var(--f-sans); font-stretch: 106%; letter-spacing: -.01em; color: var(--ink); }
+.vm-now-desc { font: 500 13px/1.4 var(--f-sans); color: var(--ink-2); text-wrap: pretty; }
+.vm-worlds { display: grid; grid-auto-flow: column; grid-auto-columns: 112px; gap: 10px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory;
+  scroll-padding: 0 14px; margin: 0 -14px; padding: 4px 14px 8px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.vm-worlds::-webkit-scrollbar { display: none; }
+.vm-world { display: grid; gap: 8px; padding: 0; border: 0; background: none; text-align: left; color: var(--ink); scroll-snap-align: start; min-width: 0; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+.vm-world[hidden] { display: none; }
+.vm-wpic { position: relative; display: block; aspect-ratio: 3 / 4; border-radius: 12px; overflow: hidden; background: var(--sw);
+  box-shadow: 0 0 0 1px rgba(18,22,24,.16), 0 8px 18px -10px rgba(20,24,26,.55); transition: transform .2s var(--ease), box-shadow .2s var(--ease); }
+.vm-wthumb { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity .6s var(--ease); }
+.vm-world.ready .vm-wthumb { opacity: 1; }
+.vm-wshim { position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,.14) 50%, transparent 70%); background-size: 220% 100%; animation: vz-shim 1.8s ease-in-out infinite; }
+.vm-world.ready .vm-wshim { display: none; }
+.vm-world:active .vm-wpic { transform: scale(.97); }
+.vm-world[aria-checked="true"] .vm-wpic { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--ink), 0 12px 24px -10px rgba(20,24,26,.6); }
+.vm-world:focus-visible { outline: none; }
+.vm-world:focus-visible .vm-wpic { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--cobalt); }
+.vm-wmeta { display: grid; gap: 4px; padding: 0 2px; min-width: 0; }
+.vm-weye { font: var(--t-label); font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
+.vm-wname { font: 650 13px/1.2 var(--f-sans); color: var(--ink); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.4em; }
+.vm-world[aria-checked="true"] .vm-wname { font-weight: 750; }
+.vm-world.off { opacity: .5; }
+.vm-chips { display: flex; gap: 8px; overflow-x: auto; margin: 0 -14px; padding: 2px 14px 4px; scrollbar-width: none; }
+.vm-chips::-webkit-scrollbar { display: none; }
+.vm-chips:empty { display: none; }
+.vm-chip { flex: none; min-height: 40px; padding: 0 16px 0 13px; border-radius: 20px; gap: 9px; font: 600 13px/1 var(--f-sans); letter-spacing: .01em; touch-action: manipulation; }
+.vm-chip i { width: 9px; height: 9px; border-radius: 50%; background: var(--dot); box-shadow: 0 0 0 1px rgba(0,0,0,.18), 0 0 7px var(--dot); flex: none; }
+.vmaker .vm-chip[aria-checked="true"], .vmaker .vm-chip[aria-checked="true"]:hover { background: linear-gradient(#3A3F43, #24282B); color: #F2F3F1;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.14), inset 0 -2px 0 rgba(0,0,0,.35), 0 2px 4px rgba(20,24,26,.25); }
+.vm-busy .vm-chip, .vm-busy .vm-world { pointer-events: none; }
+.vm-spec { margin: 0; font: 500 12px/1.3 var(--f-mono); color: var(--ink-2); letter-spacing: .01em; }
+.vm-warn { display: grid; gap: 4px; font-weight: 500; }
+.vm-warn strong { font: 700 13px/1.35 var(--f-sans); }
+.vm-warn .vm-est { margin-top: 4px; font: 650 13px/1.35 var(--f-sans); color: var(--ink); font-variant-numeric: tabular-nums; }
+.vm-warn .vm-est[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) { .vm-wshim, .vm-stage.loading::after { animation: none; } .vm-wpic, .vm-wthumb { transition: none; } }
