@@ -4,7 +4,7 @@
 // stone footings (deombeong jucho) over a granite platform (gidan), deep eaves (~1.25 m past the columns) whose corners
 // rise (anhyeo) and swing outward (anheori), a concave tiled slope (giwa: convex sumaksae rows over concave amsaw
 // channels), stacked-tile ridges with lime mortar, round rafters (seokarae) under a lime-plastered soffit.
-import * as kit from './kit.js?v=9c';
+import * as kit from './kit.js?v=9d';
 
 // ------------------------------------------------------------------------------------------------ merged builder
 export function createBuilder(THREE) {

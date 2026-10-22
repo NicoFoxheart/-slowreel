@@ -3,8 +3,8 @@
 // signs, a couple of cars ahead with red tail lights. The tube is infinite: the geometry slides back by whole light
 // periods while every pattern (tiles, grime, fixture colour, segment lighting) is computed from the true world z, so
 // nothing repeats. Light from the fixtures is analytic in the shader (nearest fixtures summed), the road mirrors them.
-import * as kit from './kit.js?v=9c';
-import { PRE, SIGN_VS, SIGN_FS, HALO_VS, HALO_FS } from './neon-night-glsl.js?v=9c';
+import * as kit from './kit.js?v=9d';
+import { PRE, SIGN_VS, SIGN_FS, HALO_VS, HALO_FS } from './neon-night-glsl.js?v=9d';
 
 const S = 6;                 // fixture spacing (m)
 const W = 5.4, WALL = 3.8, TOP = 6.6;   // half width (m), wall height, crown height

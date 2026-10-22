@@ -7,16 +7,16 @@ export const GROUPS = ['Cozy', 'Korea', 'Japan', 'China', 'Nature', 'Night city'
 export const DEFAULT_SCENE = 'rain-window';
 
 const ENTRIES = [
-  { id: 'rain-window', swatch: ['#2b3445', '#e0a86a'], name: 'Rain on the window', group: 'Cozy', desc: 'A rainy window, warm room light, city bokeh outside.', load: () => import('./rain-window.js?v=9c') },
-  { id: 'hanok-rain', swatch: ['#1f2a2c', '#f0a25a'], name: 'Hanok in the rain', group: 'Korea', desc: 'A Korean hanok courtyard in soft rain, paper lanterns, wet stone.', load: () => import('./hanok-rain.js?v=9c') },
-  { id: 'bamboo-temple', hidden: true, swatch: ['#1d3324', '#d9e2b0'], name: 'Bamboo temple', group: 'Japan', desc: 'A Japanese temple path through tall bamboo, light shafts and mist.', load: () => import('./bamboo-temple.js?v=9c') },
-  { id: 'guilin-mist', swatch: ['#5d7280', '#e9d9c0'], name: 'Guilin mist', group: 'China', desc: 'Karst peaks over the Li river at dawn, drifting mist, a bamboo raft.', load: () => import('./guilin-mist.js?v=9c') },
-  { id: 'golden-ocean', hidden: true, swatch: ['#2a4a66', '#ffb35c'], name: 'Golden ocean', group: 'Nature', desc: 'An open ocean at golden hour, slow swell and sun glitter.', load: () => import('./golden-ocean.js?v=9c') },
-  { id: 'aurora-snow', swatch: ['#0d1f3a', '#5ff0b0'], name: 'Aurora snow', group: 'Nature', desc: 'Northern lights over a snowy valley, falling snow, a frozen lake.', load: () => import('./aurora-snow.js?v=9c') },
-  { id: 'neon-night', swatch: ['#1a0f2e', '#ff4fa0'], name: 'Neon night', group: 'Night city', desc: 'A wet neon street at night, signs glowing in the puddles.', load: () => import('./neon-night.js?v=9c') },
-  { id: 'heart', swatch: ['#1d1640', '#ff7fbf'], name: 'Fox heart', group: 'Classic', desc: "Nico's glowing fox heart under a dusk sky.", load: () => import('./heart.js?v=9c') },
+  { id: 'rain-window', swatch: ['#2b3445', '#e0a86a'], name: 'Rain on the window', group: 'Cozy', desc: 'A rainy window, warm room light, city bokeh outside.', load: () => import('./rain-window.js?v=9d') },
+  { id: 'hanok-rain', swatch: ['#1f2a2c', '#f0a25a'], name: 'Hanok in the rain', group: 'Korea', desc: 'A Korean hanok courtyard in soft rain, paper lanterns, wet stone.', load: () => import('./hanok-rain.js?v=9d') },
+  { id: 'bamboo-temple', swatch: ['#1d3324', '#d9e2b0'], name: 'Bamboo temple', group: 'Japan', desc: 'A Japanese temple path through tall bamboo, light shafts and mist.', load: () => import('./bamboo-temple.js?v=9d') },
+  { id: 'guilin-mist', swatch: ['#5d7280', '#e9d9c0'], name: 'Guilin mist', group: 'China', desc: 'Karst peaks over the Li river at dawn, drifting mist, a bamboo raft.', load: () => import('./guilin-mist.js?v=9d') },
+  { id: 'golden-ocean', swatch: ['#2a4a66', '#ffb35c'], name: 'Golden ocean', group: 'Nature', desc: 'An open ocean at golden hour, slow swell and sun glitter.', load: () => import('./golden-ocean.js?v=9d') },
+  { id: 'aurora-snow', swatch: ['#0d1f3a', '#5ff0b0'], name: 'Aurora snow', group: 'Nature', desc: 'Northern lights over a snowy valley, falling snow, a frozen lake.', load: () => import('./aurora-snow.js?v=9d') },
+  { id: 'neon-night', swatch: ['#1a0f2e', '#ff4fa0'], name: 'Neon night', group: 'Night city', desc: 'A wet neon street at night, signs glowing in the puddles.', load: () => import('./neon-night.js?v=9d') },
+  { id: 'heart', swatch: ['#1d1640', '#ff7fbf'], name: 'Fox heart', group: 'Classic', desc: "Nico's glowing fox heart under a dusk sky.", load: () => import('./heart.js?v=9d') },
   // test scene for the kit (scene-check.cjs kit-demo); not shown in the picker
-  { id: 'kit-demo', swatch: ['#20242c', '#ffc98a'], name: 'Kit demo', group: 'Classic', desc: 'Reference scene for the kit.', hidden: true, load: () => import('./kit-demo.js?v=9c') },
+  { id: 'kit-demo', swatch: ['#20242c', '#ffc98a'], name: 'Kit demo', group: 'Classic', desc: 'Reference scene for the kit.', hidden: true, load: () => import('./kit-demo.js?v=9d') },
 ];
 const BY_ID = new Map(ENTRIES.map(e => [e.id, e]));
 const state = new Map();   // id -> {promise, ok, error, meta}

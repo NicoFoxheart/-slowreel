@@ -5,12 +5,12 @@
 // night train window (the city sliding past behind wet glass with the carriage reflected in it).
 // Light: every sign, shop and lamp is baked into per-vertex irradiance (neon-night-city.js), the ground mirrors the
 // scene with roughness streaks, fog + halos scatter the light, the kit post chain grades it (AgX, bloom, DOF, grain).
-import * as kit from './kit.js?v=9c';
-import { ASPHALT_FS, SKY_VS, SKY_FS, PRE } from './neon-night-glsl.js?v=9c';
-import { glyphAtlas } from './neon-night-glyphs.js?v=9c';
-import { buildCity, lin } from './neon-night-city.js?v=9c';
-import { buildTunnel } from './neon-night-tunnel.js?v=9c';
-import { buildTrain } from './neon-night-train.js?v=9c';
+import * as kit from './kit.js?v=9d';
+import { ASPHALT_FS, SKY_VS, SKY_FS, PRE } from './neon-night-glsl.js?v=9d';
+import { glyphAtlas } from './neon-night-glyphs.js?v=9d';
+import { buildCity, lin } from './neon-night-city.js?v=9d';
+import { buildTunnel } from './neon-night-tunnel.js?v=9d';
+import { buildTrain } from './neon-night-train.js?v=9d';
 
 export const meta = {
   id: 'neon-night', name: 'Neon night drive', group: 'Night city',

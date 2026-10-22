@@ -2,7 +2,7 @@
 // courtyard with paper lanterns, three looks: rainy dusk (wet stone, puddle reflections, ripples, rain + splashes,
 // height fog), golden lake (water, sun glitter, light shafts, dust) and snowy night (moon, stars, snow, lantern glow).
 // Copy it as a template: meta + createScene, everything built from the kit, everything freed by one bag.
-import * as kit from './kit.js?v=9c';
+import * as kit from './kit.js?v=9d';
 
 export const meta = {
   id: 'kit-demo', name: 'Kit demo', group: 'Classic', desc: 'Reference scene for the kit.',

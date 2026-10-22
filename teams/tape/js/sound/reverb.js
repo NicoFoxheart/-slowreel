@@ -1,7 +1,7 @@
 // reverb.js - impulse responses for the tape studio, synthesized from shaped noise (no samples).
 // Characters: plate, spring, room, hall, cathedral, reverse, infinite. Generated once per (sampleRate, settings) and cached.
 // Every IR is normalized to unit energy per channel, and the lows under ~120 Hz are thinned so reverb never turns to mud.
-import { rng } from './util.js?v=9c';
+import { rng } from './util.js?v=9d';
 
 export const REVERB_TYPES = [
   { value: 'plate',     label: 'Plate' },

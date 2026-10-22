@@ -1,8 +1,8 @@
 // effects.js - the tape studio's effect rack. Every effect: create(ctx, params, env) -> {input, output, set(id, v), dispose(), transport?(playing, t)}
 // env: { bpm() -> number }. All effects are native Web Audio nodes (no worklets), so they run everywhere and render offline.
-import { clamp, dbToGain, satCurve, noiseBuffer, disconnectAll, cached, sp, krateFilter } from './util.js?v=9c';
-import { makeIR, irPlan, hasIR, REVERB_TYPES } from './reverb.js?v=9c';
-import { ensureIR } from './assets.js?v=9c';
+import { clamp, dbToGain, satCurve, noiseBuffer, disconnectAll, cached, sp, krateFilter } from './util.js?v=9d';
+import { makeIR, irPlan, hasIR, REVERB_TYPES } from './reverb.js?v=9d';
+import { ensureIR } from './assets.js?v=9d';
 
 const P = (id, name, min, max, def, unit = '', extra = {}) => ({ id, name, min, max, default: def, unit, ...extra });
 

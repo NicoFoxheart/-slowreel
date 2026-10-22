@@ -2,7 +2,7 @@
 // with flutes, ledges, leaning and twin summits, each base shape at three detail levels), the peak layout (near bank
 // cliffs, the mid rows and the far ranges, never inside the river corridor), the floodplain with banks (a grid that is
 // dense near the river and the camera), phoenix-tail bamboo clumps, and the cormorant fisherman's bamboo raft.
-import * as kit from './kit.js?v=9c';
+import * as kit from './kit.js?v=9d';
 
 // ------------------------------------------------------------------------------------------------ the river
 export const riverX = z => 70 * Math.sin(z / 640 + 0.4) + 28 * Math.sin(z / 265 + 1.3) + 9 * Math.sin(z / 97 + 2.2);

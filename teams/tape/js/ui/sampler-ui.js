@@ -2,9 +2,9 @@
 // the waveform behind dark glass with the region and slice markers, slice keys (C3 up) and a per-slice editor
 // (pitch, reverse, start / end trim). The instrument's own knobs (Slowed, Pitch, Position, Tone, Slices, Region, ...) stay in the
 // standard Sound panel; this panel is shown above or beside them for tracks whose instrument id is 'chop'.
-import { h, knob } from './controls.js?v=9c';
-import { SAMPLER, SLICE_BASE_MIDI, sampleBuffer, sampleName, loadSample, importSampleFile, trackSampleId, computeSlices, regionOf } from '../sound/sampler.js?v=9c';
-import { SONGS } from '../sound/songs.js?v=9c';
+import { h, knob } from './controls.js?v=9d';
+import { SAMPLER, SLICE_BASE_MIDI, sampleBuffer, sampleName, loadSample, importSampleFile, trackSampleId, computeSlices, regionOf } from '../sound/sampler.js?v=9d';
+import { SONGS } from '../sound/songs.js?v=9d';
 
 const NOTE = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const noteName = m => NOTE[m % 12] + (Math.floor(m / 12) - 1);
