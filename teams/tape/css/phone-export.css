@@ -1,11 +1,11 @@
 /* phone-export.css - "Your tapes" on the phone (js/ui/phone-export.js): pick a tape, make its audio file, listen, save.
-   Slowreel's one contrast: what you touch is light and matte, what shows the sound sits behind dark glass. Here the tape
-   is a dark-glass hero with its reels; the waveform scrubber is glass too. Phone widths 320-520 px. Slowreel is a single
-   light theme (color-scheme: light on :root), so this screen looks the same with the phone in light or dark mode. */
+   Slowreel's one contrast: what you touch is graphite and matte, what shows the sound sits behind smoked glass. Here the
+   tape is a glass hero with its reels; the waveform scrubber is glass too. Phone widths 320-520 px. Slowreel is a single
+   dark theme ("Midnight tape", color-scheme: dark on :root), so this screen looks the same in light or dark mode. */
 
 /* the made-for-your-computer screen: two equal actions */
 .pconly .pc-audio, .pconly .pc-video { width: min(300px, 100%); min-height: 52px; font-size: 15px; gap: 10px; border-radius: 12px; }
-.pconly .pc-audio { margin-top: 10px; box-shadow: inset 0 1px 0 rgba(255,255,255,.3), inset 0 -2px 0 rgba(0,0,0,.18), 0 10px 22px -10px rgba(222,69,23,.65); }
+.pconly .pc-audio { margin-top: 10px; box-shadow: inset 0 1px 0 rgba(255,200,160,.3), inset 0 -2px 0 rgba(0,0,0,.25), 0 0 0 1px rgba(0,0,0,.4), 0 10px 26px -10px rgba(240,98,42,.7); }
 .pconly .pc-audio svg, .pconly .pc-video svg { width: 19px; height: 19px; }
 .pconly .pc-audio + .pm-note { margin-top: -6px; }
 .pconly .pc-video + .pm-note { margin-top: -6px; }
@@ -13,9 +13,9 @@ html.pexp-on .pconly { display: none !important; }
 
 .pexp[hidden], .pexp [hidden] { display: none !important; }
 .pexp {
-  --px-r: 18px; --px-depth: 0 0 0 1px var(--seam), 0 1px 0 var(--seam-hi), 0 14px 30px -18px rgba(20,24,26,.35);
+  --px-r: 18px; --px-depth: 0 0 0 1px var(--seam), 0 1px 0 var(--seam-hi), 0 14px 30px -18px rgba(0,0,0,.8);
   display: flex; flex-direction: column; gap: 14px; max-width: 520px; margin: 0 auto; padding: 14px 16px 44px; min-height: 100vh; box-sizing: border-box;
-  background: radial-gradient(130% 50% at 50% -8%, rgba(255,255,255,.38), rgba(255,255,255,0) 70%);
+  background: radial-gradient(130% 50% at 50% -8%, rgba(245,165,36,.09), rgba(245,165,36,0) 70%);
 }
 .pexp * { box-sizing: border-box; }
 
@@ -25,13 +25,13 @@ html.pexp-on .pconly { display: none !important; }
 .px-backkey svg { width: 18px; height: 18px; }
 .px-titles { min-width: 0; display: grid; gap: 4px; }
 .px-head h1 { margin: 0; font: 800 24px/1.05 var(--f-sans); font-stretch: 108%; letter-spacing: -.02em; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.px-fox { width: 26px; height: 26px; filter: drop-shadow(0 3px 6px rgba(236,78,32,.3)); }
+.px-fox { width: 26px; height: 26px; filter: drop-shadow(0 0 8px rgba(240,98,42,.45)); }
 
 .px-view { display: flex; flex-direction: column; gap: 14px; }
 .px-lead { margin: 0 2px; font: 500 14px/1.5 var(--f-sans); color: var(--ink-2); text-wrap: pretty; }
 .px-group { display: grid; gap: 10px; }
 .px-glabel { margin: 6px 4px 0; display: flex; align-items: center; gap: 8px; }
-.px-count { min-width: 20px; height: 18px; padding: 0 6px; border-radius: 9px; background: var(--ink); color: var(--panel-hi); font: 600 10px/18px var(--f-mono); letter-spacing: 0; text-align: center; }
+.px-count { min-width: 20px; height: 18px; padding: 0 6px; border-radius: 9px; background: rgba(245,165,36,.18); color: var(--key-lit-ink); box-shadow: inset 0 0 0 1px rgba(245,165,36,.4); font: 600 10px/18px var(--f-mono); letter-spacing: 0; text-align: center; }
 .px-count:empty { display: none; }
 .pm-note.px-foot { margin: 0 4px; font-size: 12px; line-height: 1.5; color: var(--ink-3); }
 
@@ -39,11 +39,11 @@ html.pexp-on .pconly { display: none !important; }
 .px-tapes { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .px-tapes > li { animation: px-rise .5s var(--ease) both; animation-delay: calc(var(--i, 0) * 45ms); }
 .px-tape { width: 100%; min-height: 74px; height: auto; padding: 12px 14px 12px 12px; justify-content: flex-start; gap: 14px; text-align: left; white-space: normal; border-radius: 16px;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.95), inset 0 -2px 0 rgba(0,0,0,.07), 0 0 0 1px var(--seam), 0 10px 22px -16px rgba(20,24,26,.45); }
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), inset 0 -2px 0 rgba(0,0,0,.4), 0 0 0 1px rgba(0,0,0,.5), 0 10px 22px -14px rgba(0,0,0,.85); }
 .px-tape > svg:last-child { margin-left: auto; color: var(--ink-4); width: 18px; height: 18px; flex: none; transition: transform .25s var(--ease), color .25s; }
 .px-tape:hover > svg:last-child, .px-tape:focus-visible > svg:last-child { transform: translateX(2px); color: var(--ink-2); }
 .px-cass { position: relative; width: 60px; height: 42px; flex: none; border-radius: 8px; background: linear-gradient(170deg, #2A3034, var(--glass) 60%);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), inset 0 -1px 2px rgba(0,0,0,.5), 0 2px 5px rgba(20,24,26,.25); overflow: hidden; }
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), inset 0 -1px 2px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.05), 0 2px 6px rgba(0,0,0,.6); overflow: hidden; }
 .px-stripes { position: absolute; left: 6px; right: 6px; top: 6px; height: 7px; display: flex; gap: 1.5px; border-radius: 2px; overflow: hidden; }
 .px-stripes i { flex: 1 1 0; background: var(--c); }
 .px-hubs { position: absolute; left: 10px; right: 10px; bottom: 7px; height: 18px; display: flex; justify-content: space-between; align-items: center;
@@ -57,9 +57,9 @@ html.pexp-on .pconly { display: none !important; }
 
 /* hero: the tape behind dark glass, set in a light bezel */
 .px-hero { padding: 6px; border-radius: 24px; background: linear-gradient(180deg, var(--panel-hi), var(--chassis));
-  box-shadow: inset 0 1px 0 var(--seam-hi), 0 0 0 1px var(--seam), 0 26px 44px -26px rgba(20,24,26,.6), 0 6px 14px -8px rgba(20,24,26,.25); animation: px-rise .55s var(--ease) both; }
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 0 0 1px var(--seam), 0 26px 44px -22px rgba(0,0,0,.9), 0 6px 14px -8px rgba(0,0,0,.6); animation: px-rise .55s var(--ease) both; }
 .px-glass { border-radius: 19px; padding: 14px 16px 16px; display: grid; gap: 10px; isolation: isolate;
-  background: radial-gradient(120% 70% at 50% 0%, #283035 0%, var(--glass) 62%); }
+  background: radial-gradient(120% 70% at 50% 0%, #1D1912 0%, var(--glass) 62%); box-shadow: inset 0 2px 8px rgba(0,0,0,.8), inset 0 0 0 1px rgba(255,190,110,.06); }
 .px-glass::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: 0; transition: opacity 1.2s var(--ease);
   background: radial-gradient(60% 45% at 50% 62%, rgba(236,78,32,.24), rgba(236,78,32,0) 70%), radial-gradient(90% 60% at 50% 110%, rgba(242,169,0,.10), rgba(242,169,0,0) 70%); }
 .px-hero[data-state="rec"] .px-glass::before { opacity: 1; }
@@ -94,14 +94,14 @@ html.pexp-on .pconly { display: none !important; }
 .px-step { display: flex; align-items: center; gap: 10px; }
 .px-step h2 { margin: 0; font: 750 16px/1.2 var(--f-sans); font-weight: 750; letter-spacing: -.005em; color: var(--ink); }
 .px-num { position: relative; width: 26px; height: 26px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--well);
-  box-shadow: inset 0 1px 2px rgba(0,0,0,.14); font: 700 12px/1 var(--f-mono); color: var(--ink-2); transition: background .35s var(--ease); }
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.5), 0 0 0 1px var(--seam); font: 700 12px/1 var(--f-mono); color: var(--ink-2); transition: background .35s var(--ease); }
 .px-num svg { position: absolute; width: 15px; height: 15px; color: #fff; opacity: 0; transform: scale(.6); transition: opacity .3s, transform .35s var(--ease); }
-.px-step.done .px-num { background: linear-gradient(#3CB57F, var(--leaf)); box-shadow: 0 0 0 3px rgba(46,158,110,.14); }
+.px-step.done .px-num { background: linear-gradient(#46C58D, #2E9E6E); box-shadow: 0 0 0 3px rgba(63,191,136,.16), 0 0 10px rgba(63,191,136,.4); }
 .px-step.done .px-num .n { opacity: 0; }
 .px-step.done .px-num svg { opacity: 1; transform: none; }
 
 .px-big { width: 100%; min-height: 58px; font-size: 16px; font-weight: 700; letter-spacing: .01em; gap: 10px; border-radius: 14px; }
-.px-big.signal { box-shadow: inset 0 1px 0 rgba(255,255,255,.32), inset 0 -2px 0 rgba(0,0,0,.18), 0 12px 24px -12px rgba(222,69,23,.75); }
+.px-big.signal { box-shadow: inset 0 1px 0 rgba(255,200,160,.32), inset 0 -2px 0 rgba(0,0,0,.25), 0 0 0 1px rgba(0,0,0,.4), 0 12px 26px -12px rgba(240,98,42,.75); }
 .px-big svg { width: 16px; height: 16px; }
 .px-big.px-again { min-height: 48px; font-size: 14px; }
 .px-big.px-again svg { color: var(--signal); }
@@ -131,25 +131,25 @@ html.pexp-on .pconly { display: none !important; }
 .px-play { width: 72px; height: 72px; min-height: 72px; border-radius: 50%; padding: 0; transition: transform .08s var(--ease), box-shadow .4s var(--ease); }
 .px-play svg { width: 26px; height: 26px; }
 .px-play[aria-label="Listen"] svg { transform: translateX(2px); }
-.px-play[aria-pressed="true"] { box-shadow: inset 0 1px 0 rgba(255,255,255,.14), inset 0 -2px 0 rgba(0,0,0,.35), 0 0 0 6px rgba(236,78,32,.12), 0 10px 24px -8px rgba(236,78,32,.55); }
+.px-play[aria-pressed="true"] { box-shadow: inset 0 1px 0 rgba(255,255,255,.14), inset 0 -2px 0 rgba(0,0,0,.35), 0 0 0 6px rgba(240,98,42,.14), 0 0 26px -4px rgba(240,98,42,.55); }
 #px-info { margin: 0; font-family: var(--f-mono); font-size: 11px; text-align: center; }
 
 /* save: the final step, one clear signal key */
 .px-saves { display: grid; gap: 10px; }
 .px-save { width: 100%; min-height: 76px; height: auto; padding: 12px 16px 12px 12px; justify-content: flex-start; gap: 14px; text-align: left; white-space: normal; border-radius: 16px; }
 .px-save > svg:last-child { margin-left: auto; width: 20px; height: 20px; flex: none; }
-.px-sico { width: 46px; height: 46px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--well); color: var(--ink); box-shadow: inset 0 1px 2px rgba(0,0,0,.12); }
+.px-sico { width: 46px; height: 46px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--well); color: var(--ink); box-shadow: inset 0 1px 2px rgba(0,0,0,.5), 0 0 0 1px var(--seam); }
 .px-sico svg { width: 22px; height: 22px; }
 .px-save .nm { font-size: 16px; }
 .px-save .sub { font: 500 12px/1.4 var(--f-sans); letter-spacing: 0; color: var(--ink-3); }
-.px-save.primary { min-height: 84px; background: linear-gradient(#F4643A, #DE4517); color: #fff;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.32), inset 0 -2px 0 rgba(0,0,0,.18), 0 16px 30px -14px rgba(222,69,23,.8); }
-.px-save.primary:hover { background: linear-gradient(#F87249, #E44D1F); }
+.px-save.primary { min-height: 84px; background: linear-gradient(#D44C17, #B0390B); color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255,200,160,.32), inset 0 -2px 0 rgba(0,0,0,.25), 0 0 0 1px rgba(0,0,0,.4), 0 16px 32px -14px rgba(240,98,42,.8); }
+.px-save.primary:hover { background: linear-gradient(#DC541C, #BA3F0E); }
 .px-save.primary .px-sico { background: rgba(255,255,255,.18); color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.28); }
 .px-save.primary .nm { font-size: 18px; font-weight: 800; letter-spacing: -.01em; }
 .px-save.primary .sub { color: rgba(255,255,255,.86); }
-.px-save.saved { background: linear-gradient(#F6FAF8, #E7F2EC); color: var(--ink); box-shadow: inset 0 1px 0 rgba(255,255,255,.95), inset 0 -2px 0 rgba(0,0,0,.06), 0 0 0 1px rgba(46,158,110,.35), 0 10px 22px -16px rgba(46,158,110,.6); }
-.px-save.saved .px-sico { background: linear-gradient(#3CB57F, var(--leaf)); color: #fff; box-shadow: 0 0 0 4px rgba(46,158,110,.14); }
+.px-save.saved { background: linear-gradient(#17271F, #112019); color: var(--ink); box-shadow: inset 0 1px 0 rgba(255,255,255,.06), inset 0 -2px 0 rgba(0,0,0,.35), 0 0 0 1px rgba(63,191,136,.45), 0 0 22px -8px rgba(63,191,136,.5); }
+.px-save.saved .px-sico { background: linear-gradient(#46C58D, #2E9E6E); color: #08140E; box-shadow: 0 0 0 4px rgba(63,191,136,.16); }
 .px-save.saved .sub { color: var(--ink-3); }
 .px-save.pop { animation: px-pop .6s var(--ease); }
 .px-save.pop .px-sico { animation: px-ring .7s var(--ease); }

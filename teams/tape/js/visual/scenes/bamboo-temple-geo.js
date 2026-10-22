@@ -2,7 +2,7 @@
 // per-culm height, girth, age, lean toward the path, chunked for culling), canopy leaf cards, brushwood fences with split
 // bamboo rails, a myojin torii, kasuga stone lanterns, a cherry tree, and the
 // canvas-drawn leaf / blossom card textures. Everything is deterministic from the seeded rng passed in.
-import * as kit from './kit.js?v=9e';
+import * as kit from './kit.js?v=10';
 
 /** Path centre line x(z) - the same function as btPathX in bamboo-temple-glsl.js. */
 export const pathX = z => (1.7 * Math.sin(z * 0.052 + 0.4) + 0.6 * Math.sin(z * 0.13 + 1.9)) * kit.smoothstep(-60, -38, z);

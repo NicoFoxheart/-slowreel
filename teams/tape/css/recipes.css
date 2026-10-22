@@ -1,7 +1,7 @@
 /* Slowreel - Recipes browser and the "Tips while you play" panel (js/ui/recipes-panel.js).
-   Same chassis language as studio.css (uses its tokens): light painted panels and keycaps for what you touch,
-   dark glass for the facts (BPM / key / scale / length). Each region has a signal colour (--rc): Korea vermilion,
-   China saffron, Japan cobalt, Ambient basics leaf. Cards are built like clips: a solid colour strip on a light body. */
+   Same chassis language as studio.css (uses its tokens): graphite panels and keycaps for what you touch,
+   smoked glass for the facts (BPM / key / scale / length). Each region has a signal colour (--rc): Korea vermilion,
+   China saffron, Japan cobalt, Ambient basics leaf. Cards are built like clips: a solid colour strip on a dark body. */
 
 /* ------------------------------------------------------------------ browser dialog */
 .rc-scrim { padding: 16px; }
@@ -10,8 +10,8 @@
 .rc-head { display: grid; gap: 6px; min-width: 0; flex: 1 1 220px; }
 .rc-head .label { letter-spacing: .1em; }
 .rc-filter { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
-.rc-dialog .rc-fk[aria-pressed="true"], .rc-dialog .rc-fk[aria-pressed="true"]:hover { background: linear-gradient(#3A3F43, #24282B); color: #F2F3F1; box-shadow: inset 0 1px 0 rgba(255,255,255,.14), inset 0 -2px 0 rgba(0,0,0,.35), 0 2px 4px rgba(20,24,26,.25); }
-.rc-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--rc, var(--ink-3)); box-shadow: 0 0 0 1px rgba(0,0,0,.12); flex: none; }
+.rc-dialog .rc-fk[aria-pressed="true"], .rc-dialog .rc-fk[aria-pressed="true"]:hover { background: linear-gradient(var(--key-lit-top), var(--key-lit-bot)); color: var(--key-lit-ink); box-shadow: var(--key-lit-shadow); }
+.rc-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--rc, var(--ink-3)); box-shadow: 0 0 0 1px rgba(0,0,0,.4), 0 0 6px var(--rc, transparent); flex: none; }
 
 .rc-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 340px; }
 .rc-list { overflow: auto; padding: 16px 18px 24px; display: grid; gap: 22px; align-content: start; background: var(--chassis); box-shadow: inset -1px 0 0 var(--seam); }
@@ -24,9 +24,9 @@
 .rc-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
 .rc-item { display: flex; min-width: 0; }
 .rc-card { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--panel-hi); border-radius: var(--r-panel); overflow: hidden;
-  box-shadow: inset 0 1px 0 var(--seam-hi), 0 0 0 1px var(--seam), 0 1px 2px rgba(20,24,26,.08); transition: box-shadow .15s var(--ease); }
-.rc-card.sel { box-shadow: 0 0 0 2px var(--ink), 0 4px 12px rgba(20,24,26,.16); }
-.rc-strip { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 5px 10px; background: var(--rc); color: #fff;
+  box-shadow: inset 0 1px 0 var(--seam-hi), 0 0 0 1px var(--seam), 0 2px 6px rgba(0,0,0,.35); transition: box-shadow .15s var(--ease); }
+.rc-card.sel { box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--rc, var(--amber)) 80%, #fff), 0 0 22px -6px var(--rc, var(--amber)), 0 4px 14px rgba(0,0,0,.5); }
+.rc-strip { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 5px 10px; background: color-mix(in srgb, var(--rc) 50%, #0E1116); color: #FFF3E2; box-shadow: inset 0 2px 0 var(--rc);
   font: 700 10px/1.2 var(--f-sans); letter-spacing: .12em; text-transform: uppercase; }
 .rc-strip .mono { font: 500 10px/1.2 var(--f-mono); letter-spacing: 0; text-transform: none; opacity: .9; }
 .rc-card-in { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
@@ -51,7 +51,7 @@
 .rc-peek-list { margin: 0; padding: 0 12px 10px 28px; display: grid; gap: 6px; color: var(--ink-2); font: 500 12px/1.45 var(--f-sans); }
 .rc-actions { display: flex; gap: 6px; margin-top: auto; padding-top: 2px; }
 .rc-actions .rc-load { flex: 1; }
-.rc-card .rc-actions .key[aria-pressed="true"] { box-shadow: var(--key-shadow), inset 0 0 0 1.5px var(--ink); }
+.rc-card .rc-actions .key[aria-pressed="true"] { background: linear-gradient(var(--key-lit-top), var(--key-lit-bot)); color: var(--key-lit-ink); box-shadow: var(--key-lit-shadow); }
 
 /* ------------------------------------------------------------------ side panel: tips for the selected recipe */
 .rc-side { overflow: auto; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; background: var(--panel); border-top: 3px solid var(--rc, var(--seam)); }
@@ -71,7 +71,7 @@
 /* ------------------------------------------------------------------ floating "Tips while you play" (non-modal) */
 .rc-dock { position: fixed; z-index: 55; right: 16px; top: 128px; width: min(320px, calc(100vw - 32px)); max-height: min(calc(100vh - 150px), 470px); display: flex; flex-direction: column;
   background: var(--panel-hi); border-radius: 12px; overflow: hidden; border-top: 3px solid var(--rc, var(--ink));
-  box-shadow: 0 0 0 1px var(--seam-strong), 0 18px 40px rgba(20,24,26,.25); }
+  box-shadow: 0 0 0 1px var(--seam-strong), 0 0 30px -10px var(--rc, transparent), 0 18px 44px rgba(0,0,0,.65); }
 .rc-dock-head { display: flex; align-items: center; gap: 6px; padding: 10px 10px 8px 14px; border-bottom: 1px solid var(--seam); }
 .rc-dock-titles { flex: 1; min-width: 0; display: grid; gap: 4px; }
 .rc-dock-titles h2 { margin: 0; font: 800 14px/1.2 var(--f-sans); font-stretch: 105%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -86,7 +86,7 @@
 .rc-checks > li input { margin: 3px 0 0; width: 15px; height: 15px; accent-color: var(--leaf); }
 .rc-checks > li label { display: grid; grid-template-columns: 22px 1fr; gap: 6px; cursor: pointer; }
 .rc-checks > li.cur { background: color-mix(in srgb, var(--rc, var(--saffron)) 12%, var(--panel-hi)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rc, var(--saffron)) 45%, transparent); }
-.rc-checks > li.cur .rc-n { background: var(--rc, var(--ink)); color: #fff; box-shadow: none; }
+.rc-checks > li.cur .rc-n { background: color-mix(in srgb, var(--rc, var(--amber)) 82%, #F6E4C8); color: var(--on-colour-ink); box-shadow: 0 0 8px -1px var(--rc, var(--amber)); }
 .rc-checks > li.done label > span:last-child { color: var(--ink-3); }
 .rc-dock-foot { display: flex; align-items: center; gap: 6px; }
 .rc-dock-foot .grow { flex: 1; }

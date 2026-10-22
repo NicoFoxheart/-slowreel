@@ -1,19 +1,28 @@
 # Slowreel - design
 
 ## The idea
-**Slowreel is an ambient tape machine you could hold.** One instrument, built like a high-end synth: a light painted-aluminium
-chassis, plastic keycaps in four signal colours, real knobs with skirts and indicator lines, VU needles, and a reel-to-reel
-transport behind dark glass. Everything you *touch* is light and matte; everything that *shows the sound* (counter, deck,
-VU, song cloud, song waveform) sits behind dark glass. That single contrast is the whole visual system.
+**Slowreel is an ambient tape machine you could hold, playing in a dark room at night ("Midnight tape").** One instrument,
+built like high-end studio gear: a charcoal / ink-blue anodized chassis, graphite keycaps, brushed-metal knobs with skirts
+and amber indicator lines, an amber-backlit VU meter, and a reel-to-reel transport behind smoked glass. Everything you
+*touch* is graphite and matte; everything that *shows the sound* (amber LCD counter, deck, VU, song cloud, song waveform)
+sits behind darker smoked glass. Light is the accent: what is on or selected glows warm amber (lit keys, the playhead, LEDs),
+nothing else shouts. Calm, deep, readable.
 
 Name: **Slowreel** (model line "SR-8 ambient tape studio"), because ambient music is tape running slowly and nothing is rushed.
 
 ## Tokens (css/studio.css `:root`)
-- Surfaces: `--room #C9CECC` (the desk), `--chassis`, `--panel #EDEFED`, `--panel-hi #F7F8F7`, `--well`, lanes `--lane`/`--lane-alt`.
-- Ink: `--ink #15181A`, `--ink-2`, `--ink-3`, `--ink-4` (four steps, no pure black).
-- Glass: `--glass #1B2023`, `--glass-ink #EEF0EA`, `--glass-dim`.
-- Signal colours (keycaps, LEDs, knob arcs): `--signal #EC4E20` (play/record/export/peak), `--cobalt #2D55D2` (Space reverb,
-  focus ring), `--saffron #F2A900` (loop, Echo, song-cloud glow), `--leaf #2E9E6E` (on/saved).
+- Surfaces (dark, `color-scheme: dark`): `--room #090B0E` (the dark room, with a faint amber lamp glow top-left and an
+  ink-blue bounce bottom-right), `--chassis`, `--panel #141920`, `--panel-hi #1A2028`, `--well`, lanes `--lane`/`--lane-alt`.
+  Seams are light hairlines (`--seam`, `--seam-strong`), shadows are black.
+- Ink (warm paper under lamplight): `--ink #EFE7D9`, `--ink-2`, `--ink-3 #9A9387`, `--ink-4 #80868F` (all >= 4.5:1 on panels).
+- Glass: `--glass #05070A`, `--glass-ink #F4E6CC`, `--glass-dim`; `--lcd #FFB54A` amber LCD digits with a soft glow.
+- Keycaps: `--key-top/--key-bot` graphite; the selected / on state is "lit": `--key-lit-top/-bot`, `--key-lit-ink #FFD38F`,
+  `--key-lit-shadow` (amber edge + glow). Clip and recipe strips are the track colour mixed 50% into ink with light text.
+- Signal colours (keycaps, LEDs, knob arcs): `--signal #F0622A` (VU orange: play/record/export/peak), `--amber #F5A524`
+  (default knob arc, progress, lit state), `--cobalt #7C9CF4` (Space reverb, focus ring), `--saffron #F4B03A` (loop, Echo,
+  song-cloud glow), `--leaf #3FBF88` (on/saved).
+- The 3D header (js/ui3d/scene3d.js) uses the same palette: charcoal slab with a little metalness, a near-black niche,
+  walnut desk, brushed-metal reels, cool moonlight key light, and a strong warm desk lamp + amber VU as the light sources.
 - Track colours: 8 inks in `sample-project.js` `TRACK_COLORS`; each track's colour runs through its head chip, clips, notes,
   meter, mixer strip and keyboard.
 - Type: Archivo (wide-ish grotesk, 600-800 for names, uppercase tracked 10px labels) + IBM Plex Mono for every number.

@@ -1,6 +1,6 @@
 // heart.js - Nico's original fox-heart scene (../heart-scene.js) wrapped in the scene contract. Its picture is exactly the
 // old one; it draws its own title, vignette, fades and progress line (meta.ownsText), so the host adds no overlay.
-import { setThree, createHeartScene, MOODS } from '../heart-scene.js?v=9e';
+import { setThree, createHeartScene, MOODS } from '../heart-scene.js?v=10';
 
 export const meta = {
   id: 'heart', name: 'Fox heart', group: 'Classic', desc: "Nico's glowing fox heart under a dusk sky, petals and fox-fire sparks.",

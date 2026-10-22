@@ -14,7 +14,7 @@
 //
 // Integrator:  import { ASIAN, ASIAN_SCALES } from './asian.js';
 //              INSTRUMENTS.push(...ASIAN); for (const d of ASIAN) INSTRUMENT_MAP[d.id] = d;
-import { clamp, mtof, rng, noiseBuffer, wave, disconnectAll, krate, krateFilter, cached, release as relParam } from './util.js?v=9e';
+import { clamp, mtof, rng, noiseBuffer, wave, disconnectAll, krate, krateFilter, cached, release as relParam } from './util.js?v=10';
 
 const P = (id, name, min, max, def, extra = {}) => ({ id, name, min, max, default: def, unit: '', ...extra });
 const ENUM = (id, name, options, def) => ({ id, name, min: 0, max: options.length - 1, default: def, unit: '', type: 'enum', options });

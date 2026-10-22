@@ -1,9 +1,9 @@
 // pianoroll.js - note editor for the selected instrument clip: draw (with chord stamp + scale lock), select (click,
 // shift-click, marquee, Ctrl+A), move, resize, delete, velocity lane, audition keys. Notes may run as long as you like;
 // drawing past the clip end grows the clip.
-import { S, on, emit, begin, end, edit, clipOf, snapTo, clamp, bpb, isSongTrack, instDef } from './state.js?v=9e';
-import { h } from './controls.js?v=9e';
-import { noteName, isBlack, inScale, snapToScale, chordNotes, keyIndex, scaleById } from './theory.js?v=9e';
+import { S, on, emit, begin, end, edit, clipOf, snapTo, clamp, bpb, isSongTrack, instDef } from './state.js?v=10';
+import { h } from './controls.js?v=10';
+import { noteName, isBlack, inScale, snapToScale, chordNotes, keyIndex, scaleById } from './theory.js?v=10';
 
 const LO = 24, HI = 108, RH = 13, KW = 54, RULER = 22, VEL = 58;
 let pane, scroller, grid, velLane, notesLayer, headEl, built = null;

@@ -7,8 +7,8 @@
 //     setSize(w, h, pr), setIntensity(v), setText({title, artist, showText}), render(t, f, info) -> bool,
 //     snap({scene, variant, quality, size: [w, h], t, f}) -> Promise<ImageBitmap|null>, metas(ids) -> Promise<[{id, ok, meta}]>,
 //     dispose()}
-import { drawTextLayer } from './heart-scene.js?v=9e';
-import { textStyle } from './scenes/index.js?v=9e';
+import { drawTextLayer } from './heart-scene.js?v=10';
+import { textStyle } from './scenes/index.js?v=10';
 
 export async function createPreview(opts) {
   if (typeof OffscreenCanvas !== 'undefined' && typeof Worker !== 'undefined' && HTMLCanvasElement.prototype.transferControlToOffscreen && !/[?&]preview=page/.test(location.search)) {
@@ -38,7 +38,7 @@ async function workerPreview(o) {
   const tc = document.createElement('canvas');
   const layer = async () => { const layout = makeLayer(st, canvas, tc); return { bitmap: await createImageBitmap(tc, { imageOrientation: 'flipY' }), layout }; };
   const off = canvas.transferControlToOffscreen();
-  const w = new Worker(new URL('./preview-worker.js?v=9e', import.meta.url), { type: 'module' });
+  const w = new Worker(new URL('./preview-worker.js?v=10', import.meta.url), { type: 'module' });
   let busy = false, dead = false, seq = 0, rid = 0, loading = null;
   const pending = new Map();
   const ask = (msg, transfer = []) => new Promise((res, rej) => { const id = ++rid; pending.set(id, { res, rej }); w.postMessage({ ...msg, id }, transfer); });
@@ -111,7 +111,7 @@ async function workerPreview(o) {
 // Fallback: a scene host on the page (no snapshots: cards show their colour swatch instead).
 async function pagePreview(o) {
   const st = textState(o);
-  const [{ createSceneHost }, THREE, { probeScenes }] = await Promise.all([import('./scenes/host.js?v=9e'), import('three'), import('./scenes/index.js?v=9e')]);
+  const [{ createSceneHost }, THREE, { probeScenes }] = await Promise.all([import('./scenes/host.js?v=10'), import('three'), import('./scenes/index.js?v=10')]);
   const host = createSceneHost({ THREE, width: st.w, height: st.h, pixelRatio: st.pr, antialias: st.scene === 'heart' && st.quality !== 'light' });
   const tc = document.createElement('canvas');
   const text = async () => { const layout = makeLayer(st, host.canvas, tc); return { bitmap: await createImageBitmap(tc, { imageOrientation: 'flipY' }), layout }; };

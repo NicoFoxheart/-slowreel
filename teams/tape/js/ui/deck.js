@@ -23,11 +23,11 @@ export function createDeck(canvas) {
   function reel(g, x, y, R, pack, ang, dpr) {
     // flange (aluminium, three windows)
     g.save(); g.translate(x, y);
-    g.beginPath(); g.arc(0, 0, R, 0, Math.PI * 2); g.fillStyle = 'rgba(214,219,217,.16)'; g.fill();
+    g.beginPath(); g.arc(0, 0, R, 0, Math.PI * 2); g.fillStyle = 'rgba(184,190,196,.22)'; g.fill();
     g.lineWidth = 1 * dpr; g.strokeStyle = 'rgba(238,240,234,.28)'; g.stroke();
     // tape pack
     g.beginPath(); g.arc(0, 0, pack, 0, Math.PI * 2);
-    const gr = g.createRadialGradient(0, 0, R * 0.2, 0, 0, pack); gr.addColorStop(0, '#3A3230'); gr.addColorStop(1, '#5A4A42');
+    const gr = g.createRadialGradient(0, 0, R * 0.2, 0, 0, pack); gr.addColorStop(0, '#2A221E'); gr.addColorStop(1, '#4A3B32');
     g.fillStyle = gr; g.fill();
     g.strokeStyle = 'rgba(255,255,255,.08)'; g.lineWidth = 0.6 * dpr;
     for (let r = R * 0.3; r < pack; r += 3 * dpr) { g.beginPath(); g.arc(0, 0, r, 0, Math.PI * 2); g.stroke(); }
@@ -37,13 +37,13 @@ export function createDeck(canvas) {
     for (let i = 0; i < 3; i++) {
       g.save(); g.rotate(i * Math.PI * 2 / 3);
       g.beginPath(); g.arc(0, 0, R * 0.86, -0.42, 0.42); g.arc(0, 0, R * 0.42, 0.62, -0.62, true); g.closePath();
-      g.fillStyle = 'rgba(27,32,35,.55)'; g.fill(); g.stroke(); g.restore();
+      g.fillStyle = 'rgba(5,7,10,.6)'; g.fill(); g.stroke(); g.restore();
     }
     // hub
     g.beginPath(); g.arc(0, 0, R * 0.26, 0, Math.PI * 2); g.fillStyle = '#D9DEDB'; g.fill();
     g.fillStyle = '#1B2023';
     for (let i = 0; i < 3; i++) { g.save(); g.rotate(i * Math.PI * 2 / 3); g.fillRect(-1.6 * dpr, -R * 0.24, 3.2 * dpr, R * 0.1); g.restore(); }
-    g.beginPath(); g.arc(0, 0, R * 0.08, 0, Math.PI * 2); g.fillStyle = '#EC4E20'; g.fill();
+    g.beginPath(); g.arc(0, 0, R * 0.08, 0, Math.PI * 2); g.fillStyle = '#F0622A'; g.fill();
     g.restore();
   }
   return {
@@ -68,7 +68,7 @@ export function createDeck(canvas) {
       g.fillStyle = '#C9CED0';
       [gL, gR].forEach(x => { g.beginPath(); g.arc(x, gy, 3.2 * dpr, 0, Math.PI * 2); g.fill(); });
       const hw = 16 * dpr, glow = Math.min(1, level * 1.4);
-      if (glow > 0.01) { const rg = g.createRadialGradient(w / 2, gy, 0, w / 2, gy, 34 * dpr); rg.addColorStop(0, `rgba(236,78,32,${0.38 * glow})`); rg.addColorStop(1, 'rgba(236,78,32,0)'); g.fillStyle = rg; g.fillRect(w / 2 - 40 * dpr, gy - 40 * dpr, 80 * dpr, 80 * dpr); }
+      if (glow > 0.01) { const rg = g.createRadialGradient(w / 2, gy, 0, w / 2, gy, 34 * dpr); rg.addColorStop(0, `rgba(255,150,60,${0.45 * glow})`); rg.addColorStop(1, 'rgba(255,150,60,0)'); g.fillStyle = rg; g.fillRect(w / 2 - 40 * dpr, gy - 40 * dpr, 80 * dpr, 80 * dpr); }
       g.fillStyle = '#D9DEDB'; g.fillRect(w / 2 - hw / 2, gy - 1 * dpr, hw, 8 * dpr);
       g.fillStyle = '#1B2023'; g.fillRect(w / 2 - 1, gy - 1 * dpr, 2, 8 * dpr);
       reel(g, xL, y, R, pL, angL, dpr); reel(g, xR, y, R, pR, angR, dpr);
@@ -91,21 +91,22 @@ export function createVU(canvas) {
       pk = tp > pk ? pk + (tp - pk) * Math.min(1, dt / 0.01) : pk + (tp - pk) * Math.min(1, dt / 1.2);
       g.clearRect(0, 0, w, h);
       const pad = 8 * dpr, fx = pad, fy = pad, fw = w - pad * 2, fh = h - pad * 2;
-      g.fillStyle = '#E9ECE7'; roundRect(g, fx, fy, fw, fh, 5 * dpr); g.fill();
+      { const fg = g.createRadialGradient(fx + fw / 2, fy + fh * 0.75, 0, fx + fw / 2, fy + fh * 0.6, fw * 0.75); fg.addColorStop(0, '#FFD592'); fg.addColorStop(0.6, '#F0B061'); fg.addColorStop(1, '#C47E34');
+        g.fillStyle = fg; roundRect(g, fx, fy, fw, fh, 5 * dpr); g.fill(); }
       const cx = fx + fw / 2, cy = fy + fh * 1.25, r = fh * 1.02;
       const ang = db => { const x = Math.max(-20, Math.min(3, db)); const n = Math.pow((x + 20) / 23, 1.3); return -0.78 + n * 1.56; };
-      g.lineWidth = 1 * dpr; g.strokeStyle = '#15181A';
+      g.lineWidth = 1 * dpr; g.strokeStyle = '#2A1A0C';
       g.beginPath(); g.arc(cx, cy, r * 0.82, -Math.PI / 2 + ang(-20), -Math.PI / 2 + ang(0)); g.stroke();
-      g.strokeStyle = '#EC4E20'; g.lineWidth = 2.2 * dpr; g.beginPath(); g.arc(cx, cy, r * 0.82, -Math.PI / 2 + ang(0), -Math.PI / 2 + ang(3)); g.stroke();
-      g.font = `600 ${7.5 * dpr}px "IBM Plex Mono", ui-monospace, monospace`; g.textAlign = 'center'; g.fillStyle = '#474D52';
+      g.strokeStyle = '#B8320A'; g.lineWidth = 2.2 * dpr; g.beginPath(); g.arc(cx, cy, r * 0.82, -Math.PI / 2 + ang(0), -Math.PI / 2 + ang(3)); g.stroke();
+      g.font = `600 ${7.5 * dpr}px "IBM Plex Mono", ui-monospace, monospace`; g.textAlign = 'center'; g.fillStyle = '#3A2614';
       [-20, -10, -5, 0, 3].forEach(d => { const a = -Math.PI / 2 + ang(d); const x0 = cx + Math.cos(a) * r * 0.82, y0 = cy + Math.sin(a) * r * 0.82; const x1 = cx + Math.cos(a) * r * 0.9, y1 = cy + Math.sin(a) * r * 0.9;
-        g.strokeStyle = d > 0 ? '#EC4E20' : '#15181A'; g.lineWidth = 1 * dpr; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
-        g.fillStyle = d > 0 ? '#EC4E20' : '#474D52'; g.fillText(d > 0 ? '+' + d : String(d), cx + Math.cos(a) * r * 1.0, cy + Math.sin(a) * r * 1.0 + 3 * dpr); });
-      g.font = `700 ${7 * dpr}px "Archivo", system-ui, sans-serif`; g.fillStyle = '#737A7F'; g.textAlign = 'left'; g.fillText('VU', fx + 6 * dpr, fy + fh - 6 * dpr);
-      g.fillStyle = '#EC4E20'; g.textAlign = 'right'; g.fillText('PEAK', fx + fw - 6 * dpr, fy + fh - 6 * dpr);
+        g.strokeStyle = d > 0 ? '#B8320A' : '#2A1A0C'; g.lineWidth = 1 * dpr; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
+        g.fillStyle = d > 0 ? '#B8320A' : '#3A2614'; g.fillText(d > 0 ? '+' + d : String(d), cx + Math.cos(a) * r * 1.0, cy + Math.sin(a) * r * 1.0 + 3 * dpr); });
+      g.font = `700 ${7 * dpr}px "Archivo", system-ui, sans-serif`; g.fillStyle = '#4A3018'; g.textAlign = 'left'; g.fillText('VU', fx + 6 * dpr, fy + fh - 6 * dpr);
+      g.fillStyle = '#B8320A'; g.textAlign = 'right'; g.fillText('PEAK', fx + fw - 6 * dpr, fy + fh - 6 * dpr);
       g.save(); g.beginPath(); roundRect(g, fx, fy, fw, fh, 5 * dpr); g.clip();
       const needle = (db, col, lw) => { const a = -Math.PI / 2 + ang(db); g.strokeStyle = col; g.lineWidth = lw * dpr; g.beginPath(); g.moveTo(cx + Math.cos(a) * r * 0.25, cy + Math.sin(a) * r * 0.25); g.lineTo(cx + Math.cos(a) * r * 0.93, cy + Math.sin(a) * r * 0.93); g.stroke(); };
-      needle(pk, '#EC4E20', 1); needle(vu, '#15181A', 1.4);
+      needle(pk, '#C23A0E', 1); needle(vu, '#1A1008', 1.4);
       g.restore();
       return Math.abs(vu - tv) > 0.3 || Math.abs(pk - tp) > 0.3; // still moving
     },

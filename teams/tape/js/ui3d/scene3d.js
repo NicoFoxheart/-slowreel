@@ -16,10 +16,11 @@ const PAR_X = 70, PAR_Y = 26;   // parallax travel of the eye (px)
 const NICHE_DEPTH = 84, BEVEL = 6, BEVEL_T = 7;
 
 const C = {
-  slab: 0xEDEFEB, niche: 0x34434B, wood: 0xD9B48E, mint: 0x8BD3BC,
-  cream: 0xF6F2EA, hub: 0xD9DEDB, signal: 0xEC4E20, pack: 0x4E3F38, tape: 0x6E5A4E,
-  steel: 0xC9CED0, ink: 0x2A2F33, skirt: 0x2C3135, cap: 0xF4F5F2,
-  saffron: 0xF2A900, cobalt: 0x2D55D2, leaf: 0x2E9E6E,
+  // Midnight tape: a charcoal / ink-blue machine in a dark room, brushed-metal reels, amber lamp and VU light
+  slab: 0x1B2129, niche: 0x0E1318, wood: 0x5A3A25, mint: 0x3A2A1F,
+  cream: 0xAEB4BB, hub: 0xC9CED3, signal: 0xF0622A, pack: 0x3A2E28, tape: 0x5E4A3E,
+  steel: 0xB8BEC4, ink: 0x15191E, skirt: 0x101317, cap: 0x4C535C,
+  saffron: 0xF4B03A, cobalt: 0x4F73E0, leaf: 0x3FBF88,
   fox: 0xEE8A4E, foxCream: 0xFBF1E4, foxDark: 0x3B2B27,
   terracotta: 0xD9A27A, plant: 0x5FAE7E, plant2: 0x86C99A,
 };
@@ -66,7 +67,7 @@ export function createStudioScene({ canvas, width, height, dpr = 1, layout, soft
   renderer.setClearColor(0x000000, 0);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.12;
+  renderer.toneMappingExposure = 1.05;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.shadowMap.autoUpdate = false;
@@ -77,9 +78,9 @@ export function createStudioScene({ canvas, width, height, dpr = 1, layout, soft
   // soft studio reflections, only on the glossy parts (clay stays matte, as in the portfolio diorama)
   const pmrem = new THREE.PMREMGenerator(renderer);
   const envScene = new THREE.Scene();
-  envScene.add(new THREE.Mesh(new THREE.BoxGeometry(10, 10, 10), new THREE.MeshBasicMaterial({ color: 0x9aa3a6, side: THREE.BackSide })));
+  envScene.add(new THREE.Mesh(new THREE.BoxGeometry(10, 10, 10), new THREE.MeshBasicMaterial({ color: 0x1A2027, side: THREE.BackSide })));
   const panel = (c, x, y, z, s) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(s, s * 0.6), new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide })); m.position.set(x, y, z); m.lookAt(0, 0, 0); envScene.add(m); };
-  panel(0xfff1dc, -3, 4, 2, 5); panel(0xd8e8ff, 4, 2, 3, 4); panel(0xffffff, 0, 4.8, -1, 6);
+  panel(0xb0884f, -3, 4, 2, 5); panel(0x4a5f8a, 4, 2, 3, 4); panel(0x6a717a, 0, 4.8, -1, 6);
   const ENV = pmrem.fromScene(envScene, 0.04).texture;
 
   const mats = new Map();
@@ -104,15 +105,15 @@ export function createStudioScene({ canvas, width, height, dpr = 1, layout, soft
   })();
   const vuTex = (() => {
     const c = mkCanvas(256, 160), g = c.getContext('2d');
-    const bg = g.createLinearGradient(0, 0, 0, 160); bg.addColorStop(0, '#FFF6E2'); bg.addColorStop(1, '#F1DFC0'); g.fillStyle = bg; g.fillRect(0, 0, 256, 160);
+    const bg = g.createLinearGradient(0, 0, 0, 160); bg.addColorStop(0, '#F9C26C'); bg.addColorStop(1, '#D3812F'); g.fillStyle = bg; g.fillRect(0, 0, 256, 160);
     const cx = 128, cy = 196, R = 150, ang = db => { const x = clamp(db, -20, 3); return -0.84 + Math.pow((x + 20) / 23, 1.3) * 1.68; };
-    g.lineCap = 'round'; g.strokeStyle = '#2A2F33'; g.lineWidth = 2.5; g.beginPath(); g.arc(cx, cy, R * 0.8, -Math.PI / 2 + ang(-20), -Math.PI / 2 + ang(0)); g.stroke();
-    g.strokeStyle = '#EC4E20'; g.lineWidth = 6; g.beginPath(); g.arc(cx, cy, R * 0.8, -Math.PI / 2 + ang(0), -Math.PI / 2 + ang(3)); g.stroke();
+    g.lineCap = 'round'; g.strokeStyle = '#2A1A0C'; g.lineWidth = 2.5; g.beginPath(); g.arc(cx, cy, R * 0.8, -Math.PI / 2 + ang(-20), -Math.PI / 2 + ang(0)); g.stroke();
+    g.strokeStyle = '#C23A0E'; g.lineWidth = 6; g.beginPath(); g.arc(cx, cy, R * 0.8, -Math.PI / 2 + ang(0), -Math.PI / 2 + ang(3)); g.stroke();
     g.font = '600 15px ui-monospace, Menlo, monospace'; g.textAlign = 'center';
     [-20, -10, -7, -5, -3, 0, 3].forEach(d => { const a = -Math.PI / 2 + ang(d);
-      g.strokeStyle = d > 0 ? '#EC4E20' : '#2A2F33'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(cx + Math.cos(a) * R * 0.8, cy + Math.sin(a) * R * 0.8); g.lineTo(cx + Math.cos(a) * R * 0.9, cy + Math.sin(a) * R * 0.9); g.stroke();
-      if (d === -7 || d === -3) return; g.fillStyle = d > 0 ? '#EC4E20' : '#4A4F53'; g.fillText(d > 0 ? '+' + d : String(d), cx + Math.cos(a) * R * 1.0, cy + Math.sin(a) * R * 1.0 + 5); });
-    g.font = '700 17px system-ui, sans-serif'; g.fillStyle = '#4A4F53'; g.fillText('VU', cx, 132);
+      g.strokeStyle = d > 0 ? '#B8320A' : '#2A1A0C'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(cx + Math.cos(a) * R * 0.8, cy + Math.sin(a) * R * 0.8); g.lineTo(cx + Math.cos(a) * R * 0.9, cy + Math.sin(a) * R * 0.9); g.stroke();
+      if (d === -7 || d === -3) return; g.fillStyle = d > 0 ? '#B8320A' : '#3A2614'; g.fillText(d > 0 ? '+' + d : String(d), cx + Math.cos(a) * R * 1.0, cy + Math.sin(a) * R * 1.0 + 5); });
+    g.font = '700 17px system-ui, sans-serif'; g.fillStyle = '#3A2614'; g.fillText('VU', cx, 132);
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return { tex: t, ang };
   })();
 
@@ -144,11 +145,11 @@ export function createStudioScene({ canvas, width, height, dpr = 1, layout, soft
   }
 
   // ---------------------------------------------------------------- lights (fixed; positions follow the layout)
-  const hemi = new THREE.HemisphereLight(0xf2f5ff, 0x9a8a7c, 0.95); scene.add(hemi);
-  const key = new THREE.DirectionalLight(0xfff0de, 2.1); key.castShadow = true;
+  const hemi = new THREE.HemisphereLight(0xa8bce6, 0x2a1d12, 0.62); scene.add(hemi);
+  const key = new THREE.DirectionalLight(0xc6d4ff, 1.05); key.castShadow = true;
   key.shadow.mapSize.set(soft ? 1024 : 2048, soft ? 256 : 512); key.shadow.bias = -0.0006; key.shadow.normalBias = 0.6; key.shadow.radius = 3;
   scene.add(key, key.target);
-  const fill = new THREE.DirectionalLight(0xd8e6ff, 0.45); scene.add(fill, fill.target);
+  const fill = new THREE.DirectionalLight(0x7f9ad6, 0.38); scene.add(fill, fill.target);
   const spill = new THREE.PointLight(0xffc48a, 0, 900, 1.2); scene.add(spill);     // lamplight spilling out of the niche onto the face
   const lamp = new THREE.SpotLight(0xffb36a, 0, 600, 1.15, 0.9, 1); lamp.castShadow = true;
   lamp.shadow.mapSize.set(soft ? 256 : 512, soft ? 256 : 512); lamp.shadow.bias = -0.002; lamp.shadow.normalBias = 0.4; lamp.shadow.radius = 4; lamp.shadow.camera.near = 4; lamp.shadow.camera.far = 500;
@@ -180,9 +181,9 @@ export function createStudioScene({ canvas, width, height, dpr = 1, layout, soft
     const sh = new THREE.Shape(); rrectPath(sh, BEVEL + 1, BEVEL + 1, W - 2 * BEVEL - 2, H - 2 * BEVEL - 2, 14);
     if (n) { const hole = new THREE.Path(); rrectPath(hole, n.x, n.y, n.w, n.h, 8); sh.holes.push(hole); }
     const slabGeo = new THREE.ExtrudeGeometry(sh, { depth: 2, bevelEnabled: true, bevelThickness: BEVEL_T, bevelSize: BEVEL, bevelSegments: soft ? 3 : 5, curveSegments: soft ? 6 : 10 });
-    const slab = add(content, slabGeo, clay(C.slab, { roughness: 0.62 }), 0, 0, -(2 + BEVEL_T), { cast: false });
+    const slab = add(content, slabGeo, clay(C.slab, { roughness: 0.48, metalness: 0.28, gloss: true }), 0, 0, -(2 + BEVEL_T), { cast: false });
     // a fine seam line under the deck's top lip, like a painted metal panel joint (very subtle)
-    add(content, new THREE.BoxGeometry(W - 60, 0.6, 0.4), clay(0xd6dad7), W / 2, H - 15, 0.2, { cast: false });
+    add(content, new THREE.BoxGeometry(W - 60, 0.6, 0.4), clay(0x2E3640), W / 2, H - 15, 0.2, { cast: false });
     void slab;
     if (n) buildNiche(n);
     // knob bodies under the DOM knobs (the DOM keeps the value arc, the ticks and the indicator line)
@@ -197,15 +198,15 @@ export function createStudioScene({ canvas, width, height, dpr = 1, layout, soft
       add(g, skirt, clay(C.skirt, { roughness: 0.55 }));
       const prof = [[rc, hS - 0.2], [rc, top - 2], [rc * 0.88, top - 0.6], [rc * 0.55, top + 0.35], [0.01, top + 0.6]].map(([r, z]) => new THREE.Vector2(r, z));
       const capG = new THREE.LatheGeometry(prof, 40); capG.rotateX(Math.PI / 2);
-      add(g, capG, clay(C.cap, { roughness: 0.45, gloss: true }));
+      add(g, capG, clay(C.cap, { roughness: 0.32, metalness: 0.55, gloss: true }));
       const halo = glowPlane(content, k.color, k.x, k.y, 0.5, k.r * 2.35, k.r * 2.35, ringTex);
       parts.knobs.push({ id: k.id, halo, g });
     }
     // backlight pools around the transport keys (green play, saffron loop, vermilion rec)
     const keyGlow = (r, hex) => r && glowPlane(content, hex, r.x + r.w / 2, r.y + r.h / 2, 0.4, r.w * 2.1, r.h * 1.7);
-    parts.play = keyGlow(L.keys?.play, 0x57D19A); parts.loop = keyGlow(L.keys?.loop, 0xF2A900); parts.rec = keyGlow(L.keys?.rec, 0xEC4E20);
+    parts.play = keyGlow(L.keys?.play, 0x57D19A); parts.loop = keyGlow(L.keys?.loop, 0xF5A524); parts.rec = keyGlow(L.keys?.rec, 0xF0622A);
     // the LCD glass gets a faint cool spill on the face
-    if (L.lcd) parts.lcd = glowPlane(content, 0x9fd8c8, L.lcd.x + L.lcd.w / 2, L.lcd.y + L.lcd.h / 2, 0.3, L.lcd.w * 1.25, L.lcd.h * 1.5);
+    if (L.lcd) parts.lcd = glowPlane(content, 0xffb54a, L.lcd.x + L.lcd.w / 2, L.lcd.y + L.lcd.h / 2, 0.3, L.lcd.w * 1.25, L.lcd.h * 1.5);
 
     // lights follow the layout
     key.position.set(W * 0.28, H + 520, 620); key.target.position.set(W * 0.5, H * 0.4, -40);
@@ -253,8 +254,8 @@ export function createStudioScene({ canvas, width, height, dpr = 1, layout, soft
       for (let i = 0; i < 3; i++) { const a0 = i * Math.PI * 2 / 3 + 0.5, hp = new THREE.Path();
         hp.absarc(0, 0, R * 0.8, a0, a0 + 1.25, false); hp.absarc(0, 0, R * 0.42, a0 + 1.25, a0, true); flShape.holes.push(hp); }
       const flG = new THREE.ExtrudeGeometry(flShape, { depth: 0.8, bevelEnabled: true, bevelThickness: 0.7, bevelSize: 0.6, bevelSegments: 2, curveSegments: soft ? 16 : 28 });
-      add(rg, flG, clay(C.cream, { roughness: 0.55 }), 0, 0, 0);
-      add(rg, flG, clay(0xE9E3D6, { roughness: 0.6 }), 0, 0, -9);
+      add(rg, flG, clay(C.cream, { roughness: 0.32, metalness: 0.6, gloss: true }), 0, 0, 0);
+      add(rg, flG, clay(0x8E959D, { roughness: 0.4, metalness: 0.5 }), 0, 0, -9);
       const pack = new THREE.Mesh(CYL, [clay(C.pack, { roughness: 0.45 }), new THREE.MeshStandardMaterial({ map: packCapTex, roughness: 0.4 }), clay(C.pack)]);
       pack.rotation.x = Math.PI / 2; pack.position.z = -4.3; pack.scale.set(R * 0.5, 7.4, R * 0.5); pack.castShadow = pack.receiveShadow = true; rg.add(pack);
       add(rg, CYL, clay(C.hub, { roughness: 0.4, gloss: true }), 0, 0, -1.5, { rx: Math.PI / 2, s: [R * 0.25, 9, R * 0.25] });
@@ -265,7 +266,7 @@ export function createStudioScene({ canvas, width, height, dpr = 1, layout, soft
     };
     parts.L = mkReel(rxL); parts.R = mkReel(rxR); parts.R0 = R; parts.rx = [rxL, rxR]; parts.cy = cy; parts.reelZ = reelZ;
     // a small deck plate the reels are mounted on (reads as the machine inside the window)
-    add(g, roundedBox(R * 4.9, R * 2.5 + 12, 6, 2, 6), clay(0x3A4448, { roughness: 0.6 }), at.reels, cy - 5, zb + 3, { cast: false });
+    add(g, roundedBox(R * 4.9, R * 2.5 + 12, 6, 2, 6), clay(0x1A2028, { roughness: 0.6 }), at.reels, cy - 5, zb + 3, { cast: false });
     // tape path: packs -> guide rollers -> head -> guide rollers
     const gy = floorY + Math.max(7, ih * 0.1), gL = at.reels - R * 0.72, gR = at.reels + R * 0.72;
     parts.gy = gy; parts.gL = gL; parts.gR = gR;
@@ -281,7 +282,7 @@ export function createStudioScene({ canvas, width, height, dpr = 1, layout, soft
       const vw = 52 * fs, vh = 40 * fs, vz = zb + 24;
       const vg = new THREE.Group(); vg.position.set(at.vu, floorY + vh / 2, vz); vg.rotation.y = -0.12; g.add(vg);
       add(vg, roundedBox(vw, vh, 18, 2, 4.5), clay(C.ink, { roughness: 0.38, gloss: true }), 0, 0, 0);
-      const faceMat = new THREE.MeshStandardMaterial({ map: vuTex.tex, emissiveMap: vuTex.tex, emissive: 0xffe2b0, emissiveIntensity: 0.6, roughness: 0.8 });
+      const faceMat = new THREE.MeshStandardMaterial({ map: vuTex.tex, emissiveMap: vuTex.tex, emissive: 0xffa548, emissiveIntensity: 0.6, roughness: 0.8 });
       const fw = vw - 8 * fs, fh = vh - 13 * fs;
       add(vg, PLANE, faceMat, 0, 2.5 * fs, 9.1, { s: [fw, fh, 1], cast: false });
       const piv = new THREE.Group(); piv.position.set(0, 2.5 * fs - fh / 2 - fh * 0.42, 9.6); vg.add(piv);
@@ -331,7 +332,7 @@ export function createStudioScene({ canvas, width, height, dpr = 1, layout, soft
     // ---- cassette stack
     if (at.tapes) {
       const tg = new THREE.Group(); tg.position.set(at.tapes, floorY, zb + 40); tg.scale.setScalar(fs); g.add(tg);
-      [[C.cobalt, 0.08], [C.saffron, -0.12], [C.leaf, 0.05], [0xEDEFEB, -0.04]].forEach(([c, r], i) => {
+      [[C.cobalt, 0.08], [C.saffron, -0.12], [C.leaf, 0.05], [0x5A626C, -0.04]].forEach(([c, r], i) => {
         const cg = new THREE.Group(); cg.position.set((i % 2 ? -1.5 : 1.2), 3.2 + i * 6.4, 0); cg.rotation.y = r; tg.add(cg);
         add(cg, roundedBox(36, 6, 23, 2, 1.6), clay(c, { roughness: 0.55 }), 0, 0, 0);
         add(cg, roundedBox(24, 3, 0.6, 1, 0.5), clay(0xF7F3EA, { roughness: 0.8 }), 0, 0, 11.6, { cast: false });
@@ -352,7 +353,7 @@ export function createStudioScene({ canvas, width, height, dpr = 1, layout, soft
       const sg = new THREE.Group(); sg.position.set(at[id], floorY, zb + 36); sg.rotation.y = 0.18 * sx; sg.scale.setScalar(fs); g.add(sg);
       add(sg, roundedBox(26, 40, 22, 2, 4), clay(C.mint, { roughness: 0.6 }), 0, 20, 0);
       add(sg, new THREE.CylinderGeometry(8, 8, 2, 28), clay(C.ink, { roughness: 0.5 }), 0, 24.5, 11, { rx: Math.PI / 2 });
-      add(sg, SPHERE, clay(0xEDEFEB, { roughness: 0.4, gloss: true }), 0, 24.5, 12, { s: [3.2, 3.2, 1.6] });
+      add(sg, SPHERE, clay(0x8E959D, { roughness: 0.35, metalness: 0.5, gloss: true }), 0, 24.5, 12, { s: [3.2, 3.2, 1.6] });
       add(sg, new THREE.CylinderGeometry(3.4, 3.4, 2, 20), clay(C.ink, { roughness: 0.5 }), 0, 9.5, 11, { rx: Math.PI / 2 });
     }
     // ---- on the back wall, when the window is wide: a little window on a rainy dusk, and a fox-heart poster
@@ -360,15 +361,15 @@ export function createStudioScene({ canvas, width, height, dpr = 1, layout, soft
     if (wallL > 90 * fs || iw > 640) {
       const ww = Math.min(96, Math.max(70, wallL * 0.62)) * fs, wh = ih * 0.5, wx = Math.max(ix + ww / 2 + 14, Math.min(left - ww / 2 - 14, ix + wallL * 0.5));
       const wg = new THREE.Group(); wg.position.set(wx, floorY + ih * 0.6, zb + 1.5); g.add(wg);
-      add(wg, roundedBox(ww + 8, wh + 8, 3, 1, 2.5), clay(C.cream, { roughness: 0.6 }), 0, 0, 0, { cast: false });
+      add(wg, roundedBox(ww + 8, wh + 8, 3, 1, 2.5), clay(0x2A2F36, { roughness: 0.6 }), 0, 0, 0, { cast: false });
       add(wg, PLANE, new THREE.MeshBasicMaterial({ map: duskTex(), toneMapped: false, color: 0xd9d4e6 }), 0, 0, 1.6, { s: [ww, wh, 1], cast: false });
-      add(wg, roundedBox(1.6, wh, 1.4, 1, 0.6), clay(C.cream), 0, 0, 2.2, { cast: false });
-      add(wg, roundedBox(ww + 14, 3.2, 7, 1, 1.2), clay(C.cream), 0, -wh / 2 - 4, 3, { cast: false });
+      add(wg, roundedBox(1.6, wh, 1.4, 1, 0.6), clay(0x2A2F36), 0, 0, 2.2, { cast: false });
+      add(wg, roundedBox(ww + 14, 3.2, 7, 1, 1.2), clay(0x2A2F36), 0, -wh / 2 - 4, 3, { cast: false });
     }
     if (wallR > 70 * fs || iw > 760) {
       const pw = 34 * fs, ph = 44 * fs, px = Math.min(ix + iw - pw / 2 - 16, right + Math.max(16, wallR * 0.45));
       const pg = new THREE.Group(); pg.position.set(px, floorY + ih * 0.6, zb + 1.5); pg.rotation.z = 0.035; g.add(pg);
-      add(pg, roundedBox(pw + 4, ph + 4, 2, 1, 1.2), clay(0xF4EFE6, { roughness: 0.7 }), 0, 0, 0, { cast: false });
+      add(pg, roundedBox(pw + 4, ph + 4, 2, 1, 1.2), clay(0x3A2A1C, { roughness: 0.7 }), 0, 0, 0, { cast: false });
       add(pg, PLANE, new THREE.MeshStandardMaterial({ map: posterTex(), roughness: 0.9 }), 0, 0, 1.1, { s: [pw, ph, 1], cast: false });
     }
   }
@@ -430,13 +431,13 @@ export function createStudioScene({ canvas, width, height, dpr = 1, layout, soft
     if (setGlow(parts.headGlow, 'head', Math.min(0.9, A.lv * 1.6), dt, 0.08)) moving = true;
     if (parts.vu) {
       parts.vu.piv.rotation.z = -vuTex.ang(A.vu);
-      parts.vu.faceMat.emissiveIntensity = 0.22 + Math.min(1, A.lv * 1.2) * 0.45;
+      parts.vu.faceMat.emissiveIntensity = 0.3 + Math.min(1, A.lv * 1.2) * 0.4;
       parts.vu.led.material.color.setHex(A.vu > 1.5 ? 0xff5a2a : 0x5a2a20);
       if (setGlow(parts.vu.glow, 'vu', 0.12 + Math.min(1, A.lv) * 0.35, dt, 0.15)) moving = true;
     }
     // lamp: warm, steady, breathing very slightly with the music
     const lampI = 1 + A.lv * 0.25;
-    lamp.intensity = 420 * lampI; spill.intensity = 110 * (0.9 + A.lv * 0.3); nicheFill.intensity = 60;
+    lamp.intensity = 560 * lampI; spill.intensity = 150 * (0.9 + A.lv * 0.3); nicheFill.intensity = 40;
     if (setGlow(parts.bulbGlow, 'bulb', 0.55 + A.lv * 0.25, dt, 0.2)) moving = true;
     if (setGlow(parts.pool, 'pool', 0.3 + A.lv * 0.08, dt, 0.2)) moving = true;
     if (setGlow(parts.wallPool, 'wpool', 0.2 + A.lv * 0.08, dt, 0.2)) moving = true;

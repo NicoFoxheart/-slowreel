@@ -7,8 +7,8 @@
 //   blankProject(base)                 zero tracks
 //   starterProject(starter, base)      the set-up tape (base = { instruments, buses, colors, uid })
 //   guideFor(project)                  a recipe-shaped object for recipes-panel openTips (style guide or flow tips)
-import { h, icon } from './controls.js?v=9e';
-import { KEYMAP } from './panels.js?v=9e';
+import { h, icon } from './controls.js?v=10';
+import { KEYMAP } from './panels.js?v=10';
 
 // ---------------------------------------------------------------- notes, keys and the home note
 const NOTE = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -161,7 +161,7 @@ export function guideFor(p, scaleName = s => s) {
 }
 
 // ---------------------------------------------------------------- the chooser
-const REGION_COLOR = { korea: 'var(--signal)', china: 'var(--saffron)', japan: 'var(--cobalt)', garage: '#7A63C8', ambient: 'var(--leaf)' };
+const REGION_COLOR = { korea: 'var(--signal)', china: 'var(--saffron)', japan: 'var(--cobalt)', garage: '#9B85E8', ambient: 'var(--leaf)' };
 let open = null;
 export const isChooserOpen = () => !!open;
 export function closeChooser() { open?.close(); }

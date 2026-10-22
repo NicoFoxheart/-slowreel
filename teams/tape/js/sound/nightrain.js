@@ -3,7 +3,7 @@
 //   'glass' - soft rain bed, dull drops tapping glass, a few slow runs of water
 //   'city'  - far traffic wash, a faint mains hum, cars passing far away
 // Each loop is scaled to RMS ~ -22 dBFS so the instrument can set levels predictably.
-import { rng } from './util.js?v=9e';
+import { rng } from './util.js?v=10';
 
 const LOOP = 12, XF = 1;
 const floats = new Map();            // `${kind}|${sr}` -> [Float32Array L, R]

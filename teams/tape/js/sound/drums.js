@@ -2,7 +2,7 @@
 // Same definition format as instruments.js: {id, name, kind, maxVoices, params, macros, presets:[{id,name,params}], voice()}.
 // A voice: {out, release(t), kill(t), stop(t), endTime, dead}; the engine owns scheduling, polyphony and cleanup.
 // Register with: INSTRUMENTS.push(...DRUM_INSTRUMENTS); Object.assign(INSTRUMENT_MAP, {drums, bass808}) (the integrator).
-import { clamp, mtof, rng, noiseBuffer, disconnectAll, cached } from './util.js?v=9e';
+import { clamp, mtof, rng, noiseBuffer, disconnectAll, cached } from './util.js?v=10';
 
 const P = (id, name, min, max, def, extra = {}) => ({ id, name, min, max, default: def, unit: '', ...extra });
 const R = rng(3636);

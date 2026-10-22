@@ -1,25 +1,25 @@
 // app.js - Slowreel boot + the deck (transport, counter, master), Nico's tapes, projects, export dialog, the dock,
 // QWERTY playing / recording, keyboard shortcuts, the visual loop and the test hook window.__studio.
 import { S, on, emit, edit, track, clipOf, clamp, uid, clone, bpb, songBeats, fmtTime, isSongTrack, instDef, isSongParam,
-  doUndo, doRedo, canUndo, canRedo, resetHistory } from './state.js?v=9e';
-import { h, icon, knob } from './controls.js?v=9e';
-import { loadEngine } from './engine.js?v=9e';
-import { initArrange, render as renderArrange, fitZoom, zoomBy, setPlayhead, updateLoop, updateMeters, addClipHere, duplicateClip, deleteClip, addTrack, createClipAt, selectClip } from './arrange.js?v=9e';
-import { initRoll, render as renderRoll, setRollHead, zoom as rollZoom } from './pianoroll.js?v=9e';
-import { initPanels, renderTab, renderSongClip, updateMixMeters, animateCloud, KEYMAP, markKbKey } from './panels.js?v=9e';
-import { createDeck, createVU } from './deck.js?v=9e';
-import { exportMaster, renderProject, songSeconds, kb } from './exporter.js?v=9e';
-import { initPhone, phoneFrame } from './phone.js?v=9e';
-import { KEYS, CHORDS, scaleGroups } from './theory.js?v=9e';
-import { TRACK_COLORS } from './sample-project.js?v=9e';
-import { SONGS, loadSong } from '../../lib/songs.js?v=9e';
-import { openProjects, autosave } from '../../lib/storage.js?v=9e';
-import { measure } from '../../lib/export.js?v=9e';
-import { initVisual, openVisual, isVisualOpen, exportVideoFor } from '../visual/visual-panel.js?v=9e';
-import { mountStudio3D } from '../ui3d/studio3d.js?v=9e';
-import { initSteps, renderSteps, isDrumTrack } from './steps.js?v=9e';
-import { openChooser, closeChooser, blankProject, starterProject as styleStarter, guideFor, starterById } from './starters.js?v=9e';
-import { createLiveArp } from '../sound/arp.js?v=9e';
+  doUndo, doRedo, canUndo, canRedo, resetHistory } from './state.js?v=10';
+import { h, icon, knob } from './controls.js?v=10';
+import { loadEngine } from './engine.js?v=10';
+import { initArrange, render as renderArrange, fitZoom, zoomBy, setPlayhead, updateLoop, updateMeters, addClipHere, duplicateClip, deleteClip, addTrack, createClipAt, selectClip } from './arrange.js?v=10';
+import { initRoll, render as renderRoll, setRollHead, zoom as rollZoom } from './pianoroll.js?v=10';
+import { initPanels, renderTab, renderSongClip, updateMixMeters, animateCloud, KEYMAP, markKbKey } from './panels.js?v=10';
+import { createDeck, createVU } from './deck.js?v=10';
+import { exportMaster, renderProject, songSeconds, kb } from './exporter.js?v=10';
+import { initPhone, phoneFrame } from './phone.js?v=10';
+import { KEYS, CHORDS, scaleGroups } from './theory.js?v=10';
+import { TRACK_COLORS } from './sample-project.js?v=10';
+import { SONGS, loadSong } from '../../lib/songs.js?v=10';
+import { openProjects, autosave } from '../../lib/storage.js?v=10';
+import { measure } from '../../lib/export.js?v=10';
+import { initVisual, openVisual, isVisualOpen, exportVideoFor } from '../visual/visual-panel.js?v=10';
+import { mountStudio3D } from '../ui3d/studio3d.js?v=10';
+import { initSteps, renderSteps, isDrumTrack } from './steps.js?v=10';
+import { openChooser, closeChooser, blankProject, starterProject as styleStarter, guideFor, starterById } from './starters.js?v=10';
+import { createLiveArp } from '../sound/arp.js?v=10';
 
 const $ = id => document.getElementById(id);
 const LAST_KEY = 'slowreel:last';
@@ -215,7 +215,7 @@ function drawPeaks(cv, peaks, col, progress = -1) {
   const d = Math.min(2, devicePixelRatio || 1), r = cv.getBoundingClientRect(); if (!r.width) return;
   cv.width = Math.round(r.width * d); cv.height = Math.round(r.height * d);
   const g = cv.getContext('2d'), W = cv.width, H = cv.height, n = peaks.length, bw = W / n;
-  for (let i = 0; i < n; i++) { const a = Math.max(d, peaks[i] * H * 0.48); g.fillStyle = progress >= 0 && i / n <= progress ? col : (progress >= 0 ? 'rgba(18,22,24,.22)' : col); g.globalAlpha = progress >= 0 ? 1 : 0.75; g.fillRect(i * bw + bw * 0.15, H / 2 - a, Math.max(1, bw * 0.7), a * 2); }
+  for (let i = 0; i < n; i++) { const a = Math.max(d, peaks[i] * H * 0.48); g.fillStyle = progress >= 0 && i / n <= progress ? col : (progress >= 0 ? 'rgba(239,231,217,.16)' : col); g.globalAlpha = progress >= 0 ? 1 : 0.75; g.fillRect(i * bw + bw * 0.15, H / 2 - a, Math.max(1, bw * 0.7), a * 2); }
 }
 async function togglePreview(id) {
   const was = preview?.id; stopPreview(); if (was === id) return;
@@ -519,7 +519,7 @@ async function restoreDemo() {
 // The second demo, "Night Garage" (Antent-style future garage: drums, 808, supersaw pad with pump, chops, arp, automation).
 // Fetched when asked for (demo-night-garage.json next to index.html); opening it always gives a fresh copy.
 async function nightGarageCopy() {
-  const r = await fetch('demo-night-garage.json?v=9e', { cache: 'no-cache' }); if (!r.ok) throw new Error('HTTP ' + r.status);
+  const r = await fetch('demo-night-garage.json?v=10', { cache: 'no-cache' }); if (!r.ok) throw new Error('HTTP ' + r.status);
   const d = await r.json(); d.id = 'demo-night-garage'; d.schema = d.schema || 'nfx-studio/1'; d.updatedAt = Date.now(); return d;
 }
 async function openNightGarage() {
@@ -531,7 +531,7 @@ async function openNightGarage() {
 }
 // ---------------------------------------------------------------- recipes (js/recipes + js/ui/recipes-panel.js)
 let recipesMod = null;
-const recipesPanel = () => (recipesMod ||= import('./recipes-panel.js?v=9e'));
+const recipesPanel = () => (recipesMod ||= import('./recipes-panel.js?v=10'));
 /** Load a recipe project the way opening a project or the demo does: the current tape is saved first, the recipe becomes
  *  the current project (its own id, saved, autosaved from here on) and starts with a clean undo history. */
 async function loadRecipeProject(project, recipe) {
@@ -756,7 +756,7 @@ window.__studio = {
   setLight(on) { setLight(on, { save: false }); return S.light; },
   speedProbe(seconds = 3) { return S.engine.speedProbe?.({ seconds }); },
   // load a recipe by id through the same path as the Recipes panel (tests)
-  async loadRecipe(id) { const m = await import('../recipes/recipes.js?v=9e'); const r = m.recipeById?.(id) || m.RECIPES.find(x => x.id === id); if (!r) return null; const p = await loadRecipeProject(m.recipeProject ? m.recipeProject(r) : clone(r.project), r); return { id: p.id, name: p.name, tracks: p.tracks.length }; },
+  async loadRecipe(id) { const m = await import('../recipes/recipes.js?v=10'); const r = m.recipeById?.(id) || m.RECIPES.find(x => x.id === id); if (!r) return null; const p = await loadRecipeProject(m.recipeProject ? m.recipeProject(r) : clone(r.project), r); return { id: p.id, name: p.name, tracks: p.tracks.length }; },
 };
 
 // ---------------------------------------------------------------- go
@@ -780,6 +780,6 @@ function showPcOnly() {
   const draw = () => d.draw({ playing: false, frac: 0.38, level: 0, analyser: null, dt: 0, still: true });
   requestAnimationFrame(draw); new ResizeObserver(() => requestAnimationFrame(draw)).observe(cv);
   // the studio stays PC only, but a phone can make a music video of one of Nico's songs (or a file from the phone)
-  $('pc-video').onclick = () => import('../visual/phone-maker.js?v=9e').then(m => m.openPhoneMaker()).catch(e => { console.error('[slowreel] video maker', e); });
+  $('pc-video').onclick = () => import('../visual/phone-maker.js?v=10').then(m => m.openPhoneMaker()).catch(e => { console.error('[slowreel] video maker', e); });
 }
 void renderTab; void instDef; void kb;

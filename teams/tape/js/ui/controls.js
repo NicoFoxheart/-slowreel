@@ -35,7 +35,7 @@ function arcPath(r, a0, a1) {
 }
 
 /** A knob. spec: {id, name, min, max, default, unit, step}. opts: {value, size:'sm'|''|'lg', color, onInput, onCommit, idPrefix, glass} */
-export function knob(spec, { value, size = '', color = 'var(--ink)', onInput, onCommit, idPrefix = 'k', glass = false } = {}) {
+export function knob(spec, { value, size = '', color = 'var(--amber)', onInput, onCommit, idPrefix = 'k', glass = false } = {}) {
   const min = spec.min ?? 0, max = spec.max ?? 1, def = spec.default ?? min;
   const log = (spec.unit === 'Hz' && min > 0 && max / min > 20);
   const toN = v => log ? Math.log(v / min) / Math.log(max / min) : (v - min) / (max - min || 1);
@@ -44,16 +44,16 @@ export function knob(spec, { value, size = '', color = 'var(--ink)', onInput, on
   const bipolar = min < 0 && max > 0;
   const el = h('div', { class: `knob ${size} ${glass ? 'on-glass' : ''}`, role: 'slider', tabindex: 0, id: `${idPrefix}-${spec.id}`, 'aria-label': spec.name, 'aria-valuemin': min, 'aria-valuemax': max });
   const s = svg('svg', { viewBox: '-50 -50 100 100', 'aria-hidden': 'true' });
-  for (let i = 0; i <= 10; i++) { const a = (-135 + 27 * i) * Math.PI / 180; const r0 = i % 5 ? 45.5 : 44, r1 = 49; s.append(svg('line', { x1: Math.sin(a) * r0, y1: -Math.cos(a) * r0, x2: Math.sin(a) * r1, y2: -Math.cos(a) * r1, stroke: glass ? '#5E686B' : '#A3A9AC', 'stroke-width': i % 5 ? 1.2 : 1.8, 'stroke-linecap': 'round' })); }
-  s.append(svg('path', { d: arcPath(40.5, -135, 135), fill: 'none', stroke: glass ? 'rgba(255,255,255,.1)' : 'rgba(18,22,24,.1)', 'stroke-width': 3.5, 'stroke-linecap': 'round' }));
+  for (let i = 0; i <= 10; i++) { const a = (-135 + 27 * i) * Math.PI / 180; const r0 = i % 5 ? 45.5 : 44, r1 = 49; s.append(svg('line', { x1: Math.sin(a) * r0, y1: -Math.cos(a) * r0, x2: Math.sin(a) * r1, y2: -Math.cos(a) * r1, stroke: glass ? '#5E686B' : '#5C636C', 'stroke-width': i % 5 ? 1.2 : 1.8, 'stroke-linecap': 'round' })); }
+  s.append(svg('path', { d: arcPath(40.5, -135, 135), fill: 'none', stroke: glass ? 'rgba(255,255,255,.1)' : 'rgba(255,255,255,.07)', 'stroke-width': 3.5, 'stroke-linecap': 'round' }));
   const arc = svg('path', { fill: 'none', stroke: color, 'stroke-width': 3.5, 'stroke-linecap': 'round' }); s.append(arc);
-  s.append(svg('circle', { cx: 0, cy: 3.5, r: 34, fill: 'rgba(20,24,26,.22)' }));
+  s.append(svg('circle', { cx: 0, cy: 3.5, r: 34, fill: 'rgba(0,0,0,.5)' }));
   const rot = svg('g', {});
   rot.append(svg('circle', { r: 34, fill: 'url(#kn-skirt)' }));
-  for (let i = 0; i < 28; i++) { const a = i * Math.PI * 2 / 28; rot.append(svg('line', { x1: Math.sin(a) * 30.5, y1: Math.cos(a) * 30.5, x2: Math.sin(a) * 33.5, y2: Math.cos(a) * 33.5, stroke: 'rgba(255,255,255,.16)', 'stroke-width': 1.4 })); }
-  rot.append(svg('circle', { r: 27, fill: 'url(#kn-cap)', stroke: 'rgba(0,0,0,.12)', 'stroke-width': 1 }));
-  rot.append(svg('circle', { r: 21, fill: 'none', stroke: 'rgba(0,0,0,.05)', 'stroke-width': 1 }));
-  rot.append(svg('line', { x1: 0, y1: -10, x2: 0, y2: -23, stroke: color === 'var(--ink)' ? '#15181A' : color, 'stroke-width': 4, 'stroke-linecap': 'round' }));
+  for (let i = 0; i < 28; i++) { const a = i * Math.PI * 2 / 28; rot.append(svg('line', { x1: Math.sin(a) * 30.5, y1: Math.cos(a) * 30.5, x2: Math.sin(a) * 33.5, y2: Math.cos(a) * 33.5, stroke: 'rgba(255,255,255,.10)', 'stroke-width': 1.4 })); }
+  rot.append(svg('circle', { r: 27, fill: 'url(#kn-cap)', stroke: 'rgba(0,0,0,.55)', 'stroke-width': 1 }));
+  rot.append(svg('circle', { r: 21, fill: 'none', stroke: 'rgba(255,255,255,.06)', 'stroke-width': 1 }));
+  rot.append(svg('line', { x1: 0, y1: -10, x2: 0, y2: -23, stroke: color, 'stroke-width': 4, 'stroke-linecap': 'round' }));
   s.append(rot);
   const ring = svg('circle', { r: 47, fill: 'none', stroke: 'transparent', class: 'kn-ring' }); s.append(ring);
   const name = h('span', { class: 'kn-name', text: spec.name }), val = h('span', { class: 'kn-val mono' });
@@ -143,7 +143,7 @@ export function meter({ height = 150 } = {}) {
     const W = c.width, H = c.height, seg = H / N; g.clearRect(0, 0, W, H);
     for (let i = 0; i < N; i++) {
       const db = -48 + (i + 1) * (48 / N), on = cur >= db, isHold = Math.abs(hold - db) < 48 / N / 2 + 0.01 && hold > -48;
-      g.fillStyle = (on || isHold) ? (db > -3 ? '#EC4E20' : db > -12 ? '#F2A900' : '#2E9E6E') : 'rgba(18,22,24,.10)';
+      g.fillStyle = (on || isHold) ? (db > -3 ? '#F0622A' : db > -12 ? '#F4B03A' : '#3FBF88') : 'rgba(255,255,255,.06)';
       g.fillRect(2, H - (i + 1) * seg + 2, W - 4, seg - 3);
     }
   };

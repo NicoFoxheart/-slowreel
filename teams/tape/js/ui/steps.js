@@ -6,9 +6,9 @@
 //
 // Integrator: initSteps(document.getElementById('pane-beats')); call renderSteps() when the Beats tab opens.
 // It listens to 'render' / 'select' itself while isActive() (default: S.tab === 'beats').
-import { S, on, emit, begin, end, edit, clipOf, clamp, uid, bpb, track, instDef } from './state.js?v=9e';
-import { h, knob } from './controls.js?v=9e';
-import { DRUM_MAP } from '../sound/drums.js?v=9e';
+import { S, on, emit, begin, end, edit, clipOf, clamp, uid, bpb, track, instDef } from './state.js?v=10';
+import { h, knob } from './controls.js?v=10';
+import { DRUM_MAP } from '../sound/drums.js?v=10';
 
 export const STEP_BEATS = 0.25;                    // one step = a 16th note
 export const MIN_STEPS = 4, MAX_STEPS = 128;       // 128 steps = 8 bars of 4/4
@@ -331,29 +331,29 @@ const CSS = `
 .stp-grid { position: relative; padding-bottom: 6px; }
 .stp-row { display: flex; height: var(--rh); }
 .stp-row.alt .stp-head { background: var(--panel); }
-.stp-head { position: sticky; left: 0; z-index: 3; width: var(--hw); flex: none; display: flex; align-items: center; gap: 5px; padding: 0 6px; background: var(--panel-hi); border-right: 1px solid var(--seam-strong); border-bottom: 1px solid rgba(18,22,24,.06); }
+.stp-head { position: sticky; left: 0; z-index: 3; width: var(--hw); flex: none; display: flex; align-items: center; gap: 5px; padding: 0 6px; background: var(--panel-hi); border-right: 1px solid var(--seam-strong); border-bottom: 1px solid var(--seam); }
 .stp-ruler { position: sticky; top: 0; z-index: 4; height: 22px; background: var(--panel); border-bottom: 1px solid var(--seam-strong); }
 .stp-ruler .stp-head { background: var(--panel); border-bottom: 0; }
 .stp-num-cell { width: var(--cw); flex: none; font: 500 9px/22px var(--f-mono); color: var(--ink-4); text-align: center; }
 .stp-num-cell.bar { color: var(--ink-2); font-weight: 700; border-left: 1px solid var(--seam-strong); }
 .stp-m.key.sm { width: 25px; justify-content: flex-start; padding-left: 5px; min-height: 17px; height: 17px; padding: 0; font: 700 9px/1 var(--f-sans); border-radius: 4px; }
 .stp-m .led { top: 2px; right: 2px; width: 4px; height: 4px; }
-.stp-m[aria-pressed="true"] { background: linear-gradient(#FFC93A, #F2A900); }
+.stp-m[aria-pressed="true"] { background: linear-gradient(#FFC24A, #E89A10); color: #1A1206; }
 .stp-name { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 6px; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; color: var(--ink); }
-.stp-short { font: 700 9.5px/1 var(--f-mono); color: var(--c); filter: saturate(1.1) brightness(.85); width: 26px; flex: none; }
+.stp-short { font: 700 9.5px/1 var(--f-mono); color: var(--c); filter: saturate(1.05) brightness(1.15); width: 26px; flex: none; }
 .stp-full { font: 500 11px/1 var(--f-sans); color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stp-name:active .stp-full { color: var(--signal); }
 .stp-row.muted .stp-full, .stp-row.muted .stp-short { color: var(--ink-4); }
-.stp-cell { width: var(--cw); flex: none; padding: 2px 1.5px; cursor: pointer; touch-action: none; border-bottom: 1px solid rgba(18,22,24,.05); }
-.stp-cell.odd { background: rgba(18,22,24,.035); }
-.stp-cell.beat { border-left: 1px solid rgba(18,22,24,.10); }
-.stp-cell i { display: block; height: 100%; border-radius: 3px; background: linear-gradient(#FAFBFA, #E4E7E5); box-shadow: inset 0 1px 0 rgba(255,255,255,.9), inset 0 -1px 0 rgba(0,0,0,.10), 0 0 0 1px rgba(18,22,24,.08); position: relative; overflow: hidden; }
-.stp-cell:hover i { background: linear-gradient(#FFFFFF, #ECEEEC); }
-.stp-cell.on i { background: color-mix(in srgb, var(--c) calc(40% + var(--v) * 60%), #FFFFFF); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 70%, #000 25%), inset 0 1px 0 rgba(255,255,255,.35); }
-.stp-cell.on i::after { content: ""; position: absolute; left: 2px; right: 2px; bottom: 2px; height: calc((var(--rh) - 10px) * var(--v)); max-height: calc(100% - 4px); border-radius: 1px; background: rgba(255,255,255,.55); }
-.stp-row.muted .stp-cell.on i { background: color-mix(in srgb, var(--c) 18%, #FFFFFF); box-shadow: inset 0 0 0 1px rgba(18,22,24,.2); }
+.stp-cell { width: var(--cw); flex: none; padding: 2px 1.5px; cursor: pointer; touch-action: none; border-bottom: 1px solid rgba(255,255,255,.025); }
+.stp-cell.odd { background: rgba(0,0,0,.16); }
+.stp-cell.beat { border-left: 1px solid rgba(255,255,255,.07); }
+.stp-cell i { display: block; height: 100%; border-radius: 3px; background: linear-gradient(#232930, #1C2127); box-shadow: inset 0 1px 0 rgba(255,255,255,.06), inset 0 -1px 0 rgba(0,0,0,.4), 0 0 0 1px rgba(0,0,0,.45); position: relative; overflow: hidden; }
+.stp-cell:hover i { background: linear-gradient(#2E353E, #252B32); }
+.stp-cell.on i { background: color-mix(in srgb, var(--c) calc(45% + var(--v) * 55%), #1C2127); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 70%, #fff 30%), inset 0 1px 0 rgba(255,255,255,.25), 0 0 10px -3px var(--c); }
+.stp-cell.on i::after { content: ""; position: absolute; left: 2px; right: 2px; bottom: 2px; height: calc((var(--rh) - 10px) * var(--v)); max-height: calc(100% - 4px); border-radius: 1px; background: rgba(255,255,255,.4); }
+.stp-row.muted .stp-cell.on i { background: color-mix(in srgb, var(--c) 22%, #1C2127); box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }
 .stp-cell.cur i { outline: 2px solid var(--cobalt); outline-offset: 0; }
-.stp-ph { position: absolute; top: 0; bottom: 0; left: 0; width: var(--cw); background: rgba(236,78,32,.13); border-left: 2px solid var(--signal); pointer-events: none; z-index: 2; }
+.stp-ph { position: absolute; top: 0; bottom: 0; left: 0; width: var(--cw); background: rgba(240,98,42,.14); border-left: 2px solid var(--signal); box-shadow: -4px 0 10px -4px rgba(240,98,42,.6); pointer-events: none; z-index: 2; }
 .stp-ph[hidden] { display: none; }
 .stp-empty { padding: var(--s5); display: flex; flex-direction: column; gap: var(--s2); color: var(--ink-2); font: var(--t-ui); }
 .stp-acts { display: flex; gap: 6px; flex-wrap: wrap; }

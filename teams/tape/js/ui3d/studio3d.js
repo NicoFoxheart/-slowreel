@@ -7,12 +7,12 @@
 // deck if the browser has no OffscreenCanvas / module workers / WebGL, or if the worker fails or loses its context.
 //
 // API: mountStudio3D({ S, pcOnly }) -> { frame({playing, frac, level, beat}), setLight(on), settingsRow(), get active() }
-import { h } from '../ui/controls.js?v=9e';
+import { h } from '../ui/controls.js?v=10';
 
 const PREF = 'slowreel:ui3d';
 const lsGet = k => { try { return localStorage.getItem(k); } catch { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch { } };
-const KNOB_COLORS = { atmosphere: 0xEC4E20, space: 0x2D55D2, volume: 0xF4C77A };
+const KNOB_COLORS = { atmosphere: 0xF0622A, space: 0x6F8FF0, volume: 0xF5A524 };
 const $ = id => document.getElementById(id);
 
 export function supports3D() {
@@ -88,7 +88,7 @@ export function mountStudio3D({ S, pcOnly = false } = {}) {
     let off;
     try {
       off = canvas.transferControlToOffscreen();
-      worker = new Worker(new URL('./worker3d.js?v=9e', import.meta.url), { type: 'module' });
+      worker = new Worker(new URL('./worker3d.js?v=10', import.meta.url), { type: 'module' });
     } catch (e) { fail(e); return; }
     const me = worker;   // messages from a worker that was already disposed (Light mode, setting off) are ignored
     worker.onerror = ev => { ev.preventDefault?.(); if (me === worker) fail(new Error(ev.message || 'the 3D worker failed to load')); };

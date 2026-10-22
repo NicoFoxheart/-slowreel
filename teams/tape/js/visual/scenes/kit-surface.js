@@ -2,8 +2,8 @@
 // idea of three's Reflector without importing it), a water material (scrolling normal-map waves + optional Gerstner
 // swell, Fresnel, mirror or sky reflection, sun glitter, subsurface tint, rain ripples, fog), a "wet" patch for three's
 // PBR materials (darker porous albedo, glossy puddles with ripples and mirror reflections), and a heightfield helper.
-import * as G from './kit-glsl.js?v=9e';
-import { halfFloatOK, noiseTexture, normalMapFromHeight, cached } from './kit-gpu.js?v=9e';
+import * as G from './kit-glsl.js?v=10';
+import { halfFloatOK, noiseTexture, normalMapFromHeight, cached } from './kit-gpu.js?v=10';
 
 /**
  * createMirror(THREE, renderer, {y = 0, resolution = 0.5, quality}) - renders the scene mirrored in the plane y = y.
