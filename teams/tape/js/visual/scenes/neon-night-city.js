@@ -3,8 +3,8 @@
 // utility poles + street lamps, sagging power cables, wall props (AC units, gas pipes, crates, bags), cars, a traffic
 // light, steam vents. Static light from every sign, shop window and lamp is baked into per-vertex irradiance (a
 // light map without textures), so hundreds of light sources cost nothing per frame and never pop.
-import * as kit from './kit.js?v=10a';
-import { patchLit, SIGN_VS, SIGN_FS, HALO_VS, HALO_FS, STEAM_VS, STEAM_FS, PRE } from './neon-night-glsl.js?v=10a';
+import * as kit from './kit.js?v=10b';
+import { patchLit, SIGN_VS, SIGN_FS, HALO_VS, HALO_FS, STEAM_VS, STEAM_FS, PRE } from './neon-night-glsl.js?v=10b';
 
 // ------------------------------------------------------------------------------------------ geometry accumulator
 function Acc() {

@@ -6,10 +6,10 @@
 // wet granite paving that mirrors the light, rain strings dripping from every tile channel, onggi jars on the jangdokdae.
 // Variants share the world: blue hour rain (hero), lantern night, autumn maples (dry, low sun, drifting leaves) and first
 // snow. Everything is a pure function of (t, f, seed): slow camera glides, drifting light and weather, subtle audio.
-import * as kit from './kit.js?v=10a';
-import { createBuilder, buildHall, buildRoof, boxGeo, mat, jarGeometry, lanternGeometry } from './hanok-rain-geo.js?v=10a';
-import { createMaple } from './hanok-rain-tree.js?v=10a';
-import { bakeAll, patchWeather, patchPaper, patchVertexEmissive, createDrips, createCityLights } from './hanok-rain-fx.js?v=10a';
+import * as kit from './kit.js?v=10b';
+import { createBuilder, buildHall, buildRoof, boxGeo, mat, jarGeometry, lanternGeometry } from './hanok-rain-geo.js?v=10b';
+import { createMaple } from './hanok-rain-tree.js?v=10b';
+import { bakeAll, patchWeather, patchPaper, patchVertexEmissive, createDrips, createCityLights } from './hanok-rain-fx.js?v=10b';
 
 export const meta = {
   id: 'hanok-rain', name: 'Hanok in the rain', group: 'Korea',

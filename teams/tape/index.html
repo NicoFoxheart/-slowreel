@@ -2,11 +2,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500&family=Dela+Gothic+One&family=M+PLUS+Rounded+1c:wght@500&display=swap">
-<link rel="stylesheet" href="css/studio.css?v=10a">
-<link rel="stylesheet" href="css/visual.css?v=10a">
-<link rel="stylesheet" href="css/studio3d.css?v=10a">
-<link rel="stylesheet" href="css/starters.css?v=10a">
-<link rel="stylesheet" href="css/phone-export.css?v=10a">
+<link rel="stylesheet" href="css/studio.css?v=10b">
+<link rel="stylesheet" href="css/visual.css?v=10b">
+<link rel="stylesheet" href="css/studio3d.css?v=10b">
+<link rel="stylesheet" href="css/starters.css?v=10b">
+<link rel="stylesheet" href="css/phone-export.css?v=10b">
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <defs>
@@ -63,7 +63,10 @@
     <div class="module assist" role="group" aria-label="Auto mix and rhythm">
       <button class="key sm lit-on led-amber" id="b-automix" aria-pressed="true" title="Auto mix: levels, pan, room and echo from each track's role"><span class="led"></span><span class="lb">Auto mix</span></button>
       <button class="key sm" id="b-rhythm" aria-haspopup="true" aria-expanded="false" title="Rhythm: metronome, count-in, tighten timing, grooves, breathe"><svg><use href="#i-pulse"/></svg>Rhythm</button>
-      <button class="key sm lit-on led-amber" id="b-metro" aria-pressed="false" title="Metronome: a soft click on every beat (never in the export)"><span class="led"></span>Click</button>
+      <div class="assist-row">
+        <button class="key sm lit-on led-amber" id="b-metro" aria-pressed="false" title="Metronome: a soft click on every beat (never in the export)"><span class="led"></span>Click</button>
+        <button class="key sm lit-on led-amber" id="b-chords" aria-pressed="false" title="Chord keys: one key plays a whole chord from the scale (Q)"><span class="led"></span><span class="lb">Chords</span></button>
+      </div>
     </div>
 
     <div class="module lcd">
@@ -225,4 +228,4 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
-<script type="module" src="js/ui/app.js?v=10a"></script>
+<script type="module" src="js/ui/app.js?v=10b"></script>

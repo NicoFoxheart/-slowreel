@@ -4,8 +4,8 @@
 // fresh impacts land, heavy drops break free and stick-slip down in wiggly paths leaving clear wet tracks with trail
 // droplets; condensation mist veils the rest. Variants: city night, blue hour, neon, countryside (trees, one porch light).
 // Shaders: rain-window-glsl.js. Everything is procedural and a pure function of (t, f, seed).
-import * as kit from './kit.js?v=10a';
-import { BASE_VS, BASE_FS, SPRITE_VS, SPRITE_FS, GLASS_FS, MICRO_FS } from './rain-window-glsl.js?v=10a';
+import * as kit from './kit.js?v=10b';
+import { BASE_VS, BASE_FS, SPRITE_VS, SPRITE_FS, GLASS_FS, MICRO_FS } from './rain-window-glsl.js?v=10b';
 
 export const meta = {
   id: 'rain-window', name: 'Rain on the window', group: 'Cozy',

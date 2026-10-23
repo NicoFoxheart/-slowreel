@@ -1,9 +1,9 @@
 // gen-worker.js - module Worker that makes the heavy, pure-maths sample buffers off the main thread (see assets.js):
 // reverb impulse responses, the noise loops and the night-rain loops. Same code as the main-thread fallback, so the
 // samples are identical either way.
-import { noiseFloats } from './util.js?v=10a';
-import { irFloats, irPlan } from './reverb.js?v=10a';
-import { nightFloats } from './nightrain.js?v=10a';
+import { noiseFloats } from './util.js?v=10b';
+import { irFloats, irPlan } from './reverb.js?v=10b';
+import { nightFloats } from './nightrain.js?v=10b';
 
 self.onmessage = (e) => {
   const { id, kind, sr } = e.data || {};

@@ -10,7 +10,7 @@
 //   track.fx[i].auto = 'lowcut' | 'room'     (the inserts Auto mix owns)
 // Projects without project.autoMix were made before Auto mix: they load unchanged (see rhythm.js for when it runs).
 
-import { grooveById } from './grooves.js?v=10a';
+import { grooveById } from './grooves.js?v=10b';
 
 export const MIX_KEYS = ['volumeDb', 'pan', 'space', 'echo', 'lowcut', 'room'];
 

@@ -4,7 +4,7 @@
 // (box, sun, tree, person, water, cross, roof...) composed left/right or top/bottom, plus a few kana-like cells.
 // Atlas: 8 x 8 cells. R = tube profile (1 at the stroke centre falling to 0 at its edge: threshold it for thin neon or
 // bold lightbox lettering), G = wide soft glow, B = 1 inside the glyph's bounding block (for panel cut-outs).
-import * as kit from './kit.js?v=10a';
+import * as kit from './kit.js?v=10b';
 
 const L = (...p) => ({ k: 'l', p });         // polyline in the unit box (y down)
 const O = (cx, cy, rx, ry) => ({ k: 'o', c: [cx, cy, rx, ry ?? rx] });

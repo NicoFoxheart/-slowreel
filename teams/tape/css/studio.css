@@ -610,6 +610,9 @@ html.pc-only .pconly { display: flex; flex-direction: column; align-items: cente
 .deck > .module.assist { flex: 0 0 auto; flex-direction: column; align-items: stretch; justify-content: center; gap: 5px; padding: 8px 10px; width: 112px; }
 .assist .key { justify-content: flex-start; gap: 6px; min-height: 24px; }
 .assist .key svg { width: 14px; height: 14px; }
+.assist .assist-row { display: flex; gap: 4px; }
+.assist .assist-row .key { flex: 1 1 0; min-width: 0; padding-inline: 6px; gap: 4px; overflow: hidden; }
+.assist .assist-row .key .lb { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .key.lit-on[aria-pressed="true"] { background: linear-gradient(var(--key-lit-top), var(--key-lit-bot)); color: var(--key-lit-ink); box-shadow: var(--key-lit-shadow); }
 .key.led-amber[aria-pressed="true"] .led { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
 .key.pending .led { background: #7A5418; box-shadow: 0 0 4px rgba(245,165,36,.45); animation: ledwait 2.4s ease-in-out infinite; }

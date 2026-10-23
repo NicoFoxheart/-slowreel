@@ -5,8 +5,8 @@
 // lighthouse 2 km off, a fainter coast behind it. Variants: golden sunset (hero), pastel dawn, moonlit night, stormy grey.
 // Audio: swell height follows the smoothed bass, glitter the highs, wind/roughness and whitecaps the section energy,
 // lightning on rare big accents (storm only). Everything is a pure function of (t, features, seed, variant, quality).
-import * as kit from './kit.js?v=10a';
-import { BAKE_FS, DOWN4_FS, OCEAN_VS, OCEAN_FS, BEAM_VS, BEAM_FS, DECK_VS, DECK_FS } from './golden-ocean-glsl.js?v=10a';
+import * as kit from './kit.js?v=10b';
+import { BAKE_FS, DOWN4_FS, OCEAN_VS, OCEAN_FS, BEAM_VS, BEAM_FS, DECK_VS, DECK_FS } from './golden-ocean-glsl.js?v=10b';
 
 export const meta = {
   id: 'golden-ocean',

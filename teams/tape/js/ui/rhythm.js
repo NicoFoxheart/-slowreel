@@ -5,11 +5,11 @@
 //             video), Tighten timing (Notes tab and the Rhythm popover), auto-tighten new recordings, Add a groove
 //             (grooves.js) and Breathe (a Sidechain Pump on a pad, keyed to the groove's kick or to the tempo).
 // He still plays every note: nothing here writes melody or chords.
-import { S, on, emit, edit, begin, end, track, clipOf, clamp, bpb, uid, instDef, setMixHook } from './state.js?v=10a';
-import { h, icon, knob } from './controls.js?v=10a';
-import { autoMix, roleOf, roleLabel, isManual, markManual, clearManual, anyManual, canBreathe, pickReverb } from './automix.js?v=10a';
-import { GROOVES, grooveById, grooveTrack } from './grooves.js?v=10a';
-import { TRACK_COLORS } from './sample-project.js?v=10a';
+import { S, on, emit, edit, begin, end, track, clipOf, clamp, bpb, uid, instDef, setMixHook } from './state.js?v=10b';
+import { h, icon, knob } from './controls.js?v=10b';
+import { autoMix, roleOf, roleLabel, isManual, markManual, clearManual, anyManual, canBreathe, pickReverb } from './automix.js?v=10b';
+import { GROOVES, grooveById, grooveTrack } from './grooves.js?v=10b';
+import { TRACK_COLORS } from './sample-project.js?v=10b';
 
 const $ = id => document.getElementById(id);
 const lsGet = k => { try { return localStorage.getItem(k); } catch { return null; } };

@@ -1,6 +1,6 @@
 // neon-night-glsl.js - shader code for the neon-night scene: baked-irradiance PBR patch (facades, wet asphalt with
 // streaked planar reflections, props), sign faces (lightboxes, neon tubes, screens), halos, steam, the night sky.
-import * as kit from './kit.js?v=10a';
+import * as kit from './kit.js?v=10b';
 const G = kit.GLSL;
 
 // FogExp2 with a soft height falloff (low mist hugs the street) - same formula in every material.

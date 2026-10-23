@@ -4,8 +4,8 @@
 // a water-film softness plus depth-based motion blur (near poles and cars smear, far towers stay crisp), beads that
 // refract a sharp inverted image of the lights, rivulets pushed back by the slipstream, the reflection of the lit
 // carriage (ceiling strips, hand straps, windows across the aisle, bench seats) and the window frame.
-import * as kit from './kit.js?v=10a';
-import { buildCity } from './neon-night-city.js?v=10a';
+import * as kit from './kit.js?v=10b';
+import { buildCity } from './neon-night-city.js?v=10b';
 
 const DOWN_FS = /* glsl */`
 uniform sampler2D tSrc; uniform vec2 uTexel;

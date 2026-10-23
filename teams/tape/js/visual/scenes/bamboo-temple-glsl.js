@@ -4,7 +4,7 @@
 // through), in-material volumetric sun shafts (raymarched against the real depth of each fragment), analytic lantern /
 // andon / bamboo up-lights for the night, and per-kind procedural surfaces (culms with nodes and wax bloom, leaf cards
 // with wind and translucency, ground with path stones and leaf litter, brushwood fences, lacquered torii, mossy stone).
-import * as G from './kit-glsl.js?v=10a';
+import * as G from './kit-glsl.js?v=10b';
 
 /** Path centre line (x at z), mirrored on the CPU by pathX() in bamboo-temple.js. */
 export const BT_COMMON = /* glsl */`
