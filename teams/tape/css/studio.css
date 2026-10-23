@@ -604,3 +604,71 @@ html.pc-only .pconly { display: flex; flex-direction: column; align-items: cente
 .lcd-field input[type="number"]::-webkit-inner-spin-button, .lcd-field input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .lcd-field input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 .unit.chop-unit { overflow-y: auto; scrollbar-width: thin; }
+
+/* ------------------------------------------------------------------ Auto mix + Rhythm (js/ui/rhythm.js) */
+/* the deck module: three small keys stacked beside the transport; "lit" (amber backlight) when on */
+.deck > .module.assist { flex: 0 0 auto; flex-direction: column; align-items: stretch; justify-content: center; gap: 5px; padding: 8px 10px; width: 112px; }
+.assist .key { justify-content: flex-start; gap: 6px; min-height: 24px; }
+.assist .key svg { width: 14px; height: 14px; }
+.key.lit-on[aria-pressed="true"] { background: linear-gradient(var(--key-lit-top), var(--key-lit-bot)); color: var(--key-lit-ink); box-shadow: var(--key-lit-shadow); }
+.key.led-amber[aria-pressed="true"] .led { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+.key.pending .led { background: #7A5418; box-shadow: 0 0 4px rgba(245,165,36,.45); animation: ledwait 2.4s ease-in-out infinite; }
+@keyframes ledwait { 50% { opacity: .35; } }
+/* the Rhythm popover */
+.rhythm-pop { width: 360px; max-height: calc(100vh - 140px); overflow: auto; }
+.rhythm-pop .rh-sec { display: grid; gap: 7px; padding-top: 9px; border-top: 1px solid var(--seam); }
+.rhythm-pop .row .key svg { width: 14px; height: 14px; }
+.groove-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.key.groove { flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; min-height: 44px; padding: 6px 9px; text-align: left; }
+.key.groove strong { font: 600 12px/1.15 var(--f-sans); }
+.key.groove span { font: 500 10px/1.25 var(--f-sans); color: var(--ink-3); }
+.key.groove[aria-pressed="true"] { background: linear-gradient(var(--key-lit-top), var(--key-lit-bot)); color: var(--key-lit-ink); box-shadow: var(--key-lit-shadow); }
+.key.groove[aria-pressed="true"] span { color: #D9B47A; }
+/* Notes tab: Tighten + strength */
+.tight-tools { display: inline-flex; gap: 0; }
+.tight-tools .key { gap: 5px; }
+.tight-tools .key svg { width: 13px; height: 13px; }
+.tight-tools .sel { height: 24px; border-radius: 0 5px 5px 0; margin-left: 1px; font-size: 10px; padding: 0 4px; }
+/* Sound tab: the Mix unit, manual markers */
+.mix-unit { width: 268px; }
+.mix-unit .mix-knobs { gap: 10px; flex-wrap: nowrap; }
+.mix-unit .knob { position: relative; }
+.mix-unit .mix-role { margin: 0; font: 500 11px/1.4 var(--f-sans); color: var(--ink-3); }
+.mix-unit .row { display: flex; gap: 6px; flex-wrap: wrap; }
+.unit h3 .label.auto-on { color: var(--amber); }
+.knob .man { position: absolute; top: -2px; right: -4px; font: 600 8px/1 var(--f-sans); letter-spacing: .1em; text-transform: uppercase; color: var(--amber); padding: 2px 3px; border-radius: 3px; box-shadow: inset 0 0 0 1px rgba(245,165,36,.55); background: var(--panel-hi); pointer-events: auto; }
+.strip .db.is-manual { color: var(--amber); }
+.strip .db.is-manual::after { content: " · manual"; font: 600 8px/1 var(--f-sans); letter-spacing: .08em; text-transform: uppercase; }
+.unit.fx .fx-auto { color: var(--amber); margin-left: 0; }
+/* room for the assist column on 1280-1600 px screens: slimmer brand, counter, transport keys and project column */
+@media (max-width: 1600px) {
+  .deck > .module.assist { width: 96px; padding: 8px; }
+  .brand { width: 124px; }
+  .brand-name { font-size: 18px; }
+  .brand-model { font-size: 9px; letter-spacing: .1em; }
+  .lcd .glass { width: 214px; }
+  .lcd-counter { font-size: 24px; }
+  .tgroup { grid-template-columns: repeat(5, 42px); }
+  .tgroup .key.big { width: 42px; }
+  .proj { width: 206px; }
+  .window { min-width: 110px; }
+}
+@media (max-width: 1360px) {
+  .deck > .module.assist { width: 90px; }
+  .window { min-width: 90px; }
+  .masterctl { gap: 10px !important; }
+}
+/* every key in the project column stays whole: the save state text gives way first (its LED and tooltip remain) */
+.proj-meta > .key { flex: none; }
+.proj-state { min-width: 0; overflow: hidden; flex: 0 1 auto; }
+.proj-state span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* the LCD's scale menu takes the room that is left in its row (narrow counters): never past the glass */
+.lcd-row > .lcd-field:last-child { flex: 1 1 0; min-width: 0; }
+.lcd-row > .lcd-field:last-child select { width: 100%; max-width: 100%; min-width: 0; text-overflow: ellipsis; }
+/* the tape window drops its VU before the reels get squeezed (narrow decks) */
+.window { container-type: inline-size; }
+@container (max-width: 225px) { #vu-canvas { display: none; } }
+/* the popover: one column that never grows past its width; grooves wrap */
+.rhythm-pop { grid-template-columns: minmax(0, 1fr); }
+.rhythm-pop .rh-sec, .rhythm-pop .row { min-width: 0; }
+.key.groove { white-space: normal; min-width: 0; }

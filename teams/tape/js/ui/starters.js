@@ -7,8 +7,8 @@
 //   blankProject(base)                 zero tracks
 //   starterProject(starter, base)      the set-up tape (base = { instruments, buses, colors, uid })
 //   guideFor(project)                  a recipe-shaped object for recipes-panel openTips (style guide or flow tips)
-import { h, icon } from './controls.js?v=10';
-import { KEYMAP } from './panels.js?v=10';
+import { h, icon } from './controls.js?v=10a';
+import { KEYMAP } from './panels.js?v=10a';
 
 // ---------------------------------------------------------------- notes, keys and the home note
 const NOTE = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -37,6 +37,7 @@ export const STARTERS = [
       'The haegeum answers the gayageum: play a short Gayageum phrase, then click the Haegeum track and reply with a few long notes.',
       'Leave silence. After each phrase, let the rain and the Space knob fill a bar or two before you play again.',
       'Gyemyeonjo in D# is exactly the five black keys: W E T Y U O P (C# D# F# G# A#). Any of them sound good together.',
+      'Rhythm (deck): Add a groove > Korean janggu lays a soft 12/8 gutgeori pulse under you after the intro; Breathe on the Rain makes it swell with it.',
     ],
   },
   {
@@ -54,6 +55,7 @@ export const STARTERS = [
       'The erhu slides: on the Erhu track, press the next key before you let go of the last. The Slide knob (Sound tab) sets how slow the glide is.',
       'Think of a shan shui painting: most of it is empty mist. Play one or two voices at a time and let Space and Atmos be the mist.',
       'Long Erhu notes over a few Guzheng plucks: the slow voice is the mountain, the plucks are the water.',
+      'Rhythm (deck): Add a groove > Rain ticks or Heartbeat pulse for a quiet pulse; Breathe on Mountain air lets the wind swell with it.',
     ],
   },
   {
@@ -72,6 +74,7 @@ export const STARTERS = [
       'Meri bends a note down by tilting the head. The Meri knob sets how flat a held note starts before it rises; hold notes a beat or more.',
       'One koto note can be a whole phrase: pluck once, let it ring and press (the Oshide knob), then wait.',
       'Strike the Temple bell rarely, once every 4-8 bars, on E (key D).',
+      'Rhythm (deck): Add a groove > Soft taiko gives distant temple drums after the intro. Breathe is for pads: add a Tape pad if you want one to pulse.',
     ],
   },
   {
@@ -92,6 +95,7 @@ export const STARTERS = [
       '808 glide: press the next key before you let go of the last and it slides (Glide knob, Sound tab). Stay on D# most of the time.',
       'Filter sweeps: in All tools, press A on the Dream pad and draw a Tone lane rising over 8 bars. It opens the pad into the next part.',
       'The black keys W E T Y U O P are D# minor pentatonic, five safe notes of D# minor. Add F (key F) and B (key J) for the full scale.',
+      'Rhythm (deck): Add a groove > Future garage writes a shuffled 2-step to start from (edit it in Beats); Breathe on Vocal chops makes them pulse with its kick.',
     ],
   },
   {
@@ -109,6 +113,7 @@ export const STARTERS = [
       'On the Tape pad, hold two or three black keys together for 2-4 bars, then let them fade. Slow changes feel calm.',
       'The Felt piano plays only a few notes: one, wait, another. The gaps are where the room rings.',
       'Space (the blue knob) makes the room bigger, Atmos adds air. Turn them down if the notes blur.',
+      'Rhythm (deck): Add a groove > Heartbeat pulse puts a soft kick and shaker under the drone; Breathe on the Tape pad makes it pulse with it.',
     ],
   },
 ];
@@ -157,7 +162,8 @@ export function guideFor(p, scaleName = s => s) {
   const common = { bpm: p.bpm, key: p.key, scale: p.scale, project: { lengthBars: p.lengthBars, beatsPerBar: p.beatsPerBar || 4 } };
   if (st) return { ...common, id: 'guide-' + st.id, title: `${st.title} · style guide`, region: st.region, scaleName: st.key === p.key && st.scale === p.scale ? st.scaleName : scaleName(p.scale),
     steps: [...(st.key === p.key && st.scale === p.scale ? st.tips : st.tips.filter(t => !/black keys|white keys/i.test(t))), ...flowTips(p.key)] };
-  return { ...common, id: 'guide-flow', title: 'Make it flow', region: 'ambient', scaleName: scaleName(p.scale), steps: flowTips(p.key) };
+  return { ...common, id: 'guide-flow', title: 'Make it flow', region: 'ambient', scaleName: scaleName(p.scale),
+    steps: [...flowTips(p.key), 'Flow · Rhythm (deck): Add a groove for a soft pulse that starts after the intro, and Breathe on a pad to make it pulse with it. Click and the count-in keep you in time; Tighten (Notes) keeps your feel.'] };
 }
 
 // ---------------------------------------------------------------- the chooser

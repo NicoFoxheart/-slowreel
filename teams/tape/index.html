@@ -2,11 +2,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500&family=Dela+Gothic+One&family=M+PLUS+Rounded+1c:wght@500&display=swap">
-<link rel="stylesheet" href="css/studio.css?v=10">
-<link rel="stylesheet" href="css/visual.css?v=10">
-<link rel="stylesheet" href="css/studio3d.css?v=10">
-<link rel="stylesheet" href="css/starters.css?v=10">
-<link rel="stylesheet" href="css/phone-export.css?v=10">
+<link rel="stylesheet" href="css/studio.css?v=10a">
+<link rel="stylesheet" href="css/visual.css?v=10a">
+<link rel="stylesheet" href="css/studio3d.css?v=10a">
+<link rel="stylesheet" href="css/starters.css?v=10a">
+<link rel="stylesheet" href="css/phone-export.css?v=10a">
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <defs>
@@ -34,6 +34,8 @@
     <symbol id="i-book" viewBox="0 0 16 16"><path d="M2.5 3.5h4a1.5 1.5 0 0 1 1.5 1.5v8a1.2 1.2 0 0 0-1.2-1.2H2.5zM13.5 3.5h-4A1.5 1.5 0 0 0 8 5v8a1.2 1.2 0 0 1 1.2-1.2h4.3z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
     <symbol id="i-set" viewBox="0 0 16 16"><path d="M2.5 4.5h11M2.5 11.5h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10.5" cy="4.5" r="2" fill="var(--panel-hi,#fff)" stroke="currentColor" stroke-width="1.5"/><circle cx="5.5" cy="11.5" r="2" fill="var(--panel-hi,#fff)" stroke="currentColor" stroke-width="1.5"/></symbol>
     <symbol id="i-heart" viewBox="0 0 16 16"><path d="M8 13.5L2.9 8.6C1.6 7.3 1.6 5.2 2.9 4c1.2-1.1 3-1 4.1.2L8 5.3l1-1.1c1.1-1.2 2.9-1.3 4.1-.2 1.3 1.2 1.3 3.3 0 4.6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M3.2 4.6L3 1.8l2.4 1.5M12.8 4.6l.2-2.8-2.4 1.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
+    <symbol id="i-pulse" viewBox="0 0 16 16"><path d="M1.5 8.5h3l1.6-4 2.6 8 1.8-5.5 1 1.5h3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-tight" viewBox="0 0 16 16"><path d="M2.5 3v10M13.5 3v10M5 8h6M7 6l-2 2 2 2M9 6l2 2-2 2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-fox" viewBox="0 0 24 24"><path d="M12 21.2L3.6 12.8C1.9 11 1.8 8.2 2.8 6.1L4.4 2.4l4.1 3.1c1.4-.3 2.6.1 3.5.9.9-.8 2.1-1.2 3.5-.9l4.1-3.1 1.6 3.7c1 2.1.9 4.9-.8 6.7z" fill="#EC4E20"/><path d="M12 21.2L8.8 12.6h6.4z" fill="#F7F8F7" opacity=".9"/></symbol>
   </defs>
 </svg>
@@ -56,6 +58,12 @@
         </div>
         <div class="tgroup" aria-hidden="true"><span class="label cap">Rtn</span><span class="label cap">Play</span><span class="label cap">Stop</span><span class="label cap">Loop</span><span class="label cap">Rec</span></div>
       </div>
+    </div>
+
+    <div class="module assist" role="group" aria-label="Auto mix and rhythm">
+      <button class="key sm lit-on led-amber" id="b-automix" aria-pressed="true" title="Auto mix: levels, pan, room and echo from each track's role"><span class="led"></span><span class="lb">Auto mix</span></button>
+      <button class="key sm" id="b-rhythm" aria-haspopup="true" aria-expanded="false" title="Rhythm: metronome, count-in, tighten timing, grooves, breathe"><svg><use href="#i-pulse"/></svg>Rhythm</button>
+      <button class="key sm lit-on led-amber" id="b-metro" aria-pressed="false" title="Metronome: a soft click on every beat (never in the export)"><span class="led"></span>Click</button>
     </div>
 
     <div class="module lcd">
@@ -192,6 +200,7 @@
 
 <div class="pop" id="proj-pop" hidden role="dialog" aria-label="Projects"></div>
 <div class="pop" id="set-pop" hidden role="dialog" aria-label="Settings"></div>
+<div class="pop rhythm-pop" id="rhythm-pop" hidden role="dialog" aria-label="Rhythm"></div>
 
 <section class="pconly" id="pconly" hidden aria-labelledby="pc-title">
   <div class="brand-name"><svg aria-hidden="true"><use href="#i-fox"/></svg>Slowreel</div>
@@ -216,4 +225,4 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
-<script type="module" src="js/ui/app.js?v=10"></script>
+<script type="module" src="js/ui/app.js?v=10a"></script>

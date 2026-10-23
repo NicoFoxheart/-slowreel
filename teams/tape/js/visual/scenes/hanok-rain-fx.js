@@ -3,7 +3,7 @@
 // sheen, snow in the channels, fallen leaves), a paper-door glow patch, an emissive-by-vertex-colour patch; eave drips
 // (water falling from every amsaw channel end in beaded strings, with splash rings where it lands) and distant city
 // lights. All stateless in t.
-import * as kit from './kit.js?v=10';
+import * as kit from './kit.js?v=10a';
 
 // ------------------------------------------------------------------------------------------------ bakes (linear albedo)
 // giwa: 4 x 4 tiles per texture. u: one row period (sumaksae centred at 0.5, amsaw channel at 0/1). v: one course.

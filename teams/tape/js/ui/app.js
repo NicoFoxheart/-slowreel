@@ -1,25 +1,27 @@
 // app.js - Slowreel boot + the deck (transport, counter, master), Nico's tapes, projects, export dialog, the dock,
 // QWERTY playing / recording, keyboard shortcuts, the visual loop and the test hook window.__studio.
 import { S, on, emit, edit, track, clipOf, clamp, uid, clone, bpb, songBeats, fmtTime, isSongTrack, instDef, isSongParam,
-  doUndo, doRedo, canUndo, canRedo, resetHistory } from './state.js?v=10';
-import { h, icon, knob } from './controls.js?v=10';
-import { loadEngine } from './engine.js?v=10';
-import { initArrange, render as renderArrange, fitZoom, zoomBy, setPlayhead, updateLoop, updateMeters, addClipHere, duplicateClip, deleteClip, addTrack, createClipAt, selectClip } from './arrange.js?v=10';
-import { initRoll, render as renderRoll, setRollHead, zoom as rollZoom } from './pianoroll.js?v=10';
-import { initPanels, renderTab, renderSongClip, updateMixMeters, animateCloud, KEYMAP, markKbKey } from './panels.js?v=10';
-import { createDeck, createVU } from './deck.js?v=10';
-import { exportMaster, renderProject, songSeconds, kb } from './exporter.js?v=10';
-import { initPhone, phoneFrame } from './phone.js?v=10';
-import { KEYS, CHORDS, scaleGroups } from './theory.js?v=10';
-import { TRACK_COLORS } from './sample-project.js?v=10';
-import { SONGS, loadSong } from '../../lib/songs.js?v=10';
-import { openProjects, autosave } from '../../lib/storage.js?v=10';
-import { measure } from '../../lib/export.js?v=10';
-import { initVisual, openVisual, isVisualOpen, exportVideoFor } from '../visual/visual-panel.js?v=10';
-import { mountStudio3D } from '../ui3d/studio3d.js?v=10';
-import { initSteps, renderSteps, isDrumTrack } from './steps.js?v=10';
-import { openChooser, closeChooser, blankProject, starterProject as styleStarter, guideFor, starterById } from './starters.js?v=10';
-import { createLiveArp } from '../sound/arp.js?v=10';
+  doUndo, doRedo, canUndo, canRedo, resetHistory } from './state.js?v=10a';
+import { h, icon, knob } from './controls.js?v=10a';
+import { loadEngine } from './engine.js?v=10a';
+import { initArrange, render as renderArrange, fitZoom, zoomBy, setPlayhead, updateLoop, updateMeters, addClipHere, duplicateClip, deleteClip, addTrack, createClipAt, selectClip } from './arrange.js?v=10a';
+import { initRoll, render as renderRoll, setRollHead, zoom as rollZoom } from './pianoroll.js?v=10a';
+import { initPanels, renderTab, renderSongClip, updateMixMeters, animateCloud, KEYMAP, markKbKey } from './panels.js?v=10a';
+import { createDeck, createVU } from './deck.js?v=10a';
+import { exportMaster, renderProject, songSeconds, kb } from './exporter.js?v=10a';
+import { initPhone, phoneFrame } from './phone.js?v=10a';
+import { KEYS, CHORDS, scaleGroups } from './theory.js?v=10a';
+import { TRACK_COLORS } from './sample-project.js?v=10a';
+import { SONGS, loadSong } from '../../lib/songs.js?v=10a';
+import { openProjects, autosave } from '../../lib/storage.js?v=10a';
+import { measure } from '../../lib/export.js?v=10a';
+import { initVisual, openVisual, isVisualOpen, exportVideoFor } from '../visual/visual-panel.js?v=10a';
+import { mountStudio3D } from '../ui3d/studio3d.js?v=10a';
+import { initSteps, renderSteps, isDrumTrack } from './steps.js?v=10a';
+import { openChooser, closeChooser, blankProject, starterProject as styleStarter, guideFor, starterById } from './starters.js?v=10a';
+import { createLiveArp } from '../sound/arp.js?v=10a';
+import { initRhythm, onPlay, onStop, countIn, wantsCountIn, afterRecording, tightenTools, settingsRows, newTapeMix, applyAutoMix, closePop,
+  addGroove, removeGroove, toggleBreathe, tightenClip, autoState, remix, tighten, gridFor, R as rhythmPrefs } from './rhythm.js?v=10a';
 
 const $ = id => document.getElementById(id);
 const LAST_KEY = 'slowreel:last';
@@ -59,6 +61,7 @@ function demoCopy() { const d = clone(S.engine.demo); d.id = 'demo'; d.schema = 
 
 async function openProject(p, { fresh } = {}) {
   S.project = p; normalize(p);
+  if (p.autoMix?.on) applyAutoMix(p);   // Auto mix on this tape: refresh it on load (idempotent). Older tapes load unchanged.
   S.autoOpen.clear(); S.autoSel = {};   // automation lanes are view state of one tape
   recipesMod?.then(m => m.closeTips()).catch(() => { });   // tips of an earlier recipe never stay over another tape (the panel reopens them for its own load)
   const firstClip = p.tracks.find(t => t.clips.some(c => !c.song));
@@ -124,20 +127,24 @@ function setSaveState(st, err) {
   const el = $('proj-state');
   el.classList.toggle('dirty', st === 'dirty'); el.classList.toggle('err', st === 'error');
   el.lastChild.textContent = st === 'dirty' ? 'Saving soon' : st === 'error' ? (err?.code === 'too_large' ? 'Too big to save' : 'Not saved') : 'Saved';
+  el.title = el.lastChild.textContent;
 }
 on('dirty', () => { setSaveState('dirty'); clearTimeout(saveTimer); if (!S.saver) saveTimer = setTimeout(() => setSaveState('saved'), 400); });
 
 // ---------------------------------------------------------------- transport
-function play(from) {
+function play(from, { at } = {}) {
+  probeAbort?.abort();   // a Light-mode speed probe never competes with playback
   if (S.ctx.state !== 'running') S.ctx.resume();
   stopPreview();
-  const b = from ?? S.engine.position().beat;
-  S.engine.play(b >= songBeats() && !S.project.loop?.on ? 0 : b);
+  let b = from ?? S.engine.position().beat;
+  if (b >= songBeats() && !S.project.loop?.on) b = 0;
+  const t0 = S.engine.play(b, at ? { at } : undefined);
   S.playing = true; syncTransport(); startLoop();
+  onPlay(typeof t0 === 'number' ? t0 : S.ctx.currentTime + 0.3, b);   // the metronome follows the tape from here
 }
 function stop() {
   if (S.rec) finishRecording();
-  S.engine.stop(); S.playing = false; syncTransport(); startLoop();
+  S.engine.stop(); S.playing = false; onStop(); syncTransport(); startLoop();
 }
 function togglePlay() { S.playing ? stop() : play(); }
 function returnToStart() { seek(0); }
@@ -341,10 +348,10 @@ function renderDockTools() {
     const chord = h('select', { class: 'sel', id: 'pr-chord', 'aria-label': 'Chord stamp' }, ...CHORDS.map(c => h('option', { value: c.id, selected: c.id === S.chord }, c.id === 'off' ? 'Single note' : 'Chord: ' + c.name)));
     chord.onchange = () => { S.chord = chord.value; };
     const lock = h('button', { class: 'key sm led-green', id: 'pr-lock', 'aria-pressed': String(S.lock), title: 'Keep new and moved notes in the scale', onclick: e => { S.lock = !S.lock; e.currentTarget.setAttribute('aria-pressed', String(S.lock)); } }, h('span', { class: 'led' }), 'Scale lock');
-    if (S.simple) el.append(seg, lock,
+    if (S.simple) el.append(seg, tightenTools(), lock,
       h('button', { class: 'key sm sq', id: 'pr-zout', 'aria-label': 'Zoom out', onclick: () => rollZoom(1 / 1.3) }, icon('zout')),
       h('button', { class: 'key sm sq', id: 'pr-zin', 'aria-label': 'Zoom in', onclick: () => rollZoom(1.3) }, icon('zin')));
-    else el.append(seg, h('label', { class: 'field' }, h('span', { class: 'label', text: 'Snap' }), snap), chord, lock,
+    else el.append(seg, h('label', { class: 'field' }, h('span', { class: 'label', text: 'Snap' }), snap), chord, tightenTools(), lock,
       h('button', { class: 'key sm sq', id: 'pr-zout', 'aria-label': 'Zoom out', onclick: () => rollZoom(1 / 1.3) }, icon('zout')),
       h('button', { class: 'key sm sq', id: 'pr-zin', 'aria-label': 'Zoom in', onclick: () => rollZoom(1.3) }, icon('zin')));
   } else if (S.tab === 'fx') {
@@ -390,9 +397,10 @@ function toggleRec() {
   if (S.rec) { finishRecording(); syncTransport(); renderTab(); return; }
   const t = track(); if (!t || isSongTrack(t)) { toast('Pick an instrument track to record into.'); return; }
   S.rec = true; recBuf = []; recTrack = t.id;
-  if (!S.playing) play();
+  let counting = false;
+  if (!S.playing) { if (wantsCountIn() && !S.engine.isMock) { counting = true; play(undefined, { at: countIn() }); } else play(); }
   syncTransport(); if (S.tab === 'keys') renderTab();
-  toast(`Recording into ${t.name}. Press R again to finish.`);
+  toast(counting ? `Count-in: one bar of clicks, then recording into ${t.name}. Press R again to finish.` : `Recording into ${t.name}. Press R again to finish.`);
 }
 function finishRecording() {
   S.rec = false;
@@ -401,8 +409,9 @@ function finishRecording() {
     const B = bpb(), s0 = Math.floor(Math.min(...recBuf.map(n => n.s)) / B) * B, e0 = Math.max(...recBuf.map(n => n.s + n.d));
     const c = { id: uid('c'), startBeat: s0, lengthBeats: Math.max(B, Math.ceil((e0 - s0) / B) * B), notes: recBuf.map(n => ({ ...n, s: Math.round((n.s - s0) * 100) / 100 })) };
     edit(p => { p.tracks.find(x => x.id === recTrack).clips.push(c); }, { type: 'clips', trackId: recTrack });
+    const tight = afterRecording(recTrack, c.id);   // its own undo step: Ctrl+Z gives the raw timing back
     selectClip(c.id, recTrack);
-    toast(`Recorded ${recBuf.length} notes into a new clip.`);
+    toast(tight ? `Recorded ${recBuf.length} notes, tightened gently. Ctrl+Z for your exact timing.` : `Recorded ${recBuf.length} notes into a new clip.`);
   }
   recBuf = []; syncTransport();
 }
@@ -410,7 +419,7 @@ function finishRecording() {
 // ---------------------------------------------------------------- global keyboard
 const typing = el => el && (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
 window.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeProj(); if (!$('export-scrim').hidden && !exporting) closeExport(); return; }
+  if (e.key === 'Escape') { closeProj(); closePop(); if (!$('export-scrim').hidden && !exporting) closeExport(); return; }
   if (typing(e.target) || !$('export-scrim').hidden || isVisualOpen()) return;
   const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
   if (mod && k === 'z') { e.preventDefault(); e.shiftKey ? doRedo() : doUndo(); return; }
@@ -488,6 +497,7 @@ async function startTape(c) {
   await S.saver?.flush();
   const base = { instruments: S.engine.instruments, buses: S.engine.demo.buses, colors: TRACK_COLORS, uid };
   const p = c.kind === 'starter' ? styleStarter(typeof c.starter === 'string' ? starterById(c.starter) : c.starter, base) : blankProject(base);
+  newTapeMix(p);   // Auto mix (on by default): the starter's tracks get their mix from their roles, and the room from the style
   try { await S.store?.save(p); } catch (e) { console.warn('[slowreel] new tape save', e); }
   closeChooser(); await openProject(p, { fresh: true });
   if (p.starter) { await showGuide(); toast(`${p.name}: ${p.bpm} BPM, ${p.key}. The tracks are empty - play them on your keys.`); }
@@ -519,7 +529,7 @@ async function restoreDemo() {
 // The second demo, "Night Garage" (Antent-style future garage: drums, 808, supersaw pad with pump, chops, arp, automation).
 // Fetched when asked for (demo-night-garage.json next to index.html); opening it always gives a fresh copy.
 async function nightGarageCopy() {
-  const r = await fetch('demo-night-garage.json?v=10', { cache: 'no-cache' }); if (!r.ok) throw new Error('HTTP ' + r.status);
+  const r = await fetch('demo-night-garage.json?v=10a', { cache: 'no-cache' }); if (!r.ok) throw new Error('HTTP ' + r.status);
   const d = await r.json(); d.id = 'demo-night-garage'; d.schema = d.schema || 'nfx-studio/1'; d.updatedAt = Date.now(); return d;
 }
 async function openNightGarage() {
@@ -531,7 +541,7 @@ async function openNightGarage() {
 }
 // ---------------------------------------------------------------- recipes (js/recipes + js/ui/recipes-panel.js)
 let recipesMod = null;
-const recipesPanel = () => (recipesMod ||= import('./recipes-panel.js?v=10'));
+const recipesPanel = () => (recipesMod ||= import('./recipes-panel.js?v=10a'));
 /** Load a recipe project the way opening a project or the demo does: the current tape is saved first, the recipe becomes
  *  the current project (its own id, saved, autosaved from here on) and starts with a clean undo history. */
 async function loadRecipeProject(project, recipe) {
@@ -669,7 +679,7 @@ phoneMQ.addEventListener?.('change', () => { if (!raf) drawIdle(); });
 // real time offline, live playback runs the audio thread at ~65% on average with peaks past 90%, which is where
 // stutters start. The choice Nico makes in Settings always wins. Exports always render the full sound.
 const LIGHT_KEY = 'slowreel:light', PROBE_KEY = 'slowreel:probe', PROBE_MIN_RTF = 1.8;
-let probeInfo = null;
+let probeInfo = null, probeAbort = null;   // probeAbort: the running speed probe (play() aborts it)
 try { probeInfo = JSON.parse(lsGet(PROBE_KEY) || 'null'); } catch { }
 function setLight(on, { save = true, why = '' } = {}) {
   on = !!on; S.light = on;
@@ -686,10 +696,17 @@ function initLight() {
   const saved = lsGet(LIGHT_KEY);
   if (saved === 'on' || saved === 'off') { setLight(saved === 'on', { save: false }); return; }
   if (probeInfo && Date.now() - (probeInfo.at || 0) < 30 * 864e5) { if (probeInfo.rtf < PROBE_MIN_RTF) setLight(true, { save: false }); return; }
-  // no choice and no recent probe: measure once, when the studio is idle
+  // no choice and no recent probe: measure once, when the studio is idle. The probe never runs while the tape plays:
+  // pressing play aborts it (it stops its main-thread work and is tried again later), and the second chance waits too.
+  const idle = () => !S.playing && !exporting && !!S.engine?.speedProbe;
+  const once = async () => {
+    while (!idle()) await new Promise(r => setTimeout(r, 5000));
+    probeAbort = new AbortController();
+    const r = await S.engine.speedProbe({ seconds: 2.5, signal: probeAbort.signal }).catch(e => { console.warn('[slowreel] speed probe', e); return null; });
+    probeAbort = null;
+    return r || (S.playing || exporting ? once() : null);   // aborted by play / export: measure again when idle
+  };
   const tryProbe = () => {
-    if (S.playing || exporting || !S.engine?.speedProbe) { setTimeout(tryProbe, 5000); return; }
-    const once = () => S.engine.speedProbe({ seconds: 2.5 });
     once().then(a => (a && a.rtf < PROBE_MIN_RTF ? once().then(b => (b && b.rtf > a.rtf ? b : a)) : a)).then(r => {   // a slow first run gets a second chance
       if (!r) return;
       probeInfo = { rtf: r.rtf, at: Date.now() }; lsSet(PROBE_KEY, JSON.stringify(probeInfo));
@@ -708,6 +725,7 @@ function openSettings() {
   setPop.style.top = r.bottom + 8 + 'px'; setPop.style.left = Math.max(10, Math.min(innerWidth - 330, r.right - 320)) + 'px';
   fillSettings(); setPop.querySelector('button')?.focus();
 }
+on('settings', () => { if (!setPop.hidden) fillSettings(); });
 function closeSettings() { if (setPop.hidden) return; setPop.hidden = true; $('b-settings').setAttribute('aria-expanded', 'false'); }
 function fillSettings() {
   setPop.textContent = '';
@@ -717,6 +735,7 @@ function fillSettings() {
     h('button', { class: 'key sm', id: 'set-simple', 'aria-pressed': String(S.simple), text: 'Simple', onclick: () => setSimple(true) }),
     h('button', { class: 'key sm', id: 'set-all', 'aria-pressed': String(!S.simple), text: 'All tools', onclick: () => setSimple(false) }));
   setPop.append(h('h2', { text: 'Settings' }),
+    ...settingsRows(),
     h('div', { class: 'set-row mode-row' }, mode),
     h('p', { class: 'pm-note', text: 'Simple shows Notes, Sound and Keys (and Beats when the tape has drums). All tools adds Effects, Mixer, automation and every editing option. Your tapes sound and export the same either way.' }),
     h('div', { class: 'set-row' }, btn),
@@ -755,8 +774,15 @@ window.__studio = {
   info() { return { engine: S.engine.isMock ? 'mock' : 'real', backend: S.store?.backend || null, projectId: S.project?.id, stats: S.engine?.stats?.(), light: S.light, pcOnlyScreen: PC_ONLY_SCREEN }; },
   setLight(on) { setLight(on, { save: false }); return S.light; },
   speedProbe(seconds = 3) { return S.engine.speedProbe?.({ seconds }); },
+  // Auto mix + rhythm helpers (tests): state, grooves, tighten, breathe, metronome
+  rhythm: {
+    autoState: () => autoState(), remix: id => remix(id || null), addGroove: id => { const t = addGroove(id); return t ? { id: t.id, name: t.name, clips: t.clips.length } : null; },
+    removeGroove: () => removeGroove(), breathe: id => toggleBreathe(id), tighten: s => tightenClip(s ?? rhythmPrefs.strength), tightenNotes: (notes, o) => tighten(notes, o), gridFor,
+    prefs: () => ({ ...rhythmPrefs }), project: () => JSON.parse(JSON.stringify(S.project)),
+    finish: () => { toggleRec(); stop(); return true; },
+  },
   // load a recipe by id through the same path as the Recipes panel (tests)
-  async loadRecipe(id) { const m = await import('../recipes/recipes.js?v=10'); const r = m.recipeById?.(id) || m.RECIPES.find(x => x.id === id); if (!r) return null; const p = await loadRecipeProject(m.recipeProject ? m.recipeProject(r) : clone(r.project), r); return { id: p.id, name: p.name, tracks: p.tracks.length }; },
+  async loadRecipe(id) { const m = await import('../recipes/recipes.js?v=10a'); const r = m.recipeById?.(id) || m.RECIPES.find(x => x.id === id); if (!r) return null; const p = await loadRecipeProject(m.recipeProject ? m.recipeProject(r) : clone(r.project), r); return { id: p.id, name: p.name, tracks: p.tracks.length }; },
 };
 
 // ---------------------------------------------------------------- go
@@ -766,6 +792,7 @@ else {
   initRoll($('pane-notes'));
   initPanels({ sound: $('pane-sound'), fx: $('pane-fx'), mix: $('pane-mix'), keys: $('pane-keys') });
   initSteps($('pane-beats'));
+  initRhythm();
   // pocket mode: only for a narrow window on a computer (phones get the made-for-your-computer screen instead)
   initVisual({ S, play: () => play(), stop, togglePreview, stopPreview, previewId: () => preview?.id || null, openAudioExport: openExport, toast });
   $('b-visual').onclick = () => openVisual({ kind: 'project' });
@@ -780,6 +807,6 @@ function showPcOnly() {
   const draw = () => d.draw({ playing: false, frac: 0.38, level: 0, analyser: null, dt: 0, still: true });
   requestAnimationFrame(draw); new ResizeObserver(() => requestAnimationFrame(draw)).observe(cv);
   // the studio stays PC only, but a phone can make a music video of one of Nico's songs (or a file from the phone)
-  $('pc-video').onclick = () => import('../visual/phone-maker.js?v=10').then(m => m.openPhoneMaker()).catch(e => { console.error('[slowreel] video maker', e); });
+  $('pc-video').onclick = () => import('../visual/phone-maker.js?v=10a').then(m => m.openPhoneMaker()).catch(e => { console.error('[slowreel] video maker', e); });
 }
 void renderTab; void instDef; void kb;

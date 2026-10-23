@@ -37,29 +37,42 @@ export const fmtTime = s => { s = Math.max(0, s); const m = Math.floor(s / 60); 
 // ---------------------------------------------------------------- history (snapshots; projects are small)
 const undo = [], redo = [];
 let pending = null;
+// Auto mix (rhythm.js) runs inside every edit, before the snapshot is compared, so its changes are part of the same undo
+// step. It returns an extra engine change ({type:'all'} or {type:'track', trackId}) when it changed something, else null.
+let mixHook = null;
+export function setMixHook(fn) { mixHook = fn; }
+const runHook = change => { if (!mixHook || !S.project) return null; try { return mixHook(change) || null; } catch (e) { console.warn('[ui] auto mix', e); return null; } };
 /** Take a snapshot before a gesture that mutates S.project in place (drags). Call end() when it is over. */
 export function begin() { if (!pending) pending = JSON.stringify(S.project); }
 export function end(change = { type: 'all' }, { render = true } = {}) {
   if (!pending) return;
   const before = pending; pending = null;
+  const extra = runHook(change);
   if (before === JSON.stringify(S.project)) return;
-  push(before); changed(change, render);
+  push(before); changed(change, render, extra);
 }
 /** One-shot edit: fn mutates S.project. */
 export function edit(fn, change = { type: 'all' }, { render = true } = {}) {
   const before = JSON.stringify(S.project);
   const r = fn(S.project);
+  const extra = runHook(change);
   if (before === JSON.stringify(S.project)) return r;
-  push(before); changed(change, render);
+  push(before); changed(change, render, extra);
   return r;
 }
 function push(before) { undo.push(before); if (undo.length > 120) undo.shift(); redo.length = 0; emit('history'); }
-export function changed(change, render = true) {
+export function changed(change, render = true, extra = null) {
   S.project.updatedAt = Date.now();
   S.saver?.touch(); emit('dirty');
   try {
     const eng = S.engine;
-    if (eng) { if (change.type === 'all' || !eng.applyChange) eng.load(S.project); else eng.applyChange(S.project, change); }
+    if (eng) {
+      if (change.type === 'all' || !eng.applyChange) eng.load(S.project); else eng.applyChange(S.project, change);
+      // Auto mix touched more than the edit itself: let the engine pick that up too (cheap: only what changed is rebuilt)
+      if (extra && change.type !== 'all' && !(extra.type === 'track' && extra.trackId === change.trackId && change.type === 'track')) {
+        if (extra.type === 'all' || !eng.applyChange) eng.load(S.project); else eng.applyChange(S.project, extra);
+      }
+    }
   } catch (e) { console.warn('[ui] engine update', e); }
   if (render) emit('render', change);
 }

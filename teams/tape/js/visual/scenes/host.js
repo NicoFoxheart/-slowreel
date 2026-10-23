@@ -3,8 +3,8 @@
 // legibility gradient, the progress hairline, fade in from / out to black) on top of scenes that do not draw their own,
 // and reports renderer stats. Used by render-worker.js (export), preview-worker.js (live preview + thumbnails), the page
 // fallbacks and tests/scene-check.cjs. No DOM needed (OffscreenCanvas); the text layer arrives as an ImageBitmap.
-import { loadScene, pickVariant, textStyle } from './index.js?v=10';
-import { disposeCached, createPass } from './kit-gpu.js?v=10';
+import { loadScene, pickVariant, textStyle } from './index.js?v=10a';
+import { disposeCached, createPass } from './kit-gpu.js?v=10a';
 
 const OVERLAY_FS = /* glsl */`
 uniform sampler2D tText; uniform float uHasLayer, uText, uFade, uProg, uBarOn; uniform vec4 uBar; uniform vec3 uAccent; uniform float uGradY;

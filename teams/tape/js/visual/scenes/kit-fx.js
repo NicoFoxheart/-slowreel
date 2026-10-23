@@ -3,7 +3,7 @@
 // a new random spot every cycle), snow (bokeh for near flakes), sakura / maple petals (3D tumbling, cupped, two-sided
 // with translucency), dust motes and fireflies. Stateless: every particle's position is a pure function of
 // (seed, time, drift) computed in the vertex shader, so frames are deterministic and seeking is free.
-import * as G from './kit-glsl.js?v=10';
+import * as G from './kit-glsl.js?v=10a';
 
 const FOGLESS = `
 float kFogT(vec3 w, vec3 c) { return 1.0; }`;

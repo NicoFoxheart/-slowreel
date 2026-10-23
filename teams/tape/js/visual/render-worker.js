@@ -5,9 +5,9 @@
 //   sceneOpts: {scene, variant, quality, seed, title, artist, showText, intensity}
 // Replies: {type:'ready', meta} | {type:'progress', stage, f, info, still?} | {type:'done', buffer} | {type:'error', message, name, init}.
 //   still: a small ImageBitmap of the frame just rendered (about every 1.5 s) for the export screen.
-import { createSceneHost } from './scenes/host.js?v=10';
-import { encodeVideo } from './video-core.js?v=10';
-import { silentFeatures } from './features.js?v=10';
+import { createSceneHost } from './scenes/host.js?v=10a';
+import { encodeVideo } from './video-core.js?v=10a';
+import { silentFeatures } from './features.js?v=10a';
 
 const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 let cancelled = false;

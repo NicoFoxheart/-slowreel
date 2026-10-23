@@ -1,15 +1,17 @@
 // panels.js - the dock's Sound (instrument), Effects, Mixer and Keys panes, the song-clip editor and the
 // glowing Song Cloud window. Knob drags are live (engine.setParam) and land in undo history on release.
 import { S, on, emit, edit, begin, end, track, clipOf, clamp, bpb, isSongTrack, instDef, fxDef, optId, optName,
-  isSongParam, isEnum, isToggle, instValue, fxValue, songBeats, instGroups } from './state.js?v=10';
-import { h, icon, knob, fader, meter, fmt } from './controls.js?v=10';
-import { SONGS, getSong } from '../../lib/songs.js?v=10';
-import { TRACK_COLORS } from './sample-project.js?v=10';
-import { NOTE_NAMES, noteName, isBlack, inScale } from './theory.js?v=10';
-import { removeTrack } from './arrange.js?v=10';
-import { canvasSize } from './deck.js?v=10';
-import { ARP_PARAMS, arpSettings } from '../sound/arp.js?v=10';
-import { createSamplerPanel } from './sampler-ui.js?v=10';
+  isSongParam, isEnum, isToggle, instValue, fxValue, songBeats, instGroups } from './state.js?v=10a';
+import { h, icon, knob, fader, meter, fmt } from './controls.js?v=10a';
+import { SONGS, getSong } from '../../lib/songs.js?v=10a';
+import { TRACK_COLORS } from './sample-project.js?v=10a';
+import { NOTE_NAMES, noteName, isBlack, inScale } from './theory.js?v=10a';
+import { removeTrack } from './arrange.js?v=10a';
+import { canvasSize } from './deck.js?v=10a';
+import { ARP_PARAMS, arpSettings } from '../sound/arp.js?v=10a';
+import { createSamplerPanel } from './sampler-ui.js?v=10a';
+import { mixUnit } from './rhythm.js?v=10a';
+import { markManual, isManual } from './automix.js?v=10a';
 
 const panes = {};
 let mixRefs = { meters: {}, master: null }, cloudRef = null;
@@ -76,7 +78,7 @@ function renderSound() {
       if (!['drums', 'texture', 'granular'].includes(def.kind) && (!S.simple || t.arp?.on)) rack.append(arpUnit(t));
     }
   }
-  rack.append(trackUnit(t));
+  rack.append(mixUnit(t, unit), trackUnit(t));
   el.append(rack);
 }
 // ---------------------------------------------------------------- Arpeggiator (track.arp; clip playback and live keys)
@@ -248,7 +250,9 @@ function renderFx() {
   const chainPath = p => tgt === 'space' ? p.buses.space.fx : tgt === 'echo' ? p.buses.echo.fx : tgt === 'master' ? p.master.fx : p.tracks.find(x => x.id === t.id).fx;
   chain.forEach((fx, i) => {
     const def = fxDef(fx.id); if (!def) return;
-    const apply = (id, v) => { const f = chainPath(S.project)[i]; f.params = { ...(f.params || {}), [id]: v }; S.engine.setParam({ ...target, fx: i }, id, v); };
+    // touching an Auto mix insert (low cut / short room) or the Space reverb makes it Nico's: Auto mix leaves it alone
+    const own = p => { const f = chainPath(p)[i]; if (f?.auto && tgt === 'track') markManual(p.tracks.find(x => x.id === t.id), f.auto); if (tgt === 'space') p.buses.space.manual = true; };
+    const apply = (id, v) => { const f = chainPath(S.project)[i]; f.params = { ...(f.params || {}), [id]: v }; own(S.project); S.engine.setParam({ ...target, fx: i }, id, v); };
     const change = tgt === 'track' ? { type: 'track', trackId: t.id } : { type: 'master' };
     const kn = h('div', { class: 'knobs' });
     def.params.forEach(p => {
@@ -256,11 +260,11 @@ function renderFx() {
       else kn.append(knob(p, { value: fxValue(fx, p), size: 'sm', idPrefix: `fx${i}`, ...live(v => apply(p.id, v), change) }));
     });
     const byp = h('button', { class: 'key sm led-green', id: `fx${i}-on`, 'aria-pressed': String(!fx.bypass), 'aria-label': `${def.name} on`, title: 'On / bypass',
-      onclick: () => edit(p => { const f = chainPath(p)[i]; f.bypass = !f.bypass; }, { type: 'all' }) }, h('span', { class: 'led' }), 'On');
-    const rmv = h('button', { class: 'key sm sq', id: `fx${i}-rm`, 'aria-label': `Remove ${def.name}`, title: 'Remove', onclick: () => edit(p => { chainPath(p).splice(i, 1); }, { type: 'all' }) }, icon('close'));
+      onclick: () => edit(p => { const f = chainPath(p)[i]; own(p); f.bypass = !f.bypass; }, { type: 'all' }) }, h('span', { class: 'led' }), 'On');
+    const rmv = h('button', { class: 'key sm sq', id: `fx${i}-rm`, 'aria-label': `Remove ${def.name}`, title: 'Remove', onclick: () => edit(p => { own(p); chainPath(p).splice(i, 1); }, { type: 'all' }) }, icon('close'));
     const left = i > 0 ? h('button', { class: 'key sm sq', 'aria-label': `Move ${def.name} earlier`, title: 'Move earlier', onclick: () => edit(p => { const c = chainPath(p); [c[i - 1], c[i]] = [c[i], c[i - 1]]; }, { type: 'all' }) }, '‹') : null;
     rack.append(h('div', { class: 'unit fx' + (fx.bypass ? ' off' : '') + (/shimmer/.test(fx.id) ? ' shimmer' : '') },
-      h('h3', {}, h('span', { class: 'fxn', text: def.name }), h('span', { class: 'grow' }), left, byp, rmv), kn));
+      h('h3', {}, h('span', { class: 'fxn', text: def.name }), fx.auto ? h('span', { class: 'label fx-auto', text: fx.auto === 'lowcut' ? 'auto low cut' : fx.auto === 'room' ? 'auto room' : '' }) : fx.breathe ? h('span', { class: 'label fx-auto', text: 'breathe' }) : null, h('span', { class: 'grow' }), left, byp, rmv), kn));
   });
   if (chain.length < 6) {
     const opts = h('div', { class: 'opts' });
@@ -287,8 +291,9 @@ function renderMixer() {
 }
 const mixChange = t => ({ type: 'mixer', trackId: t.id });
 function strip(t) {
-  const set = (id, v) => { const x = S.project.tracks.find(x => x.id === t.id); if (id.startsWith('sends.')) x.sends[id.slice(6)] = v; else x[id] = v; S.engine.setParam({ track: t.id }, id, v); };
-  const db = h('span', { class: 'db mono', text: fmtDb(t.volumeDb ?? 0) });
+  // a control Nico moves becomes "manual": Auto mix leaves it alone (automix.js)
+  const set = (id, v) => { const x = S.project.tracks.find(x => x.id === t.id); if (id.startsWith('sends.')) x.sends[id.slice(6)] = v; else x[id] = v; markManual(x, id.replace('sends.', '')); S.engine.setParam({ track: t.id }, id, v); };
+  const db = h('span', { class: 'db mono' + (isManual(t, 'volumeDb') ? ' is-manual' : ''), text: fmtDb(t.volumeDb ?? 0), title: isManual(t, 'volumeDb') ? 'Set by you: Auto mix leaves it alone' : null });
   const fd = fader({ id: `fader-${t.id}`, label: `${t.name} volume`, value: t.volumeDb ?? 0, onInput: v => { begin(); set('volumeDb', v); db.textContent = fmtDb(v); }, onCommit: v => { begin(); set('volumeDb', v); end(mixChange(t), { render: false }); } });
   const m = meter({ height: 108 }); mixRefs.meters[t.id] = m;
   const kn = h('div', { class: 'sknobs' },

@@ -2,20 +2,20 @@
 //   import { createEngine } from './js/sound/engine.js';
 //   const engine = await createEngine({ context: new AudioContext() });
 //   await engine.load(engine.demo); engine.play(0);
-import { clamp, dbToGain, gainToDb, num, safetyCurve, disconnectAll } from './util.js?v=10';
-import { INSTRUMENTS, INSTRUMENT_MAP, resolveParams } from './instruments.js?v=10';
-import { EFFECTS, createEffect, resolveFx } from './effects.js?v=10';
-import { SONGS, loadSong, songBuffer, songsInProject } from './songs.js?v=10';
-import { REVERB_TYPES } from './reverb.js?v=10';
-import { ensureBasics, ensureNight, assetMode, ensureIR } from './assets.js?v=10';
-import { noiseBuffer } from './util.js?v=10';
-import { nightBuffer } from './nightrain.js?v=10';
-import { DEMO } from './demo.js?v=10';
+import { clamp, dbToGain, gainToDb, num, safetyCurve, disconnectAll } from './util.js?v=10a';
+import { INSTRUMENTS, INSTRUMENT_MAP, resolveParams } from './instruments.js?v=10a';
+import { EFFECTS, createEffect, resolveFx } from './effects.js?v=10a';
+import { SONGS, loadSong, songBuffer, songsInProject } from './songs.js?v=10a';
+import { REVERB_TYPES } from './reverb.js?v=10a';
+import { ensureBasics, ensureNight, assetMode, ensureIR } from './assets.js?v=10a';
+import { noiseBuffer } from './util.js?v=10a';
+import { nightBuffer } from './nightrain.js?v=10a';
+import { DEMO } from './demo.js?v=10a';
 // Round 2 "Antent pack": new effects, the arpeggiator, the Chop Sampler's samples and automation lanes
-import { FX2, createFx2, resolveFx2, scheduleFx } from './fx2.js?v=10';
-import { arpNotes } from './arp.js?v=10';
-import { ensureSamples, setSampleSongBase, warmSampler } from './sampler.js?v=10';
-import { applyAutomation, resetAutomation } from '../ui/automation.js?v=10';
+import { FX2, createFx2, resolveFx2, scheduleFx } from './fx2.js?v=10a';
+import { arpNotes } from './arp.js?v=10a';
+import { ensureSamples, setSampleSongBase, warmSampler } from './sampler.js?v=10a';
+import { applyAutomation, resetAutomation } from '../ui/automation.js?v=10a';
 
 const GLOBAL_VOICE_CAP = 64, GRAIN_CAP = 64;   // Light mode halves both (and every instrument's own voice cap)
 const DEFAULT_SPACE_FX = () => [{ id: 'reverb', params: { type: 'hall', mix: 1, size: 1.25, tone: 0.45, preDelay: 0.03 }, bypass: false }];
@@ -495,22 +495,24 @@ export async function createEngine({ context, songBaseUrl = 'audio/', light = fa
      * Quick render-speed probe: renders `seconds` of the busiest moment of the project offline with the full sound and
      * returns {rtf (x real time), ms, fromBeat}. Below ~1.8x the PC will not keep up live; the UI then turns on Light mode.
      */
-    async speedProbe({ seconds = 3 } = {}) {
-      if (!project) return null;
+    // signal: an AbortSignal; when it fires (Nico pressed play) the probe stops doing main-thread work and returns null
+    async speedProbe({ seconds = 3, signal } = {}) {
+      if (!project || signal?.aborted) return null;
       const end = projectBeats(), secPerBeat = spb();
-      let best = 0, bestN = -1;
-      for (let b = 0; b < end; b += 1) {
-        let n = 0;
-        for (const t of project.tracks) for (const c of t.clips || []) {
-          const cs = num(c.startBeat, 0);
-          if (t.kind === 'song') { if (b >= cs && b < cs + num(c.lengthBeats, 0)) n += 3; continue; }
-          for (const x of c.notes || []) { const st = cs + num(x.s, 0); if (b >= st && b < st + num(x.d, 1)) n++; }
-        }
-        if (n > bestN) { bestN = n; best = b; }
+      // notes sounding per beat in one pass (a difference array), not beats x notes: a groove adds hundreds of notes
+      const nb = Math.max(1, Math.ceil(end)), dens = new Float64Array(nb + 1);
+      const span = (a, b, w) => { const i0 = Math.max(0, Math.ceil(a - 1e-9)), i1 = Math.min(nb, Math.ceil(b - 1e-9)); if (i1 > i0) { dens[i0] += w; dens[i1] -= w; } };
+      for (const t of project.tracks) for (const c of t.clips || []) {
+        const cs = num(c.startBeat, 0);
+        if (t.kind === 'song') { span(cs, cs + num(c.lengthBeats, 0), 3); continue; }
+        for (const x of c.notes || []) { const st = cs + num(x.s, 0); span(st, st + num(x.d, 1), 1); }
       }
+      let best = 0, bestN = -1;
+      for (let b = 0, run = 0; b < end; b += 1) { run += dens[b]; if (run > bestN) { bestN = run; best = b; } }
       const toBeat = Math.min(end, best + seconds / secPerBeat), audio = (toBeat - best) * secPerBeat;
       const t0 = performance.now();
-      await engine.render(project, { fromBeat: best, toBeat, tailSeconds: 0 });
+      const buf = await engine.render(project, { fromBeat: best, toBeat, tailSeconds: 0, signal });
+      if (!buf || signal?.aborted) return null;
       const ms = performance.now() - t0;
       return { rtf: Math.round(audio * 1000 / ms * 100) / 100, ms: Math.round(ms), seconds: Math.round(audio * 10) / 10, fromBeat: best, notes: bestN };
     },
@@ -529,11 +531,14 @@ export async function createEngine({ context, songBaseUrl = 'audio/', light = fa
       return engine.load(p);
     },
 
-    play(fromBeat) {
+    // opts.at: the audio-clock time the tape starts (a count-in plays before it); default 0.3 s from now
+    play(fromBeat, opts = {}) {
       if (!project) return;
       if (ctx.state === 'suspended' && ctx.resume) ctx.resume();
       const b = fromBeat === undefined || fromBeat === null ? stopBeat : Math.max(0, +fromBeat || 0);
-      startTransport(b, ctx.currentTime + 0.3);
+      const at = Math.max(ctx.currentTime + 0.05, +opts?.at || ctx.currentTime + 0.3);
+      startTransport(b, at);
+      return at;
     },
     stop() { if (playing) stopTransport(true); else killAll(ctx.currentTime); },
     seek(beat) { beat = Math.max(0, +beat || 0); if (playing) startTransport(beat, ctx.currentTime + 0.2); else stopBeat = beat; },
@@ -616,7 +621,7 @@ export async function createEngine({ context, songBaseUrl = 'audio/', light = fa
     songBuffer,
     projectSeconds(p = project) { const old = project; project = p; const s = projectBeats() * spb(); project = old; return s; },
 
-    async render(p, { tailSeconds = 8, sampleRate = 44100, fromBeat = 0, toBeat, onProgress, light = false } = {}) {
+    async render(p, { tailSeconds = 8, sampleRate = 44100, fromBeat = 0, toBeat, onProgress, light = false, signal } = {}) {
       const pr = clone(p || project);
       pr.loop = { ...(pr.loop || {}), on: false };
       const b0 = Math.max(0, fromBeat), bpmV = clamp(num(pr.bpm, 70), 20, 300);
@@ -625,12 +630,16 @@ export async function createEngine({ context, songBaseUrl = 'audio/', light = fa
       const b1 = toBeat === undefined ? end : Math.min(end, toBeat);
       const seconds = Math.max(0.5, (b1 - b0) * 60 / bpmV + tailSeconds);
       const off = new OfflineAudioContext(2, Math.ceil(seconds * sampleRate), sampleRate);
+      // signal (optional AbortSignal): stop building / scheduling as soon as it fires; render() then resolves null
+      if (signal?.aborted) return null;
       const sub = await createEngine({ context: off, songBaseUrl, light: !!light });   // full sound unless asked
+      if (signal?.aborted) { sub.dispose(); return null; }
       await sub.load(pr);
+      if (signal?.aborted) { sub.dispose(); return null; }
       sub._renderStart(b0, b1);
       const step = 0.5;
       for (let t = step; t < seconds; t += step) {
-        off.suspend(t).then(() => { sub._tick(t + 1.0); if (onProgress) onProgress(t / seconds); off.resume(); });
+        off.suspend(t).then(() => { if (!signal?.aborted) sub._tick(t + 1.0); if (onProgress) onProgress(t / seconds); off.resume(); });
       }
       const buf = await off.startRendering();
       engine.lastRenderStats = sub.stats();

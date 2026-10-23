@@ -5,7 +5,7 @@
 //           or arpNotes(clip, track.arp, bpm) (memoized; safe to call from the scheduler on every tick)
 //   live:   const arp = createLiveArp(engine, trackId, () => track.arp, () => project.bpm); arp.noteOn(midi, vel); arp.noteOff(midi);
 //           arp.allOff(); arp.dispose();   (only route keys through it while arp.active() is true)
-import { rng } from './util.js?v=10';
+import { rng } from './util.js?v=10a';
 
 const opt = (v, l = v) => ({ value: v, label: l });
 export const ARP_RATES = { '1/4': 1, '1/8': 0.5, '1/8T': 1 / 3, '1/16': 0.25, '1/16T': 1 / 6, '1/32': 0.125 };

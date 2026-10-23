@@ -4,10 +4,10 @@
 // track.instrument.slices = [{pitch (st), reverse (bool), start 0..1, end 0..1}] (index = slice). Imported audio lives in
 // IndexedDB ('slowreel-samples') keyed by a SHA-256 content hash; projects never hold audio.
 // The voice starts its BufferSource in tick() (the engine calls tick right after creating a voice), where v.track.spec is known.
-import { clamp, disconnectAll, release as relParam, cached } from './util.js?v=10';
-import { SONGS } from './songs.js?v=10';
-import { songBuffer as engineSongBuffer, loadSong as engineLoadSong } from './songs.js?v=10';
-import { makeIR } from './reverb.js?v=10';
+import { clamp, disconnectAll, release as relParam, cached } from './util.js?v=10a';
+import { SONGS } from './songs.js?v=10a';
+import { songBuffer as engineSongBuffer, loadSong as engineLoadSong } from './songs.js?v=10a';
+import { makeIR } from './reverb.js?v=10a';
 
 export const SLICE_BASE_MIDI = 48;   // C3 (Slowreel names MIDI 60 "C4")
 const P = (id, name, min, max, def, extra = {}) => ({ id, name, min, max, default: def, unit: '', ...extra });

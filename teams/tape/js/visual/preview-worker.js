@@ -7,9 +7,9 @@
 //   | metas {id, ids} | release (free the snapshot host) | dispose
 //   opts: {scene, variant, quality, seed, title, artist, showText, intensity, width, height, pixelRatio}
 // Messages out: ready {meta} | loaded {meta} | drawn | snap {id, ...} | metas {id, list} | error {message, init, id}
-import { createSceneHost } from './scenes/host.js?v=10';
-import { probeScenes } from './scenes/index.js?v=10';
-import { silentFeatures } from './features.js?v=10';
+import { createSceneHost } from './scenes/host.js?v=10a';
+import { probeScenes } from './scenes/index.js?v=10a';
+import { silentFeatures } from './features.js?v=10a';
 
 const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 const ONE = new Uint8Array(4);
@@ -21,7 +21,7 @@ const text = m => { if (host && m.text) { host.setText(m.text); if (m.text.bitma
 
 async function snap(m) {
   const T = await three();
-  if (m.measure && !meter) { const g = await import('./scenes/gpumem.js?v=10'); meter = g.installGpuMeter(); if (snapHost) { snapHost.dispose(); snapHost = null; snapKey = ''; } }
+  if (m.measure && !meter) { const g = await import('./scenes/gpumem.js?v=10a'); meter = g.installGpuMeter(); if (snapHost) { snapHost.dispose(); snapHost = null; snapKey = ''; } }
   const [w, h] = m.size || [320, 180], o = { quality: 'high', seed: 1, showText: false, ...m.opts };
   if (!snapHost) snapHost = createSceneHost({ THREE: T, width: w, height: h, pixelRatio: 1, preserve: true, antialias: o.scene === 'heart' });
   const key = JSON.stringify([o.scene, o.variant, o.quality, o.seed, o.showText, o.title, o.artist, o.intensity]);

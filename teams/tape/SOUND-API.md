@@ -37,7 +37,7 @@ engine.play(0);
 | `engine.setLight(on)` / `engine.light` | Light mode for slower PCs, live playback only: every reverb sends to one shared short room (impulse <= 2.5 s, no shimmer, no per-track convolvers), half the voice and grain caps (global 32 voices, 32 grains, half the cloud density), no per-voice pitch wobble or track tape wow. Returns a promise. `render()` and exports always use the full sound. |
 | `await engine.speedProbe({seconds = 3})` | renders the busiest moment of the project offline with the full sound: `{rtf, ms, seconds, fromBeat}`. The UI turns Light mode on by itself only when this is below 1.8x real time (best of two runs). |
 | `engine.applyChange(project, {type, trackId})` | fast paths: `'notes'`, `'clips'`, `'clip'` (no rebuild, the scheduler reads the project), `'mixer'`, `'loop'`, `'tempo'`, `'track'` (+`trackId`: instrument/preset/fx changed), `'master'` (buses or master changed). Anything else calls `load()`. |
-| `engine.play(fromBeat?)` | omitted = from where it stopped. `stop()`, `seek(beat)`, `setLoop(on, startBeat, endBeat)`. |
+| `engine.play(fromBeat?, {at}?)` | omitted = from where it stopped. `at` = audio-clock start time (a count-in plays before it; default now + 0.3 s); returns the start time. `stop()`, `seek(beat)`, `setLoop(on, startBeat, endBeat)`. |
 | `engine.position()` | `{beat, seconds, playing}`. Playback stops by itself at the end of the project (when the loop is off). |
 | `engine.noteOn(trackId, midi, vel 0..1)` / `noteOff(trackId, midi)` / `allNotesOff()` | live playing; works while stopped or playing. Song tracks ignore it. |
 | `engine.setParam(target, paramId, value)` | see below. Writes the value into the project too, so saving keeps it. |

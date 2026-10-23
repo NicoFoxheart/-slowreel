@@ -4,9 +4,9 @@
 // it all, with fine drizzle rings; phoenix-tail bamboo leans over the banks; a cormorant fisherman's bamboo raft with a
 // lantern glides ahead of the camera, which floats slowly downstream (about 1 m/s), never repeating within a song.
 // Variants: misty dawn (hero), golden morning, ink painting (a sumi-e grade of the same 3D world), moonlit lantern night.
-import * as kit from './kit.js?v=10';
-import * as GL from './guilin-mist-glsl.js?v=10';
-import * as GEO from './guilin-mist-geo.js?v=10';
+import * as kit from './kit.js?v=10a';
+import * as GL from './guilin-mist-glsl.js?v=10a';
+import * as GEO from './guilin-mist-geo.js?v=10a';
 
 export const meta = {
   id: 'guilin-mist', name: 'Guilin mist', group: 'China',

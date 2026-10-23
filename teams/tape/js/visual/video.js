@@ -2,9 +2,9 @@
 // (scenes/index.js) rendered offscreen at the target size and encoded with WebCodecs (H.264 + AAC in .mp4; else VP9 +
 // Opus in .webm), frame-exact at 30 (or 60) fps. Without WebCodecs it falls back to lib/export.js recordVideo (real
 // time). The audio is never changed: it is the rendered mix, Nico's song, or an imported file, decoded as it is.
-import { recordVideo, saveFile, trimTail } from '../../lib/export.js?v=10';
-import { computeFeatures, frameAt, silentFeatures } from './features.js?v=10';
-import { encodeVideo, abortErr } from './video-core.js?v=10';
+import { recordVideo, saveFile, trimTail } from '../../lib/export.js?v=10a';
+import { computeFeatures, frameAt, silentFeatures } from './features.js?v=10a';
+import { encodeVideo, abortErr } from './video-core.js?v=10a';
 
 /** Aspect formats. w/h are the 1080p ("HD") size, kept for older callers; sizes come from RESOLUTIONS. */
 export const FORMATS = {
@@ -85,12 +85,12 @@ export async function decodeAudio(arrayBuffer) {
 /** Text colours / layout for a scene: the heart keeps its mood name (exactly the old layer), others use meta.text. */
 async function textFor({ scene, variant, meta }) {
   if (scene === 'heart') return variant || 'sakura';
-  const { textStyle, sceneMeta } = await import('./scenes/index.js?v=10');
+  const { textStyle, sceneMeta } = await import('./scenes/index.js?v=10a');
   return textStyle(meta || await sceneMeta(scene), variant);
 }
 /** The title layer (drawn on the page, where the fonts are) as {bitmap, layout}, or null without text. */
 export async function makeTextLayer(width, height, { title = '', artist = '', showText = true, mood }) {
-  const { drawTextLayer } = await import('./heart-scene.js?v=10');
+  const { drawTextLayer } = await import('./heart-scene.js?v=10a');
   try { await Promise.race([Promise.all([document.fonts?.load('64px "Dela Gothic One"'), document.fonts?.load('500 32px "M PLUS Rounded 1c"')]), new Promise(r => setTimeout(r, 1500))]); } catch { }
   const tc = document.createElement('canvas'); tc.width = width; tc.height = height;
   const layout = drawTextLayer(tc, { title: showText ? title : '', artist: showText ? artist : '', mood });
@@ -133,7 +133,7 @@ export async function makeVideo({ audio, width, height, fps = 30, seconds, scene
 }
 
 async function pageHost({ width, height, sceneOpts, textMood }) {
-  const [{ createSceneHost }, THREE] = await Promise.all([import('./scenes/host.js?v=10'), import('three')]);
+  const [{ createSceneHost }, THREE] = await Promise.all([import('./scenes/host.js?v=10a'), import('three')]);
   const host = createSceneHost({ THREE, width, height, pixelRatio: 1, preserve: true, antialias: sceneOpts.scene === 'heart' && sceneOpts.quality !== 'light' });
   await host.load({ ...sceneOpts, textLayer: await makeTextLayer(width, height, { ...sceneOpts, mood: textMood }) });
   return host;
@@ -143,7 +143,7 @@ const FIELDS = ['pulse', 'low', 'mid', 'high', 'level', 'slow', 'accent', 'energ
 async function viaWorker({ audio, total, F, frames, fps, width, height, codecs, sceneOpts, textMood, onProgress, signal }) {
   const textLayer = await makeTextLayer(width, height, { ...sceneOpts, mood: textMood });
   const left = audio.getChannelData(0).slice(0, total), right = (audio.numberOfChannels > 1 ? audio.getChannelData(1) : audio.getChannelData(0)).slice(0, total);
-  const w = new Worker(new URL('./render-worker.js?v=10', import.meta.url), { type: 'module' });
+  const w = new Worker(new URL('./render-worker.js?v=10a', import.meta.url), { type: 'module' });
   return new Promise((resolve, reject) => {
     const fail = e => { cleanup(); reject(e); };
     const onAbort = () => w.postMessage({ cmd: 'cancel' });

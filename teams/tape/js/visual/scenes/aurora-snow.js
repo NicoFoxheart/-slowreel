@@ -6,9 +6,9 @@
 // (aurora-snow-glsl.js) that the planar mirror reflects in the black ice. Variants: green aurora (hero), violet
 // (a strong display with pink/violet lower fringes and red tops, a thin moon), snowfall night (no aurora, moonlight
 // through cloud, heavy snow) and twilight (deep blue hour, first stars, a faint arc appearing late).
-import * as kit from './kit.js?v=10';
-import * as S from './aurora-snow-glsl.js?v=10';
-import { spruceGeometry, terrainGrid, cabinGeometries } from './aurora-snow-geo.js?v=10';
+import * as kit from './kit.js?v=10a';
+import * as S from './aurora-snow-glsl.js?v=10a';
+import { spruceGeometry, terrainGrid, cabinGeometries } from './aurora-snow-geo.js?v=10a';
 
 export const meta = {
   id: 'aurora-snow',
