@@ -18,6 +18,17 @@ Progress log: PROGRESS.md (one line per finished step; the last line is where to
 7. Arrival flow
 8. Pushback tug, ground crew, jet bridge retract
 
+## Team (since 28 Oct): see TEAM.md for file ownership
+- Lead: items 1, 2, 7, 8
+- Aircraft artist: items 3 and 4
+- Character artist: item 5
+- Environment artist: item 6
+- Claude reviews every report before publishing:
+  - run the smoke test;
+  - check the screenshots against the brief;
+  - read the diff for sloppy work (blocky placeholders, dead code, perf traps, broken exports);
+  - send fixes back, or fix small issues directly.
+
 ## Rules
 - After each step: publish to the live link with the full `files` list (index.html, data/world.json, every js/*.js), then copy the folder into the backup repo, commit and push.
 - Runtime hosts: three.js 0.160.0 from jsdelivr and Google Fonts only. No new hosts.
