@@ -1,0 +1,415 @@
+<title>Foxheart Skies</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=B612:wght@400;700&family=B612+Mono:wght@400;700&family=Saira+Condensed:wght@300;500;700;800&display=swap">
+<style>
+/* Layout: full-bleed live 3D scene; glass flight-deck panels float above it (left rail menu, right content sheet, in-flight FCU strip). */
+:root{
+  --bg:#060a12; --ink:#e8edf5; --mute:#8e9bb1; --dim:#5b6880;
+  --panel:rgba(9,15,27,.74); --panel-solid:#0b1322; --line:rgba(150,180,225,.15); --line2:rgba(150,180,225,.28);
+  --fox:#f29a4c; --fox2:#ffbf7a; --cyan:#66d7ea; --green:#55e08f; --amber:#ffb84d; --red:#ff5d5d; --magenta:#e978ff;
+  --f-display:"Saira Condensed","Arial Narrow","Roboto Condensed",sans-serif;
+  --f-body:"B612","Segoe UI",system-ui,sans-serif;
+  --f-mono:"B612 Mono","Consolas","SFMono-Regular",ui-monospace,monospace;
+  --r:10px; color-scheme:dark;
+}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--ink);font:13px/1.45 var(--f-body);-webkit-font-smoothing:antialiased;user-select:none}
+#gl{position:fixed;inset:0;width:100%;height:100%;display:block;outline:none}
+#hudc{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--fox);outline-offset:2px}
+.glass{background:var(--panel);backdrop-filter:blur(14px) saturate(1.2);-webkit-backdrop-filter:blur(14px) saturate(1.2);border:1px solid var(--line);border-radius:var(--r)}
+.eyebrow{font:500 11px/1 var(--f-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+
+/* ---------- loader ---------- */
+#loader{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(120% 80% at 50% 110%,#1b2232 0%,#070b14 60%);z-index:50;transition:opacity .6s}
+#loader .box{display:grid;justify-items:center;gap:18px;text-align:center;padding:0 16px}
+#loader .bar{width:min(320px,70vw);height:3px;background:var(--line);border-radius:3px;overflow:hidden}
+#loader .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--fox),var(--fox2));transition:width .3s}
+#loadmsg{font:12px var(--f-mono);color:var(--mute);min-height:1.4em}
+
+/* ---------- main menu ---------- */
+#menu{position:fixed;inset:0;display:grid;grid-template-columns:minmax(300px,360px) 1fr;gap:20px;padding:20px max(20px,env(safe-area-inset-right,0px)) 20px max(20px,env(safe-area-inset-left,0px));z-index:10;pointer-events:none}
+#menu>*{pointer-events:auto}
+#rail{display:flex;flex-direction:column;gap:18px;padding:26px 22px 20px;min-height:0;overflow:auto;background:linear-gradient(180deg,rgba(8,13,24,.86),rgba(8,13,24,.62))}
+.brand{display:flex;gap:14px;align-items:center}
+.brand svg{flex:none;filter:drop-shadow(0 4px 14px rgba(242,154,76,.35))}
+.wordmark{font:800 34px/0.86 var(--f-display);letter-spacing:.02em;text-transform:uppercase}
+.wordmark span{display:block;color:var(--fox);font-weight:300;letter-spacing:.32em;font-size:15px;margin-top:6px}
+.tag{color:var(--mute);font-size:12px;max-width:30ch}
+nav#nav{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+nav#nav button{display:grid;grid-template-columns:28px 1fr;align-items:center;column-gap:10px;text-align:left;padding:11px 12px;border-radius:8px;border:1px solid transparent;transition:background .15s,border-color .15s}
+nav#nav button b{font:700 19px/1.05 var(--f-display);letter-spacing:.06em;text-transform:uppercase}
+nav#nav button small{grid-column:2;color:var(--mute);font-size:11.5px}
+nav#nav button .ic{grid-row:1/3;color:var(--dim)}
+nav#nav button:hover{background:rgba(255,255,255,.04)}
+nav#nav button[aria-current=true]{background:linear-gradient(90deg,rgba(242,154,76,.16),rgba(242,154,76,0));border-color:rgba(242,154,76,.35)}
+nav#nav button[aria-current=true] .ic{color:var(--fox)}
+.railfoot{margin-top:auto;display:grid;gap:8px;color:var(--dim);font-size:11px}
+.railfoot .stats{display:flex;gap:16px}
+.railfoot .stats div{display:grid}
+.railfoot .stats b{font:700 20px var(--f-display);color:var(--ink);letter-spacing:.03em}
+
+#sheet{min-height:0;display:flex;flex-direction:column;overflow:hidden;max-width:920px;width:100%;justify-self:end;background:rgba(8,13,24,.8)}
+.sec{display:flex;flex-direction:column;min-height:0;height:100%}
+.sechead{display:flex;align-items:end;justify-content:space-between;gap:16px;padding:22px 24px 14px;border-bottom:1px solid var(--line)}
+.sechead h2{margin:0;font:700 30px/1 var(--f-display);text-transform:uppercase;letter-spacing:.04em;text-wrap:balance}
+.secbody{padding:18px 24px 22px;overflow:auto;min-height:0;display:flex;flex-direction:column;gap:18px}
+.search{position:relative;flex:1;max-width:460px}
+.search input{width:100%;box-sizing:border-box;background:rgba(0,0,0,.35);border:1px solid var(--line2);border-radius:8px;color:var(--ink);font:14px var(--f-body);padding:11px 12px 11px 38px}
+.search svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--mute)}
+#results{display:grid;gap:2px}
+#results button{display:grid;grid-template-columns:62px 46px 1fr auto;gap:12px;align-items:center;text-align:left;padding:8px 10px;border-radius:6px}
+#results button:hover,#results button:focus-visible{background:rgba(255,255,255,.05)}
+#results .ic{font:700 14px var(--f-mono);color:var(--cyan)} #results .ia{font:700 14px var(--f-mono);color:var(--fox)}
+#results .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap} #results .nm small{color:var(--mute);margin-left:6px}
+#results .rw{color:var(--mute);font:11px var(--f-mono)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(205px,1fr));gap:12px}
+.card{position:relative;display:grid;grid-template-rows:auto auto;text-align:left;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:linear-gradient(180deg,rgba(20,30,50,.6),rgba(10,16,28,.8));transition:transform .15s,border-color .15s}
+.card:hover{transform:translateY(-2px);border-color:var(--line2)}
+.card[aria-pressed=true]{border-color:var(--fox);box-shadow:0 0 0 1px var(--fox) inset}
+.card canvas{width:100%;height:118px;display:block;background:radial-gradient(120% 100% at 30% 20%,#14223a,#0a1120)}
+.card .meta{padding:10px 12px 12px;display:grid;gap:2px}
+.card .code{display:flex;align-items:baseline;gap:8px}
+.card .code b{font:800 28px/1 var(--f-display);letter-spacing:.04em}
+.card .code span{font:12px var(--f-mono);color:var(--cyan)}
+.card .nm{font-size:11.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .sub{font:11px var(--f-mono);color:var(--mute)}
+.card .pill{position:absolute;top:8px;right:8px;font:10px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;padding:3px 7px;border-radius:20px;background:rgba(242,154,76,.16);color:var(--fox2);border:1px solid rgba(242,154,76,.3)}
+.cardrow{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+
+/* flight setup */
+#setup{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:18px;align-items:start}
+.diagram{border-radius:10px;border:1px solid var(--line);overflow:hidden;background:#09111f}
+.diagram canvas{display:block;width:100%;height:260px}
+.field{display:grid;gap:8px}
+.field>label,.field>.lab{font:11px var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--mute)}
+.seg{display:flex;flex-wrap:wrap;gap:4px;background:rgba(0,0,0,.3);padding:4px;border-radius:8px;border:1px solid var(--line)}
+.seg button{flex:1 1 auto;padding:7px 10px;border-radius:6px;font-size:12px;color:var(--mute);white-space:nowrap}
+.seg button[aria-pressed=true]{background:rgba(242,154,76,.18);color:var(--ink);box-shadow:0 0 0 1px rgba(242,154,76,.45) inset}
+.rwlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:6px}
+.rwlist button{display:grid;gap:2px;text-align:left;padding:8px 10px;border-radius:7px;border:1px solid var(--line);background:rgba(0,0,0,.25)}
+.rwlist button b{font:700 16px var(--f-mono)}
+.rwlist button small{font:10.5px var(--f-mono);color:var(--mute)}
+.rwlist button .ils{color:var(--green)}
+.rwlist button[aria-pressed=true]{border-color:var(--fox);background:rgba(242,154,76,.12)}
+input[type=range]{width:100%;accent-color:var(--fox)}
+.timeline{display:grid;gap:6px}
+.timeline .chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:11px var(--f-mono);padding:4px 8px;border-radius:20px;border:1px solid var(--line2);color:var(--mute)}
+.chip:hover{color:var(--ink);border-color:var(--fox)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.go{display:flex;align-items:center;justify-content:center;gap:10px;padding:14px 18px;border-radius:9px;background:linear-gradient(180deg,#f6a75e,#e0782f);color:#1a0d03;font:800 20px/1 var(--f-display);letter-spacing:.12em;text-transform:uppercase;box-shadow:0 8px 30px rgba(242,154,76,.3)}
+.go:hover{filter:brightness(1.08)}
+.go.ghost{background:none;color:var(--ink);box-shadow:none;border:1px solid var(--line2);font-size:16px}
+.note{font-size:11px;color:var(--mute);border-left:2px solid var(--fox);padding:2px 0 2px 10px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font:12px var(--f-mono)}
+.kv dt{color:var(--mute)} .kv dd{margin:0}
+
+/* challenge / routes / logbook */
+.list{display:grid;gap:10px}
+.item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center;padding:14px 16px;border-radius:10px;border:1px solid var(--line);background:rgba(0,0,0,.22);text-align:left}
+.item:hover{border-color:var(--line2);background:rgba(255,255,255,.03)}
+.item h3{margin:0 0 3px;font:700 20px/1.1 var(--f-display);letter-spacing:.04em;text-transform:uppercase}
+.item p{margin:0;color:var(--mute);font-size:12px}
+.item .best{text-align:right;font:11px var(--f-mono);color:var(--mute)}
+.item .best b{display:block;font:800 26px/1 var(--f-display);color:var(--fox)}
+table.log{width:100%;border-collapse:collapse;font:12px var(--f-mono)}
+table.log th{text-align:left;color:var(--mute);font-weight:400;letter-spacing:.08em;text-transform:uppercase;font-size:10.5px;padding:6px 8px;border-bottom:1px solid var(--line2)}
+table.log td{padding:7px 8px;border-bottom:1px solid var(--line)}
+.grade{font:800 16px var(--f-display);letter-spacing:.04em}
+.empty{color:var(--mute);padding:30px 0;text-align:center}
+.setgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
+select{background:rgba(0,0,0,.35);color:var(--ink);border:1px solid var(--line2);border-radius:7px;padding:8px;font:13px var(--f-body)}
+.toggle{display:flex;align-items:center;gap:10px;cursor:pointer}
+.toggle input{accent-color:var(--fox);width:16px;height:16px}
+
+/* ---------- in-flight ---------- */
+#flight{position:fixed;inset:0;pointer-events:none;z-index:5}
+#flight .glass{pointer-events:auto}
+#fcu{position:absolute;top:max(12px,env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);display:flex;gap:2px;padding:6px;border-radius:9px;background:rgba(18,22,28,.82);border:1px solid rgba(255,255,255,.08);box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.fcuw{display:grid;justify-items:center;gap:2px;padding:4px 10px;border-radius:6px;cursor:ns-resize;min-width:62px}
+.fcuw:hover{background:rgba(255,255,255,.05)}
+.fcuw .l{font:9.5px var(--f-mono);letter-spacing:.14em;color:#9aa6b8}
+.fcuw .v{font:700 18px/1 var(--f-mono);color:var(--amber);text-shadow:0 0 8px rgba(255,184,77,.35);font-variant-numeric:tabular-nums}
+.fcub{display:grid;place-items:center;gap:3px;padding:4px 9px;border-radius:6px;font:700 10.5px var(--f-mono);letter-spacing:.06em;color:#c8d0dc}
+.fcub i{display:block;width:22px;height:3px;border-radius:2px;background:#2d3540}
+.fcub[aria-pressed=true] i{background:var(--green);box-shadow:0 0 8px var(--green)}
+.fcub:hover{background:rgba(255,255,255,.05)}
+.fcusep{width:1px;background:rgba(255,255,255,.08);margin:4px 4px}
+#info{position:absolute;top:max(12px,env(safe-area-inset-top,0px));right:max(16px,env(safe-area-inset-right,0px));padding:10px 14px;display:grid;gap:3px;font:11.5px var(--f-mono);min-width:190px}
+#info .apt{font:700 17px/1.1 var(--f-display);letter-spacing:.05em;text-transform:uppercase}
+#info .k{color:var(--mute)}
+#stat{position:absolute;right:max(16px,env(safe-area-inset-right,0px));bottom:max(16px,env(safe-area-inset-bottom,0px));padding:12px 14px;display:grid;grid-template-columns:repeat(6,auto);gap:4px 16px;align-items:end;font:11px var(--f-mono)}
+#stat .c{display:grid;gap:4px;justify-items:center}
+#stat .k{color:var(--mute);font-size:9.5px;letter-spacing:.12em}
+#stat .v{font:700 14px var(--f-mono)}
+.thr{width:10px;height:54px;border-radius:3px;background:rgba(255,255,255,.08);position:relative;overflow:hidden}
+.thr i{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(0deg,var(--fox),var(--fox2))}
+#pfdwrap{position:absolute;left:max(16px,env(safe-area-inset-left,0px));bottom:max(16px,env(safe-area-inset-bottom,0px));display:flex;gap:8px;pointer-events:none}
+#pfdwrap canvas{width:250px;height:250px;border-radius:8px;border:1px solid rgba(255,255,255,.08);box-shadow:0 10px 30px rgba(0,0,0,.4);background:#000}
+#note{position:absolute;left:max(16px,env(safe-area-inset-left,0px));top:max(12px,env(safe-area-inset-top,0px));font:10.5px var(--f-mono);color:rgba(232,237,245,.72);max-width:300px;padding:8px 10px;line-height:1.4}
+#note b{color:var(--fox2);font-weight:700}
+#callout{position:absolute;top:22%;left:50%;transform:translateX(-50%);font:800 44px/1 var(--f-display);letter-spacing:.12em;color:var(--amber);text-shadow:0 2px 20px rgba(0,0,0,.6);opacity:0;transition:opacity .25s}
+#toast{position:absolute;bottom:120px;left:50%;transform:translateX(-50%);padding:9px 16px;font:12.5px var(--f-mono);opacity:0;transition:opacity .3s;white-space:nowrap}
+#yoke{position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border:2px solid var(--cyan);border-radius:50%;left:50%;top:50%;opacity:.8}
+#yoke::after{content:"";position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px;background:var(--cyan);border-radius:50%}
+#camname{position:absolute;bottom:max(16px,env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);font:11px var(--f-mono);letter-spacing:.16em;color:rgba(232,237,245,.65);text-transform:uppercase}
+
+/* overlays */
+.overlay{position:fixed;inset:0;display:grid;place-items:center;background:rgba(3,6,12,.55);backdrop-filter:blur(4px);z-index:20;padding:16px}
+.dialog{width:min(560px,100%);max-height:calc(100vh - 32px);overflow:auto;padding:24px;display:grid;gap:16px;background:rgba(10,16,28,.92)}
+.dialog h2{margin:0;font:800 30px/1 var(--f-display);text-transform:uppercase;letter-spacing:.05em}
+.btnrow{display:flex;gap:10px;flex-wrap:wrap}
+.btnrow>*{flex:1}
+.score{display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:center}
+.score .big{font:800 86px/0.85 var(--f-display);color:var(--fox)}
+.score .gr{font:800 34px/1 var(--f-display)}
+.bars{display:grid;gap:9px}
+.bars .b{display:grid;grid-template-columns:118px 1fr 92px;gap:10px;align-items:center;font:11.5px var(--f-mono)}
+.bars .b .t{height:6px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden}
+.bars .b .t i{display:block;height:100%;background:linear-gradient(90deg,var(--fox),var(--fox2))}
+.bars .b span:last-child{text-align:right;color:var(--mute)}
+.keys{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:4px 26px;font-size:12px}
+.keys div{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid var(--line)}
+kbd{font:11px var(--f-mono);padding:2px 6px;border-radius:4px;border:1px solid var(--line2);background:rgba(255,255,255,.04);white-space:nowrap}
+#atcCap{position:absolute;left:50%;bottom:150px;transform:translateX(-50%);max-width:min(760px,90vw);padding:8px 14px;font:12.5px var(--f-mono);opacity:0;transition:opacity .4s}
+#atcCap b,.rl b{color:var(--amber);font-weight:700;margin-right:6px}
+#parkPrompt{position:absolute;left:50%;top:84px;transform:translateX(-50%);padding:9px 16px;font:13px var(--f-mono);color:var(--fox2)}
+#radio{position:absolute;right:max(16px,env(safe-area-inset-right,0px));top:190px;width:min(440px,92vw);padding:12px;display:grid;gap:10px;pointer-events:auto;background:rgba(14,18,24,.9)}
+.rhead{display:flex;align-items:baseline;gap:10px}.rlab{font:10px var(--f-mono);letter-spacing:.14em;color:var(--mute)}
+.rfreq{font:700 22px var(--f-mono);color:var(--amber);text-shadow:0 0 8px rgba(255,184,77,.35)}.rname{font:12px var(--f-mono);color:var(--ink);flex:1}
+#rClose{padding:2px 8px;color:var(--mute)}
+.rfacs{display:grid;grid-template-columns:repeat(6,1fr);gap:4px}.rfac{display:grid;padding:5px 2px;border-radius:6px;border:1px solid var(--line);font:10px var(--f-mono);color:var(--mute)}
+.rfac b{font-size:11px;color:var(--ink)}.rfac[aria-pressed=true]{border-color:var(--amber);background:rgba(255,184,77,.1)}
+.rlog{max-height:170px;overflow:auto;display:grid;gap:6px;font:12px/1.4 var(--f-mono);padding:8px;border-radius:6px;background:rgba(0,0,0,.35)}
+.rl.me{color:var(--cyan)}.rl.oth{color:var(--mute)}.rl.oth b{color:#9aa6b8}.rl.me b{color:var(--cyan)}
+.ropts{display:grid;gap:5px}.ropt{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;text-align:left;padding:8px 10px;border-radius:7px;border:1px solid var(--line2);background:rgba(255,255,255,.03);font-size:12.5px}
+.ropt:hover{border-color:var(--fox)}.ropt small{font:10px var(--f-mono);color:var(--mute)}.rnone{color:var(--mute);font-size:12px}
+.rfoot{display:flex;gap:14px;flex-wrap:wrap;align-items:center;font:11px var(--f-mono);color:var(--mute)}
+#pa{position:fixed;z-index:6;right:max(16px,env(safe-area-inset-right,0px));top:170px;width:min(470px,92vw);max-height:calc(100vh - 210px);overflow:auto;padding:12px;display:grid;gap:10px;pointer-events:auto;background:rgba(14,18,24,.92)}
+.pasigns{display:flex;gap:6px;flex:1;justify-content:flex-end}
+.sgn{display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:6px;border:1px solid var(--line2);font:10px var(--f-mono);color:var(--mute);background:#0b0d11}
+.sgn svg{width:28px;height:14px;opacity:.35}.sgn[aria-pressed=true]{color:#fff4d8;border-color:#cdb98d;box-shadow:inset 0 0 12px rgba(255,232,180,.18)}
+.sgn[aria-pressed=true] svg{opacity:1;filter:drop-shadow(0 0 4px rgba(255,238,200,.85))}
+.pamood{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;font:11px var(--f-mono)}
+.meter{height:8px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden}.meter i{display:block;height:100%;width:70%;border-radius:4px;background:var(--green);transition:width .6s,background .6s}
+#pMood{min-width:118px;text-align:right}
+.palang{display:flex;gap:4px}.palang button{flex:1;padding:6px;border-radius:6px;border:1px solid var(--line);font:11px var(--f-mono);color:var(--mute)}
+.palang button[aria-pressed=true]{border-color:var(--fox);color:var(--ink);background:rgba(242,154,76,.12)}
+.palines{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.paline{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;text-align:left;padding:6px 9px;border-radius:7px;border:1px solid var(--line2);background:rgba(255,255,255,.03);font-size:12px}
+.paline:hover{border-color:var(--fox)}.paline small{font:9.5px var(--f-mono);color:var(--mute);text-align:right}
+.pacustom{display:flex;gap:6px}.pacustom input{flex:1;min-width:0;background:rgba(0,0,0,.35);border:1px solid var(--line2);border-radius:7px;color:var(--ink);font:13px var(--f-body);padding:8px 10px;user-select:text}
+.pacustom .go{padding:7px 16px;font-size:15px}
+.palog{max-height:120px;font-family:var(--f-body),"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif}.palog .rl b{color:var(--fox2)}.palog .note{color:var(--amber);font-size:11px}
+.fcub.pab{color:var(--fox2)}.fcub.pab i{background:var(--fox2)}
+#ckTip{position:fixed;z-index:7;pointer-events:none;padding:5px 9px;border-radius:6px;background:rgba(10,12,16,.88);border:1px solid var(--line2);font:12px var(--f-mono);color:var(--ink);opacity:0;transition:opacity .15s;white-space:nowrap}
+#coldList{position:absolute;left:max(16px,env(safe-area-inset-left,0px));top:110px;width:min(330px,80vw);padding:10px 12px;display:grid;gap:8px;pointer-events:auto;background:rgba(14,18,24,.88)}
+#coldList ol{list-style:none;margin:0;padding:0;display:grid;gap:4px}#coldList li{display:grid;grid-template-columns:20px 1fr;gap:6px;font-size:12px;color:var(--mute)}
+#coldList li b{font:700 11px var(--f-mono);color:var(--mute)}#coldList li small{display:block;font:10px var(--f-mono);color:var(--mute);opacity:.8}
+#coldList li.ok{color:#8fdcaa}#coldList li.ok b{color:var(--green)}#coldList li.now{color:var(--ink)}#coldList li.now b{color:var(--fox2)}
+#foot{position:fixed;inset:0;pointer-events:none;z-index:5}
+#foot .dot{position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px;border-radius:50%;background:rgba(255,255,255,.8);box-shadow:0 0 0 2px rgba(0,0,0,.3)}
+#footPrompt{position:absolute;left:50%;bottom:90px;transform:translateX(-50%);padding:10px 16px;font:13px var(--f-mono);color:var(--fox2);max-width:90vw}
+#footPrompt:empty{display:none}
+.fkeys{position:absolute;left:50%;bottom:max(16px,env(safe-area-inset-bottom,0px));transform:translateX(-50%);padding:7px 12px;font:11px var(--f-mono);color:var(--mute);white-space:nowrap}
+@media (max-width:860px){
+  #menu{grid-template-columns:1fr;overflow:auto;padding:12px 16px}
+  #rail{min-height:auto}
+  #setup{grid-template-columns:1fr}
+  #stat{grid-template-columns:repeat(3,auto)}
+  #pfdwrap canvas{width:150px;height:150px}
+  #info{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<canvas id="gl" tabindex="0"></canvas>
+<canvas id="hudc"></canvas>
+
+<div id="loader"><div class="box">
+  <svg width="74" height="74" viewBox="0 0 64 64" aria-hidden="true"><use href="#foxheart"/></svg>
+  <div class="wordmark" style="text-align:center">Foxheart Skies<span>Flight Simulator</span></div>
+  <div class="bar"><i id="loadbar"></i></div>
+  <div id="loadmsg">Starting…</div>
+</div></div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="fhg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffc583"/><stop offset="1" stop-color="#e2672a"/></linearGradient>
+    <symbol id="foxheart" viewBox="0 0 64 64">
+      <path d="M32 56 C18 46 6 37 6 23 C6 15 11 9 18 9 L14 1 L25 8 C28 9 30 11 32 14 C34 11 36 9 39 8 L50 1 L46 9 C53 9 58 15 58 23 C58 37 46 46 32 56Z" fill="url(#fhg)"/>
+      <path d="M32 47 C25 41 18 35 18 27 C21 30 26 31 32 36 C38 31 43 30 46 27 C46 35 39 41 32 47Z" fill="#fff" opacity=".92"/>
+      <circle cx="24" cy="23" r="2.4" fill="#1a0d03"/><circle cx="40" cy="23" r="2.4" fill="#1a0d03"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div id="menu" hidden>
+  <aside id="rail" class="glass">
+    <div class="brand">
+      <svg width="56" height="56" viewBox="0 0 64 64" aria-hidden="true"><use href="#foxheart"/></svg>
+      <div class="wordmark">Foxheart<br>Skies<span>for Nicofoxheart</span></div>
+    </div>
+    <p class="tag">Fly a twin-jet airliner onto real runways, from Tampa to Incheon, with live sun, weather and night lighting.</p>
+    <nav id="nav">
+      <button data-sec="free" aria-current="true"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 14l8-2 4-9 2 1-2 8 7 1 1 2-8 1-3 6-2-1 1-5-7 1z"/></svg><b>Free Flight</b><small>Gate, runway or 10 nm final at any airport</small></button>
+      <button data-sec="challenge"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20h16M7 20l3-14h4l3 14M12 6V3"/></svg><b>Landing Challenge</b><small>Scored touchdowns: rate, centerline, zone, speed</small></button>
+      <button data-sec="routes"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="5" cy="18" r="2"/><circle cx="19" cy="6" r="2"/><path d="M6.5 16.5C10 12 9 9 13 8.5s4-1 4.5-1.5" stroke-dasharray="2 2.5"/></svg><b>Scenic Routes</b><small>Short hops between featured airports, time accel</small></button>
+      <button data-sec="logbook"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 3h11l3 3v15H5zM8 9h8M8 13h8M8 17h5"/></svg><b>Logbook</b><small>Your flights and best landings</small></button>
+      <button data-sec="settings"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg><b>Settings</b><small>Graphics, controls, units, sound</small></button>
+      <button data-sec="controls"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h1M10 10h1M14 10h1M18 10h0M7 14h10"/></svg><b>Controls</b><small>Keyboard, mouse yoke and gamepad</small></button>
+    </nav>
+    <div class="railfoot">
+      <div class="stats"><div><b id="stA">–</b>airports</div><div><b id="stR">–</b>runways</div><div><b id="stN">–</b>navaids</div></div>
+      <div>Runway geometry: OurAirports open data (public domain). Terrain, coastlines, cities and buildings are hand-made approximations.</div>
+    </div>
+  </aside>
+  <main id="sheet" class="glass">
+    <section class="sec" data-sec="free">
+      <div class="sechead"><h2 id="freeTitle">Choose an airport</h2>
+        <label class="search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="q" type="search" placeholder="Search ICAO, IATA, name or city (e.g. TPA, Incheon)" autocomplete="off" spellcheck="false" aria-label="Search airports"></label>
+      </div>
+      <div class="secbody" id="freeBody">
+        <div id="results" hidden></div>
+        <div id="featuredWrap"><div class="cardrow" style="margin-bottom:10px"><span class="eyebrow">Featured airports · hand-made surroundings</span><span class="eyebrow" style="color:var(--dim)">Runways from real data</span></div><div class="cards" id="cards"></div></div>
+        <div id="setupWrap" hidden>
+          <div id="setup">
+            <div style="display:grid;gap:12px;min-width:0">
+              <div class="diagram"><canvas id="diag" width="900" height="520"></canvas></div>
+              <dl class="kv" id="aptkv"></dl>
+              <div class="note" id="aptnote"></div>
+            </div>
+            <div style="display:grid;gap:16px;min-width:0">
+              <div class="field"><span class="lab">Runway</span><div class="rwlist" id="rwlist"></div></div>
+              <div class="field"><span class="lab">Start</span><div class="seg" id="startSeg"><button data-v="terminal">In the terminal</button><button data-v="gate">Gate</button><button data-v="runway" aria-pressed="true">Runway</button><button data-v="final">10 nm final</button></div><label class="toggle"><input type="checkbox" id="coldDark"> Cold &amp; dark (gate or terminal): start the aircraft yourself from the overhead panel</label></div>
+              <div class="field timeline"><label for="tod">Local time <span id="todv" class="mono" style="color:var(--ink);margin-left:6px"></span></label><input id="tod" type="range" min="0" max="1439" step="5" value="1080"><div class="chips" id="sunchips"></div></div>
+              <div class="field"><span class="lab">Weather</span><div class="seg" id="wxSeg"><button data-v="clear" aria-pressed="true">Clear</button><button data-v="scattered">Scattered</button><button data-v="overcast">Overcast</button><button data-v="rain">Rain</button><button data-v="fog">Fog</button></div></div>
+              <div class="row2">
+                <div class="field"><label for="wdir">Wind from <span id="wdirv" class="mono" style="color:var(--ink)"></span></label><input id="wdir" type="range" min="0" max="355" step="5" value="270"></div>
+                <div class="field"><label for="wspd">Wind speed <span id="wspdv" class="mono" style="color:var(--ink)"></span></label><input id="wspd" type="range" min="0" max="35" step="1" value="6"></div>
+              </div>
+              <label class="toggle"><input type="checkbox" id="gusts"> Gusts and light turbulence</label>
+              <button class="go" id="fly"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M2 14l8-2 4-9 2 1-2 8 7 1 1 2-8 1-3 6-2-1 1-5-7 1z"/></svg>Fly</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="sec" data-sec="challenge" hidden>
+      <div class="sechead"><h2>Landing Challenge</h2><span class="eyebrow">Autopilot off at 1,000 ft is up to you</span></div>
+      <div class="secbody"><p class="note">Each challenge starts 10 nm out on the ILS with the autopilot flying. Disconnect it (<kbd>Z</kbd>) and land, or let it autoland for a reference score. Scored on touchdown rate, centerline, touchdown zone and speed versus V<sub>REF</sub>.</p><div class="list" id="chList"></div></div>
+    </section>
+    <section class="sec" data-sec="routes" hidden>
+      <div class="sechead"><h2>Scenic Routes</h2><span class="eyebrow">Use <kbd>.</kbd> and <kbd>,</kbd> for time acceleration</span></div>
+      <div class="secbody"><div class="list" id="rtList"></div></div>
+    </section>
+    <section class="sec" data-sec="logbook" hidden>
+      <div class="sechead"><h2>Logbook</h2><button class="go ghost" id="clearLog" style="padding:8px 12px;font-size:13px">Clear logbook</button></div>
+      <div class="secbody" id="logBody"></div>
+    </section>
+    <section class="sec" data-sec="settings" hidden>
+      <div class="sechead"><h2>Settings</h2><span class="eyebrow">Saved on this device</span></div>
+      <div class="secbody"><div class="setgrid">
+        <div class="field"><span class="lab">Graphics quality</span><div class="seg" id="qSeg"><button data-v="low">Low</button><button data-v="medium">Medium</button><button data-v="high">High</button><button data-v="ultra">Ultra</button></div><small style="color:var(--mute)">Low: no bloom or city blocks, half resolution. Ultra: aircraft and airport shadows, MSAA, denser city.</small></div>
+        <div class="field"><span class="lab">Resolution</span><div class="seg" id="resSeg"><button data-v="auto">Dynamic</button><button data-v="1">Native</button><button data-v="0.75">75%</button><button data-v="0.5">50%</button></div></div>
+        <div class="field"><span class="lab">Units</span><div class="seg" id="unitSeg"><button data-v="aviation">kt · ft</button><button data-v="metric">km/h · m</button></div></div>
+        <div class="field"><span class="lab">Flight control law</span><div class="seg" id="lawSeg"><button data-v="fbw">Fly-by-wire (auto-trim)</button><button data-v="direct">Direct (manual trim)</button></div></div>
+        <div class="field"><span class="lab">Pitch keys</span><div class="seg" id="invSeg"><button data-v="0">Up arrow = nose down</button><button data-v="1">Up arrow = nose up</button></div></div>
+        <div class="field"><label for="mouseSens">Mouse yoke sensitivity</label><input type="range" id="mouseSens" min="0.4" max="2" step="0.1" value="1"></div>
+        <div class="field"><label for="vol">Master volume</label><input type="range" id="vol" min="0" max="1" step="0.05" value="0.7"></div>
+        <label class="toggle"><input type="checkbox" id="voice" checked> Spoken callouts and ATC (browser speech synthesis, falls back to tones)</label>
+        <div class="field"><label for="vCtl">Controller voice</label><div style="display:flex;gap:6px"><select id="vCtl" style="flex:1;min-width:0"></select><button class="go ghost" id="vCtlTest" style="padding:6px 10px;font-size:13px">Test</button></div>
+          <label for="vPilot">Your pilot voice</label><div style="display:flex;gap:6px"><select id="vPilot" style="flex:1;min-width:0"></select><button class="go ghost" id="vPilotTest" style="padding:6px 10px;font-size:13px">Test</button></div>
+          <small style="color:var(--mute)">For the most natural ATC voices, play in Microsoft Edge: its “Online (Natural)” voices are picked automatically. Chrome uses its Google voices.</small></div>
+        <label class="toggle"><input type="checkbox" id="chatterOn" checked> Background radio chatter from other aircraft</label>
+        <label class="toggle"><input type="checkbox" id="hudOn" checked> Clean HUD in external views</label>
+      </div></div>
+    </section>
+    <section class="sec" data-sec="controls" hidden>
+      <div class="sechead"><h2>Controls</h2><span class="eyebrow">Press <kbd>?</kbd> in flight</span></div>
+      <div class="secbody"><div class="keys" id="keysA"></div></div>
+    </section>
+  </main>
+</div>
+
+<div id="flight" hidden>
+  <div id="fcu">
+    <div class="fcuw" data-k="spd" title="Scroll to change, click to sync"><span class="l">SPD</span><span class="v" id="fSpd">---</span></div>
+    <div class="fcuw" data-k="hdg" title="Scroll to change, click to sync"><span class="l">HDG</span><span class="v" id="fHdg">---</span></div>
+    <div class="fcuw" data-k="alt" title="Scroll to change, click to sync"><span class="l">ALT</span><span class="v" id="fAlt">-----</span></div>
+    <div class="fcuw" data-k="vs" title="Scroll to change, click to level off"><span class="l">V/S</span><span class="v" id="fVs">-----</span></div>
+    <div class="fcusep"></div>
+    <button class="fcub" data-b="ap" aria-pressed="false">AP<i></i></button>
+    <button class="fcub" data-b="athr" aria-pressed="false">A/THR<i></i></button>
+    <button class="fcub" data-b="hdgm" aria-pressed="false">HDG<i></i></button>
+    <button class="fcub" data-b="nav" aria-pressed="false">NAV<i></i></button>
+    <button class="fcub" data-b="loc" aria-pressed="false">LOC<i></i></button>
+    <button class="fcub" data-b="appr" aria-pressed="false">APPR<i></i></button>
+    <div class="fcusep"></div>
+    <button class="fcub" id="radioBtn" style="color:var(--amber)">RADIO<i style="background:var(--amber)"></i></button>
+    <button class="fcub pab" id="paBtn">PA<i></i></button>
+  </div>
+  <div id="note" class="glass"></div>
+  <div id="info" class="glass"></div>
+  <div id="pfdwrap"></div>
+  <div id="stat" class="glass">
+    <div class="c"><div class="thr"><i id="sThr"></i></div><span class="k">THR</span></div>
+    <div class="c"><span class="v" id="sN1">--</span><span class="k">N1 %</span></div>
+    <div class="c"><span class="v" id="sFlap">UP</span><span class="k">FLAPS</span></div>
+    <div class="c"><span class="v" id="sGear">DN</span><span class="k">GEAR</span></div>
+    <div class="c"><span class="v" id="sBrk">PARK</span><span class="k">BRAKE</span></div>
+    <div class="c"><span class="v" id="sTrim">0.0</span><span class="k">TRIM</span></div>
+  </div>
+  <div id="callout"></div>
+  <div id="toast" class="glass"></div>
+  <div id="yoke" hidden></div>
+  <div id="camname"></div>
+  <div id="atcCap" class="glass"></div>
+  <div id="parkPrompt" class="glass" hidden></div>
+  <div id="ckTip"></div>
+  <div id="coldList" class="glass" hidden></div>
+  <div id="radio" class="glass" hidden>
+    <div class="rhead"><span class="rlab">COM 1</span><span id="rFreq" class="rfreq">---.--</span><span id="rName" class="rname"></span><button id="rClose" aria-label="Close radio">✕</button></div>
+    <div id="rFacs" class="rfacs"></div>
+    <div id="rLog" class="rlog"></div>
+    <div id="rOpts" class="ropts"></div>
+    <div class="rfoot"><label class="toggle"><input type="checkbox" id="rAuto"> Auto-respond</label><label class="toggle"><input type="checkbox" id="rSpeak" checked> Speak my calls</label><span>T radio · 1–6 say · * simulated freq</span></div>
+  </div>
+</div>
+<div id="foot" hidden>
+  <div class="dot"></div>
+  <div id="footPrompt" class="glass"></div>
+  <div class="fkeys glass">WASD walk · Shift run · drag or click for mouse look · E interact · J skip ahead · Y cabin PA · Esc menu</div>
+</div>
+
+<div id="pa" class="glass" hidden>
+    <div class="rhead"><span class="rlab">CABIN PA</span><span class="pasigns"><button class="sgn" id="pBelt" aria-pressed="true" title="Fasten seat belt sign"><svg viewBox="0 0 128 64" aria-hidden="true"><g fill="currentColor"><rect x="10" y="28" width="36" height="8"/><rect x="82" y="28" width="36" height="8"/><rect x="55" y="27" width="18" height="10"/></g><rect x="46" y="19" width="36" height="26" fill="none" stroke="currentColor" stroke-width="5"/></svg>SEAT BELTS</button><button class="sgn" id="pSmoke" aria-pressed="true" title="No smoking sign"><svg viewBox="0 0 128 64" aria-hidden="true"><rect x="34" y="29" width="44" height="8" fill="currentColor"/><rect x="78" y="29" width="10" height="8" fill="#ff8b3d"/><circle cx="64" cy="32" r="25" fill="none" stroke="#ff5050" stroke-width="5"/><path d="M46 14 82 50" stroke="#ff5050" stroke-width="5"/></svg>NO SMOKING</button></span><button id="pClose" aria-label="Close PA">✕</button></div>
+    <div class="pamood"><span class="rlab">CABIN MOOD</span><div class="meter"><i id="pMeter"></i></div><span id="pMood">--</span></div>
+    <div class="palang" role="group" aria-label="Announcement language"><button data-l="en" aria-pressed="true">English</button><button data-l="es" aria-pressed="false">Español</button><button data-l="ko" aria-pressed="false">한국어</button></div>
+    <div id="pLines" class="palines"></div>
+    <form id="pForm" class="pacustom"><input id="pText" maxlength="240" placeholder="Type your own announcement…" autocomplete="off" aria-label="Custom announcement"><button class="go" type="submit">Speak</button></form>
+    <div id="pLog" class="rlog palog"></div>
+    <div class="rfoot"><span>Y PA · 1–9 announce · 0 seat belt sign</span></div>
+  </div>
+
+<div id="pause" class="overlay" hidden><div class="dialog glass">
+  <span class="eyebrow">Paused</span><h2 id="pauseTitle">Flight paused</h2>
+  <div class="btnrow"><button class="go" id="resume">Resume</button></div>
+  <div class="btnrow"><button class="go ghost" id="restart">Restart flight</button><button class="go ghost" id="toMenu">Main menu</button></div>
+  <div class="btnrow"><button class="go ghost" id="pHelp">Controls</button><button class="go ghost" id="pSet">Settings</button></div>
+</div></div>
+
+<div id="result" class="overlay" hidden><div class="dialog glass" id="resultBox"></div></div>
+<div id="help" class="overlay" hidden><div class="dialog glass" style="width:min(860px,100%)"><span class="eyebrow">Controls</span><h2>Flight deck keys</h2><div class="keys" id="keysB"></div><div class="btnrow"><button class="go ghost" id="helpClose">Close</button></div></div></div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module" src="js/main.js"></script>
