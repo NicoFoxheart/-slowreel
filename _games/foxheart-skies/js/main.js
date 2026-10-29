@@ -14,7 +14,7 @@ import { FDM, FLAPS } from './fdm.js';
 import { Displays, drawHUD } from './cockpit.js';
 import { buildCockpit, COCKPIT_EYE } from './flightdeck.js';
 import { Systems } from './systems.js';
-import { Pad, BTN } from './gamepad.js';
+import { Pad, BTN, ACTIONS, glyph, btnName } from './gamepad.js';
 import { Audio } from './audio.js';
 import { Traffic } from './traffic.js';
 import { ATC, facility, DEST_DEFAULT, SHORT } from './atc.js';
@@ -27,7 +27,7 @@ import { rng } from './terrain.js';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const errors = []; window.addEventListener('error', e => errors.push(String(e.message))); window.addEventListener('unhandledrejection', e => errors.push(String(e.reason)));
 const store = { get(k, d) { try { const v = localStorage.getItem('foxheart.' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('foxheart.' + k, JSON.stringify(v)); } catch (e) { } } };
-const settings = Object.assign({ quality: 'high', res: 'auto', units: 'aviation', law: 'fbw', invert: '0', mouseSens: 1, vol: 0.7, voice: true, hud: true }, store.get('settings', {}));
+const settings = Object.assign({ quality: 'high', res: 'auto', units: 'aviation', law: 'fbw', invert: '0', mouseSens: 1, vol: 0.7, voice: true, hud: true, padAssist: 'easy', padSens: 1, padDz: 0.15, padInvert: '0', padRumble: true }, store.get('settings', {}));
 const TODAY = new Date(Date.UTC(2026, 9, 27));
 
 // ---------------------------------------------------------------- renderer
@@ -65,7 +65,7 @@ let cockpit = new THREE.Group(); cockpit.userData = { screens: [] }; cockpit.vis
 const sys = new Systems();
 // gamepad: radial dead zone 0.15 + expo 0.5; the browser only exposes a pad after one of its buttons is pressed
 const pad = new Pad(); Object.assign(pad.cfg, { dz: settings.padDz ?? 0.15, expo: 0.5, sens: settings.padSens ?? 1, rumble: settings.padRumble !== false, map: settings.padMap || {} });
-pad.onConnect = p => { const x = /xbox|xinput|045e/i.test(p.id); toast((x ? 'Xbox controller connected' : 'Controller connected') + (p.standard ? '' : '. Its buttons are not in the standard layout, so some may differ.'), 4500); padStatus(); };
+pad.onConnect = p => { const x = /xbox|xinput|045e/i.test(p.id); toast((x ? 'Xbox controller connected' : 'Controller connected') + (p.standard ? '' : '. Its buttons are not in the standard layout, so some may differ.'), 4500); padStatus(); padHelpUntil = p.t + 12; };
 pad.onDisconnect = () => { toast('Controller disconnected'); padStatus(); };
 function padStatus() { const t = pad.gp ? ((/xbox|xinput|045e/i.test(pad.id) ? 'Xbox controller' : 'Controller') + ' connected' + (pad.standard ? '' : ' (non-standard layout)')) : 'Using an Xbox controller? Press any button on it to connect it.'; for (const el of document.querySelectorAll('.padhint')) { el.textContent = t; el.classList.toggle('on', !!pad.gp); } }
 const fdm = new FDM(); fdm.law = settings.law;
@@ -154,7 +154,7 @@ async function startFlight(cfg) {
   setWeather(cfg.wx || 'clear', cfg.windFrom, cfg.windKt, cfg.gusts);
   const P = aptPos(A); const elev = g.elev;
   const dir = new THREE.Vector3(E.dir.x, 0, E.dir.z);
-  W.end = E; W.apt = A; W.ils = ilsFor(A, E, P);
+  W.end = E; W.apt = A; W.ils = ilsFor(A, E, P); W.depIls = W.ils;
   fdm.law = settings.law;
   const sp = fdm.speeds();
   if (cfg.start === 'final' || cfg.start === 'route') {
@@ -517,6 +517,143 @@ canvas.addEventListener('wheel', e => { e.preventDefault(); const s = Math.sign(
   if (W.view === 'cabin') cabLook.fov = THREE.MathUtils.clamp(cabLook.fov + s * 4, 30, 90); else if (W.view === 'cockpit') look.fov = THREE.MathUtils.clamp(look.fov + s * 4, 25, 80); else if (W.view === 'chase') chase.dist = THREE.MathUtils.clamp(chase.dist * (1 + s * 0.1), 0.45, 4); else orbit.dist = THREE.MathUtils.clamp(orbit.dist * (1 + s * 0.1), 25, 900); }, { passive: false });
 canvas.addEventListener('dblclick', () => { if (W.view === 'cockpit') { look.yaw = 0; look.pitch = -13; look.fov = 70; look.target = null; } });
 
+// ---------------------------------------------------------------- Xbox controller: menus by pad, flying layout, smart next step, help overlay, rumble
+let padTick = 0, padUIActive = false, navEl = null, navIdx = 0, padHelpOn = false, padHelpUntil = 0, rumT = 0;
+function padPoll(dt) { if (pad._tick === padTick) return pad.gp; pad._tick = padTick; return pad.poll(dt); }
+function padRoot() {
+  const vis = s => { const e = $(s); return e && !e.hidden ? e : null; };
+  return vis('#result') || vis('#help') || vis('#pause') || (paOpen ? $('#pa') : null) || (radioOpen ? $('#radio') : null) || (W.menuMode ? vis('#menu') : null);
+}
+function setNav(el) { if (navEl === el) return; if (navEl) navEl.classList.remove('padfocus'); navEl = el; if (el) { el.classList.add('padfocus'); try { el.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (e) { } } }
+function navStep(els, cur, d) {
+  const r = cur.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2; let best = null, bs = 1e9;
+  for (const e of els) { if (e === cur) continue; const q = e.getBoundingClientRect(); const x = q.left + q.width / 2 - cx, y = q.top + q.height / 2 - cy;
+    const along = d === 'U' ? -y : d === 'D' ? y : d === 'L' ? -x : x, perp = d === 'U' || d === 'D' ? Math.abs(x) : Math.abs(y); if (along < 4) continue; const sc = along + perp * 2.2; if (sc < bs) { bs = sc; best = e; } }
+  return best;
+}
+// menus, dialogs and the ATC / PA panels: d-pad or left stick moves, A selects, B backs out
+function padUI(dt) {
+  padUIActive = false; if (!pad.gp) return false;
+  if (W.padCapture) { for (let i = 0; i < 16; i++) if (pad.down(i)) { assignPad(W.padCapture, i); return (padUIActive = true); } }
+  const root = padRoot(); if (!root) { setNav(null); return false; }
+  padUIActive = true;
+  if (root.id === 'pause' && pad.down(BTN.MENU)) { togglePause(); return true; }
+  const els = [...root.querySelectorAll('button, input[type=range], input[type=checkbox], select')].filter(e => !e.disabled && e.offsetParent !== null && e.getBoundingClientRect().width > 0);
+  if (!els.length) return true;
+  if (!navEl || !els.includes(navEl)) { const first = root.id === 'radio' ? els.find(e => e.classList.contains('ropt')) : root.id === 'pa' ? els.find(e => e.classList.contains('paline')) : null; setNav(first || els[Math.max(0, Math.min(navIdx, els.length - 1))]); }
+  navIdx = els.indexOf(navEl);
+  const d = pad.repeat(BTN.UP, dt) ? 'U' : pad.repeat(BTN.DOWN, dt) ? 'D' : pad.repeat(BTN.LEFT, dt) ? 'L' : pad.repeat(BTN.RIGHT, dt) ? 'R' : pad.stickDir(dt);
+  if (d) { if (navEl.type === 'range' && (d === 'L' || d === 'R')) { const st = +navEl.step || 1; navEl.value = +navEl.value + (d === 'R' ? st : -st); navEl.dispatchEvent(new Event('input', { bubbles: true })); navEl.dispatchEvent(new Event('change', { bubbles: true })); } else { const nb = navStep(els, navEl, d); if (nb) setNav(nb); } }
+  if (pad.down(BTN.A)) { audio.start(); if (navEl.tagName === 'SELECT') { navEl.selectedIndex = (navEl.selectedIndex + 1) % navEl.options.length; navEl.dispatchEvent(new Event('change', { bubbles: true })); } else navEl.click(); }
+  if (pad.down(BTN.B)) { if (root.id === 'help') $('#helpClose').click(); else if (root.id === 'pause') togglePause(); else if (root.id === 'pa') togglePA(false); else if (root.id === 'radio') toggleRadio(false); }
+  if (root.id === 'pa' && pad.down(BTN.X)) setSigns(!W.signs.belt, W.signs.smoke);
+  if (root.id === 'pa' && pad.down(BTN.Y)) { const L = ['en', 'es', 'ko']; pa.lang = L[(L.indexOf(pa.lang) + 1) % 3]; renderPA(); }
+  return true;
+}
+// flying: left stick flies (steers on the ground), right stick looks, triggers thrust, B brakes, LB/RB flaps, hold LB = shift layer
+function padFlight(dt) {
+  const a = pad.axes, pinv = settings.padInvert === '1' ? -1 : 1, P = k => pad.phys(k), out = { fly: !!(a[0] || a[1]), tr: a[0], tp: a[1] * pinv, ty: fdm.onGround ? a[0] : 0 };
+  const rt = pad.val[BTN.RT], lt = pad.val[BTN.LT], gsKt = Math.hypot(fdm.vel.x, fdm.vel.z) / KT;
+  if (fdm.onGround && gsKt > 40 && fdm.tl < 0.03 && lt > 0.35 && !fdm.revCmd) { fdm.revCmd = true; W.padRev = true; toast('Reverse thrust'); }
+  if (W.padRev && fdm.revCmd) { if (lt < 0.08) { fdm.revCmd = false; W.padRev = false; fdm.tl = 0; } else fdm.tl = lt; }
+  else if (rt > 0.06 || lt > 0.06) { fdm.tl = THREE.MathUtils.clamp(fdm.tl + (rt * 0.5 - lt * 0.6) * dt, 0, 1); if (fdm.ap.athr) { fdm.ap.athr = false; toast('A/THR off (manual thrust)'); } }
+  padLook(dt, a[2], a[3]); if (pad.down(BTN.RS)) padRecentre();
+  const lb = P('flapsUp');
+  if (pad.held(lb)) {
+    const sh = (b, f) => { if (pad.down(b)) { pad.markUsed(lb); f(); } };
+    sh(P('next'), () => { fdm.setGear(!fdm.gearDown); if (fdm.onGround && !fdm.gearDown) { fdm.setGear(true); toast('Gear cannot retract on the ground'); } else toast('Gear ' + (fdm.gearDown ? 'down' : 'up')); });
+    sh(P('atc'), () => toggleAP());
+    sh(P('brake'), () => { if (fdm.onGround) { fdm.spoilersArmed = !fdm.spoilersArmed; toast('Ground spoilers ' + (fdm.spoilersArmed ? 'armed' : 'disarmed')); } else { fdm.speedbrake = fdm.speedbrake >= 1 ? 0 : fdm.speedbrake + 0.5; toast('Speed brake ' + Math.round(fdm.speedbrake * 100) + '%'); } });
+    sh(P('pa'), () => { const on = !(sys.sw.landL || sys.sw.landR); sys.sw.landL = sys.sw.landR = on; sys.touched.landL = sys.touched.landR = true; toast('Landing lights ' + (on ? 'on' : 'off')); });
+  } else {
+    if (pad.down(P('next'))) doNextStep();
+    if (pad.down(P('atc'))) toggleRadio(true);
+    if (pad.down(P('pa'))) togglePA(true);
+  }
+  if (pad.tap(lb, 0.35)) { fdm.setFlaps(fdm.flapIdx - 1); toast('Flaps ' + FLAPS[fdm.flapIdx].name); }
+  if (pad.down(P('flapsDown'))) { fdm.setFlaps(fdm.flapIdx + 1); toast('Flaps ' + FLAPS[fdm.flapIdx].name); }
+  if (pad.down(BTN.UP)) setView('cockpit'); if (pad.down(BTN.DOWN)) setView('chase');
+  if (pad.down(BTN.LEFT)) setView(VIEWS[(VIEWS.indexOf(W.view) + VIEWS.length - 1) % VIEWS.length]); if (pad.down(BTN.RIGHT)) setView(VIEWS[(VIEWS.indexOf(W.view) + 1) % VIEWS.length]);
+  if (pad.long(BTN.VIEW, 0.6)) togglePadHelp(); else if (pad.tap(BTN.VIEW, 0.5)) setView(VIEWS[(VIEWS.indexOf(W.view) + 1) % VIEWS.length]);
+  if (pad.down(BTN.MENU)) togglePause();
+  return out;
+}
+function onDepRunway() {
+  const il = W.depIls; if (!il) return false; const d = ilsDeviation(il, fdm.pos); const E = il.end || W.end; if (!E) return false;
+  const hd = Math.abs(((fdm.euler().hdg - E.hdg + 540) % 360) - 180); return Math.abs(d.cross) < 15 && d.thrDist < 40 && d.thrDist > -(il.length || 2500) + 900 && hd < 15;
+}
+// the smart A button: whatever the next sensible thing is
+function nextStep() {
+  if (W.menuMode || W.onFoot || !W.started) return null;
+  const f = fdm, gs = Math.hypot(f.vel.x, f.vel.z) / KT, eng = f.engRun[0] && f.engRun[1], agl = (f.pos.y - (f.gnd?.h || 0)) / FT, vs = f.vel.y / FT * 60;
+  const opts = atc.options(), o = opts.find(x => !/atis/i.test(x.id + ' ' + x.label)) || opts[0], atcStep = o ? { label: o.label, run: () => atc.choose(o.id) } : null;
+  if (f.onGround) {
+    if (W.parkedAt) return { label: 'Stand up and walk out', run: () => enterFoot('arr') };
+    if (W.autoStart) return { label: (AUTOSTART[Math.min(W.autoStart.i, AUTOSTART.length - 1)][0]) + '…', run: null };
+    if (atcStep && /clear|push|atis|deliv/i.test(o.id + ' ' + o.label)) return atcStep;
+    if (!eng) return { label: 'Start engines', run: startEngines };
+    if (W.push && !W.push.done) return { label: 'Pushback in progress…', run: null };
+    if (f.td && gs < 4) { const st = nearestFreeStand(120); if (st) return { label: 'Park at gate ' + (st.gateName || ''), run: () => parkAtGate(st) }; }
+    if (onDepRunway() && f.tl < 0.6 && !f.td) return { label: 'Take off: brakes off, takeoff thrust', run: () => { f.parkBrake = false; if (f.flapIdx === 0) f.setFlaps(1); f.tl = 1; f.ap.athr = false; f.spoilersArmed = true; toast('Takeoff thrust. At VR pull the left stick back gently.', 5000); } };
+    if (atcStep) return atcStep;
+    if (W.taxiR && W.taxiR.pts && !W.autoTaxi && gs < 30) return { label: 'Auto-taxi along the route', run: () => { W.autoTaxi = { pts: W.taxiR.pts.slice(1), i: 0, speed: 9 }; toast('Auto-taxi engaged'); } };
+    if (f.parkBrake && gs < 1) return { label: 'Release the parking brake', run: () => { f.parkBrake = false; toast('Parking brake released'); } };
+    return null;
+  }
+  if (f.gearDown && vs > 400 && agl > 50 && agl < 4000) return { label: 'Gear up', run: () => { f.setGear(false); } };
+  if (f.flapIdx > 0 && vs > 300 && agl > 1000 && f.ias > 185) return { label: 'Flaps ' + FLAPS[f.flapIdx - 1].name, run: () => { f.setFlaps(f.flapIdx - 1); toast('Flaps ' + FLAPS[f.flapIdx].name); } };
+  if (!f.ap.on && agl > 1200 && vs > -800) return { label: 'Autopilot on', run: () => { f.ap.hdg = Math.round(f.euler().hdg); if (!f.ap.alt || Math.abs(f.ap.alt - f.pos.y / FT) > 30000) f.ap.alt = Math.round(f.pos.y / FT / 100) * 100; toggleAP(); if (!f.ap.athr) { f.ap.athr = true; f.ap.spd = f.ap.spd || Math.round(f.ias); } } };
+  if (W.ils) {
+    const d = ilsDeviation(W.ils, f.pos), nm = d.thrDist / NM;
+    if (nm > 0 && nm < 30 && W.ils !== W.depIls || (W.cfg?.start === 'final' && nm > 0)) {
+      if (f.ap.on && !(f.ap.appr || f.ap.lat === 'LOC')) return { label: 'Arm the ILS approach', run: () => armAppr() };
+      if (nm < 15 && f.flapIdx < 4 && f.ias < FLAPS[f.flapIdx + 1].vfe - 6) return { label: 'Flaps ' + FLAPS[f.flapIdx + 1].name, run: () => { f.setFlaps(f.flapIdx + 1); toast('Flaps ' + FLAPS[f.flapIdx].name); } };
+      if (nm < 9 && !f.gearDown) return { label: 'Gear down', run: () => f.setGear(true) };
+      if (nm < 12 && !f.spoilersArmed) return { label: 'Arm ground spoilers', run: () => { f.spoilersArmed = true; toast('Ground spoilers armed'); } };
+      if (nm < 12 && !f.autobrake) return { label: 'Autobrake MED', run: () => { f.autobrake = 2; toast('Autobrake MED'); } };
+    }
+  }
+  return atcStep;
+}
+function doNextStep() { const s = nextStep(); if (s && s.run) { audio.start(); s.run(); } }
+function togglePadHelp() { padHelpOn = !padHelpOn; padHelpUntil = 0; updatePadHUD(true); }
+let padHudT = 0;
+function updatePadHUD(force) {
+  padHudT += 1; if (!force && padHudT % 8) return;
+  const nx = $('#padNext'), hp = $('#padHelp'); if (!nx || !hp) return; const act = pad.gp && pad.active && W.started && !W.menuMode;
+  let label = null; if (act && !padUIActive) { if (W.onFoot) { const p = foot.prompt || ''; label = /^E\s+/.test(p) ? p.replace(/^E\s+/, '') : null; } else { const s = nextStep(); label = s ? s.label : null; } }
+  const html = label ? glyph(pad.phys('next')) + ' ' + esc(label) : ''; if (nx._h !== html) { nx._h = html; nx.innerHTML = html; nx.hidden = !html; }
+  const show = act && (padHelpOn || padT() < padHelpUntil); const ctx = !show ? '' : padUIActive ? 'panel' : W.onFoot ? 'foot' : 'fly';
+  if (hp._c !== ctx + (label || '')) { hp._c = ctx + (label || ''); hp.hidden = !show; if (show) hp.innerHTML = padHelpHTML(ctx, label); }
+  const pp = $('#parkPrompt'); if (pp && act && !pp.hidden) pp.hidden = true;
+}
+function padT() { return pad.t; }
+function padHelpHTML(ctx, label) {
+  const g = glyph, P = k => g(pad.phys(k)), row = (k, t) => `<div><span>${k}</span><span>${t}</span></div>`;
+  if (ctx === 'panel') return `<b>Controller</b>${row(g('↑') + g('↓') + ' / ' + g('LS'), 'Choose')}${row(g('A'), 'Select')}${row(g('B'), 'Close / back')}${paOpen ? row(g('X'), 'Seat belt sign') + row(g('Y'), 'Language') : ''}`;
+  if (ctx === 'foot') return `<b>Controller · on foot</b>${row(g('LS'), 'Walk')}${row(g('RS'), 'Look')}${row(g('RT'), 'Run')}${row(g('A'), label || 'Interact')}${row(g('Y'), 'Skip ahead')}${row(g('X'), 'Cabin PA')}${row(g('Menu'), 'Pause')}`;
+  return `<b>Controller · ${({ easy: 'Easy', normal: 'Normal', realistic: 'Realistic' })[settings.padAssist || 'easy']} assist</b>${row(g('LS'), fdm.onGround ? 'Fly / steer on the ground' : 'Fly (let go: holds attitude)')}${row(g('RS'), 'Look around · press to recentre')}${row(g('RT') + g('LT'), 'Thrust up / down (LT on landing roll: reverse)')}${row(P('next'), label || 'Next step')}${row(P('brake'), 'Brakes (hold)')}${row(P('atc'), 'ATC radio menu')}${row(P('pa'), 'Cabin PA menu')}${row(P('flapsUp') + P('flapsDown'), 'Flaps up / down')}${row('hold ' + P('flapsUp') + ' +', P('next') + ' gear ' + P('atc') + ' autopilot ' + P('brake') + ' spoilers ' + P('pa') + ' lights')}${row(g('↑') + g('↓') + g('←') + g('→'), 'Flight deck · chase · views')}${row(g('View'), 'Camera · hold for this help')}${row(g('Menu'), 'Pause')}`;
+}
+function padRumble(dt) {
+  if (!pad.gp || !pad.cfg.rumble || W.menuMode || W.paused || W.onFoot) return; rumT -= dt; if (rumT > 0) return; rumT = 0.12;
+  const gs = Math.hypot(fdm.vel.x, fdm.vel.z) / KT; let strong = 0, weak = 0;
+  if (fdm.onGround && gs > 5) { weak = Math.min(0.35, gs / 300) * (0.6 + Math.random() * 0.4); if (Math.random() < gs / 1500) strong = 0.22; }
+  if (fdm.stall > 0.25 && !fdm.onGround) { strong = Math.max(strong, 0.5); weak = 0.9; }
+  for (const e of sys.eng) if (e.st === 'start') weak = Math.max(weak, 0.1 + 0.15 * Math.random());
+  if (strong || weak) pad.rumble(strong, weak, 150);
+}
+// controller settings: remap a button by pressing it
+function assignPad(action, btn) {
+  const map = Object.assign({}, pad.cfg.map); const old = pad.phys(action);
+  for (const k in ACTIONS) if (k !== action && pad.phys(k) === btn) map[k] = old;
+  map[action] = btn; pad.cfg.map = map; settings.padMap = map; store.set('settings', settings); W.padCapture = null; renderPadMap(); toast(ACTIONS[action][0] + ': ' + btnName(btn));
+}
+function renderPadMap() {
+  const el = $('#padMap'); if (!el) return;
+  el.innerHTML = Object.keys(ACTIONS).map(k => `<div class="pmrow"><span>${ACTIONS[k][0]}</span><span>${W.padCapture === k ? '<i>press a button…</i>' : glyph(pad.phys(k))}</span><button class="go ghost" data-k="${k}">${W.padCapture === k ? 'Cancel' : 'Change'}</button></div>`).join('') + '<div class="pmrow"><span></span><span></span><button class="go ghost" id="padMapReset">Reset</button></div>';
+  el.querySelectorAll('button[data-k]').forEach(b => b.onclick = () => { W.padCapture = W.padCapture === b.dataset.k ? null : b.dataset.k; renderPadMap(); });
+  $('#padMapReset').onclick = () => { pad.cfg.map = {}; settings.padMap = {}; store.set('settings', settings); W.padCapture = null; renderPadMap(); };
+}
 function pollInput(dt) {
   const inv = settings.invert === '1' ? -1 : 1;
   let tp = 0, tr = 0, ty = 0;
@@ -524,20 +661,11 @@ function pollInput(dt) {
   if (keys.ArrowLeft || keys.KeyA) tr -= 1; if (keys.ArrowRight || keys.KeyD) tr += 1;
   if (keys.KeyQ) ty -= 1; if (keys.KeyE) ty += 1;
   if (mouseYoke) { const s = settings.mouseSens; const dz = v => Math.abs(v) < 0.04 ? 0 : (v - Math.sign(v) * 0.04) / 0.96; tr = THREE.MathUtils.clamp(dz(mouse.x) * 1.6 * s, -1, 1); tp = THREE.MathUtils.clamp(dz(mouse.y) * 1.6 * s, -1, 1) * inv; }
-  // gamepad (Xbox / standard layout): left stick flies, right stick looks (R3 recentres), triggers thrust, bumpers rudder
-  const gp = pad.poll(dt);
-  if (gp && W.onFoot) { if (pad.down(BTN.A)) footInteract(); if (pad.down(BTN.Y)) footSkip(); if (pad.down(BTN.MENU)) togglePause(); }
-  else if (gp) {
-    const a = pad.axes, pinv = settings.padInvert === '1' ? -1 : 1;
-    if (a[0] || a[1]) { tr = a[0]; tp = a[1] * pinv; }
-    if (pad.held(BTN.LB)) ty = -1; if (pad.held(BTN.RB)) ty = 1;
-    const rt = pad.val[BTN.RT], lt = pad.val[BTN.LT];
-    if (rt > 0.06 || lt > 0.06) { fdm.tl = THREE.MathUtils.clamp(fdm.tl + (rt * 0.5 - lt * 0.6) * dt, 0, 1); if (fdm.ap.athr) { fdm.ap.athr = false; toast('A/THR off (manual thrust)'); } }
-    padLook(dt, a[2], a[3]); if (pad.down(BTN.RS)) padRecentre();
-    if (pad.down(BTN.A)) { if (fdm.onGround && !(fdm.engRun[0] && fdm.engRun[1])) startEngines(); else { fdm.setGear(!fdm.gearDown); if (fdm.onGround && !fdm.gearDown) { fdm.setGear(true); toast('Gear cannot retract on the ground'); } } }
-    if (pad.down(BTN.X)) { fdm.setFlaps(fdm.flapIdx + 1); toast('Flaps ' + FLAPS[fdm.flapIdx].name); } if (pad.down(BTN.Y)) { fdm.setFlaps(fdm.flapIdx - 1); toast('Flaps ' + FLAPS[fdm.flapIdx].name); }
-    if (pad.down(BTN.MENU)) togglePause(); if (pad.down(BTN.VIEW)) setView(VIEWS[(VIEWS.indexOf(W.view) + 1) % VIEWS.length]);
-  }
+  // gamepad: flying layout in padFlight(); menus / panels are handled by padUI() (see the controller section)
+  const gp = padPoll(dt);
+  if (gp && W.onFoot) { if (!padUIActive) { if (pad.down(BTN.A)) footInteract(); if (pad.down(BTN.Y)) footSkip(); if (pad.down(BTN.X)) togglePA(true); if (pad.down(BTN.MENU)) togglePause(); if (pad.long(BTN.VIEW)) togglePadHelp(); } }
+  else if (gp && !padUIActive) { const r = padFlight(dt); if (r.fly) { tr = r.tr; tp = r.tp; } if (r.ty) ty = r.ty; }
+  fdm.assist = pad.active ? (settings.padAssist || 'easy') : 'normal';
   if (testInput) { tp = testInput.pitch ?? tp; tr = testInput.roll ?? tr; ty = testInput.yaw ?? ty; }
   const ramp = (cur, tgt, r) => cur + THREE.MathUtils.clamp(tgt - cur, -r * dt, r * dt);
   inp.pitch = ramp(inp.pitch, tp, tp ? 2.2 : 4); inp.roll = ramp(inp.roll, tr, tr ? 3 : 5); inp.yaw = ramp(inp.yaw, ty, 3);
@@ -548,7 +676,7 @@ function pollInput(dt) {
   if (up && !keys.KeyZ) { fdm.tl = Math.min(1, fdm.tl + dt * 0.45); if (fdm.ap.athr) { fdm.ap.athr = false; toast('A/THR off (manual thrust)'); } }
   if (dn) { fdm.tl = Math.max(0, fdm.tl - dt * 0.55); if (fdm.ap.athr) { fdm.ap.athr = false; toast('A/THR off (manual thrust)'); } }
   // wheel brakes: held = on, released = off (keyboard B or pad B)
-  const brakeIn = !!keys.KeyB || (!!gp && !W.onFoot && pad.held(pad.phys('brake')));
+  const brakeIn = !!keys.KeyB || (!!gp && !W.onFoot && !padUIActive && pad.held(pad.phys('brake')) && !pad.held(pad.phys('flapsUp')));
   if (brakeIn && fdm.autobrake && fdm.onGround) { fdm.autobrake = 0; toast('Autobrake disarmed'); }
   if (!fdm.autobrake) fdm.brake = THREE.MathUtils.clamp(fdm.brake + (brakeIn ? 3 : -4) * dt, 0, 1);
   if (keys.BracketLeft) fdm.trim = Math.max(-4, fdm.trim - dt * 0.8); if (keys.BracketRight) fdm.trim = Math.min(13, fdm.trim + dt * 0.8);
@@ -714,8 +842,8 @@ function autoConfig(dt) {
 function handleEvents() {
   for (const ev of fdm.events) {
     switch (ev.t) {
-      case 'gear': audio.gearClunk(); toast('Gear ' + (ev.v ? 'down' : 'up')); break;
-      case 'touchdown': audio.touchdown(ev.v); onTouchdown(); break;
+      case 'gear': audio.gearClunk(); toast('Gear ' + (ev.v ? 'down' : 'up')); pad.rumble(0.25, 0.15, 120); break;
+      case 'touchdown': audio.touchdown(ev.v); onTouchdown(); { const k = Math.min(1, Math.abs(ev.v) / 3); pad.rumble(0.3 + 0.7 * k, 0.6, 260); } break;
       case 'call': audio.call(ev.v); callout(ev.v); break;
       case 'retard': audio.call('RETARD'); callout('RETARD'); break;
       case 'apoff': audio.apOff(); toast('Autopilot disconnected' + (ev.v === 'rollout complete' ? '' : '')); break;
@@ -776,9 +904,10 @@ function frame(now) {
   const dt = Math.min(0.25, (now - last) / 1000); last = now; frameMs = frameMs * 0.9 + dt * 1000 * 0.1;
   fpsAcc += dt; fpsN++; if (fpsAcc > 1) { fps = Math.round(fpsN / fpsAcc); fpsAcc = 0; fpsN = 0; }
   if (!W.started) return;
-  if (!W.menuMode) pollInput(dt); else { pad.poll(dt); fdm.in.pitch = fdm.in.roll = fdm.in.yaw = 0; }
+  padTick++; padPoll(dt); padUI(dt);
+  if (!W.menuMode) pollInput(dt); else { fdm.in.pitch = fdm.in.roll = fdm.in.yaw = 0; }
   simulate(dt);
-  renderFrame(dt); updateEngStart();
+  renderFrame(dt); updateEngStart(); updatePadHUD(); padRumble(dt);
   // dynamic resolution
   if (settings.res === 'auto' && !W.menuMode) { dynT += dt; if (dynT > 2) { dynT = 0; const old = renderScale; if (frameMs > 20 && renderScale > 0.55) renderScale *= 0.88; else if (frameMs < 13 && renderScale < 1) renderScale = Math.min(1, renderScale * 1.08); if (old !== renderScale) applyRes(); } }
 }
@@ -974,7 +1103,7 @@ const AUTOSTART = [
   ['APU bleed on', () => { sys.sw.apuBleed = true; return true; }],
   ['Beacon on', () => { sys.sw.beacon = true; sys.sw.nav = true; return true; }],
   ['Engine mode IGN / START', () => { sys.sw.engMode = 'IGN'; return true; }],
-  ['Starting engine 2', () => { sys.sw.master2 = true; return fdm.engRun[1]; }],
+  ['Starting engine 2', () => { sys.sw.master2 = true; return fdm.engRun[1] || fdm.n2[1] > 50; }], // engine 1 follows once engine 2 is past 50 % N2
   ['Starting engine 1', () => { sys.sw.master1 = true; return fdm.engRun[0]; }],
   ['Engine mode NORM, APU bleed off', () => { sys.sw.engMode = 'NORM'; sys.sw.apuBleed = false; sys.sw.extPwr = false; return true; }],
 ];
@@ -1058,8 +1187,9 @@ function buildMenu() {
     el.onclick = () => { audio.start(); go({ apt: A, end: r.end, start: 'route', route: r, tod: r.tod, wx: r.wx, windFrom: 60, windKt: 8, mode: 'route', toApt: B }); }; rl.appendChild(el); }
   // settings
   const setSeg = (id, key) => { $$(`#${id} button`).forEach(b => { b.setAttribute('aria-pressed', String(settings[key]) === b.dataset.v); b.onclick = () => { $$(`#${id} button`).forEach(x => x.setAttribute('aria-pressed', x === b)); settings[key] = b.dataset.v; store.set('settings', settings); applySettings(key); }; }); };
-  setSeg('qSeg', 'quality'); setSeg('resSeg', 'res'); setSeg('unitSeg', 'units'); setSeg('lawSeg', 'law'); setSeg('invSeg', 'invert');
-  for (const [id, key] of [['mouseSens', 'mouseSens'], ['vol', 'vol']]) { const el = $('#' + id); el.value = settings[key]; el.oninput = () => { settings[key] = +el.value; store.set('settings', settings); applySettings(key); }; }
+  setSeg('qSeg', 'quality'); setSeg('resSeg', 'res'); setSeg('unitSeg', 'units'); setSeg('lawSeg', 'law'); setSeg('invSeg', 'invert'); setSeg('padAssistSeg', 'padAssist'); setSeg('padInvSeg', 'padInvert');
+  renderPadMap(); $('#padRumble').checked = settings.padRumble !== false; $('#padRumble').onchange = () => { settings.padRumble = $('#padRumble').checked; pad.cfg.rumble = settings.padRumble; store.set('settings', settings); if (pad.cfg.rumble) pad.rumble(0.4, 0.4, 200); };
+  for (const [id, key] of [['mouseSens', 'mouseSens'], ['vol', 'vol'], ['padSens', 'padSens'], ['padDz', 'padDz']]) { const el = $('#' + id); el.value = settings[key]; el.oninput = () => { settings[key] = +el.value; store.set('settings', settings); applySettings(key); }; }
   for (const [id, key] of [['voice', 'voice'], ['hudOn', 'hud']]) { const el = $('#' + id); el.checked = settings[key]; el.onchange = () => { settings[key] = el.checked; store.set('settings', settings); applySettings(key); }; }
   const fillVoices = () => { const vs = (atc.allVoices || []).filter(v => /^(en|es|ko)/i.test(v.lang)); for (const [id, key] of [['vCtl', 'controller'], ['vPilot', 'pilot']]) { const el = $('#' + id); const cur = settings['voice_' + key] || 'auto'; el.innerHTML = `<option value="auto">Auto (most natural available)</option>` + vs.map(v => `<option value="${v.name.replace(/"/g, '&quot;')}">${v.name} · ${v.lang}</option>`).join(''); el.value = vs.some(v => v.name === cur) ? cur : 'auto'; atc.voicePref[key] = el.value; el.onchange = () => { settings['voice_' + key] = el.value; atc.voicePref[key] = el.value; store.set('settings', settings); }; } };
   fillVoices(); atc.on((a, why) => { if (why === 'voices') fillVoices(); });
@@ -1080,6 +1210,7 @@ function buildMenu() {
   selectAirport(World.byIcao.get('KTPA'), true);
 }
 function applySettings(key) {
+  if (key === 'padSens') pad.cfg.sens = settings.padSens; if (key === 'padDz') pad.cfg.dz = settings.padDz;
   if (key === 'vol') audio.setVolume(settings.vol); if (key === 'voice') audio.voice = settings.voice; if (key === 'law') fdm.law = settings.law;
   if (key === 'res') applyRes();
   if (key === 'quality') { toast('Graphics quality applies on reload'); location.hash = ''; setTimeout(() => location.reload(), 600); }
@@ -1151,8 +1282,8 @@ const KEYS = [['W S / ↑ ↓', 'Pitch (↑ nose down)'], ['A D / ← →', 'Rol
   ['Z', 'Autopilot on / off'], ['Shift Z', 'Autothrust on / off'], ['O', 'Arm ILS approach (LOC + G/S)'], ['L', 'Landing lights'], ['C / 1–7', 'Camera: deck, chase, orbit, tower, runway, fly-by, cabin'], ['8 / 9 / 0', 'Flight deck only: look at pedestal / overhead / side window (again: ahead)'], ['Mouse on the deck', 'Hover a switch for its name, click to operate, scroll on knobs'],
   ['Mouse drag', 'Look / orbit camera'], ['Wheel', 'Zoom'], ['M', 'Mouse yoke'], ['N', 'Navigation display overlay'], ['H', 'HUD'], ['. ,', 'Time acceleration'], ['P / Esc', 'Pause / menu'], ['?', 'This help'],
   ['On foot', 'WASD walk, Shift run, mouse look, E interact, J skip ahead, Y PA'],
-  ['Xbox controller', 'Left stick flies, right stick looks (R3 recentres), RT / LT thrust, B brakes (hold), A start engines / gear, X / Y flaps, LB / RB rudder, View camera, Menu pause'],
-  ['Controller on foot', 'Left stick walks, right stick looks, RT run, A interact, Y skip ahead']];
+  ['Xbox controller', 'Left stick flies (Easy assist: let go and it levels) and steers on the ground; right stick looks, R3 recentres; RT / LT thrust (LT on the landing roll: reverse); A next step (shown on screen); B brakes (hold); X ATC menu; Y PA menu; LB / RB flaps up / down; hold LB + A gear, + X autopilot, + B spoilers, + Y lights; D-pad views; View camera, hold View for help; Menu pause'],
+  ['Controller in menus', 'D-pad or left stick moves, A selects, B backs out'], ['Controller on foot', 'Left stick walks, right stick looks, RT run, A interact, Y skip ahead, X cabin PA']];
 
 // ---------------------------------------------------------------- test hooks
 window.__sim = {
@@ -1160,7 +1291,7 @@ window.__sim = {
   state() { const e = fdm.euler(); return { view: W.view, mode: W.mode, apt: W.apt?.icao, end: W.end?.ident, x: fdm.pos.x, y: fdm.pos.y, z: fdm.pos.z, altFt: fdm.pos.y / FT, raFt: fdm.ra / FT, ias: fdm.ias, gs: Math.hypot(fdm.vel.x, fdm.vel.z) / KT, vsFpm: fdm.vel.y / FT * 60, ...e, onGround: fdm.onGround, gearDown: fdm.gearDown, gearPos: fdm.gearPos, flaps: fdm.flapIdx, flapPos: fdm.flapPos, tl: fdm.tl, n1: fdm.n1.slice(), ap: { on: fdm.ap.on, athr: fdm.ap.athr, lat: fdm.ap.lat, vert: fdm.ap.vert, spd: fdm.ap.spd }, crashed: fdm.crashed, td: fdm.td && { vs: fdm.td.vs, ias: fdm.td.ias }, score: lastScore, simTime: W.simTime, tod: W.tod, wx: W.wx, sunElev: sky.sunElev, fps, renderScale, built: W.built.map(b => b.icao + (b.full ? '*' : '')), cityCount: city.count || 0, lightsCount: W.primary?.b.lightsCount, alpha: fdm.alpha * R2D, stall: fdm.stall, parkBrake: fdm.parkBrake }; },
   search: q => search(q).map(a => ({ icao: a.icao, iata: a.iata, name: a.name, runways: a.runways.length })),
   async start(cfg) { const A = World.byIcao.get(cfg.icao); $('#menu').hidden = true; $('#flight').hidden = false; W.menuMode = false; W.paused = false; if (cfg.route) { const r = ROUTES.find(r => r.title === cfg.route); r.toApt = World.byIcao.get(r.to); cfg = { ...cfg, route: r, toApt: r.toApt, start: 'route', mode: 'route', end: r.end }; } await startFlight({ ...cfg, apt: A }); return this.state(); },
-  advance(sec, input) { testInput = input || null; const n = Math.round(sec / (1 / 60)); for (let i = 0; i < n; i++) { if (!W.menuMode) pollInput(1 / 60); simulate(1 / 60); } testInput = null; return this.state(); },
+  advance(sec, input) { testInput = input || null; const n = Math.round(sec / (1 / 60)); for (let i = 0; i < n; i++) { padTick++; padPoll(1 / 60); padUI(1 / 60); if (!W.menuMode) pollInput(1 / 60); simulate(1 / 60); } testInput = null; return this.state(); },
   set(o) { if (o.tl != null) fdm.tl = o.tl; if (o.parkBrake != null) fdm.parkBrake = o.parkBrake; if (o.flaps != null) fdm.setFlaps(o.flaps); if (o.gear != null) fdm.setGear(o.gear); if (o.ap != null) { if (o.ap !== fdm.ap.on) toggleAP(); } if (o.athr != null) fdm.ap.athr = o.athr; if (o.spd != null) fdm.ap.spd = o.spd; if (o.alt != null) fdm.ap.alt = o.alt; if (o.hdg != null) fdm.ap.hdg = o.hdg; return this.state(); },
   key(code, shift) { dispatchEvent(new KeyboardEvent('keydown', { code, key: code, shiftKey: !!shift })); dispatchEvent(new KeyboardEvent('keyup', { code, key: code })); },
   view(v) { setView(v); renderFrame(0.016); return W.view; },
@@ -1176,7 +1307,7 @@ window.__sim = {
   interact() { footInteract(); return this.footState(); },
   radio(v) { toggleRadio(v); return atc.options().map(o => o.id); },
   say(id) { atc.choose(id); }, atcState() { return { phase: atc.phase, log: atc.log.map(l => (l.who === 'ME' ? 'ME: ' : l.fac + ': ') + l.text), opts: atc.options().map(o => o.id), errors: atc.errors, push: W.push && { done: W.push.done } }; },
-  traffic, sys, speech, startEngines,
+  traffic, sys, speech, startEngines, padHud() { updatePadHUD(true); }, nextStep() { const s = nextStep(); return s && s.label; },
   deckLook(y, p, fov) { look.yaw = y; look.pitch = p; if (fov) look.fov = fov; look.target = null; }, deckLights(o) { Object.assign(sys.sw, o); },
   deckClick(id, dir) { const c = cockpit.userData.controls && cockpit.userData.controls.find(c => c.id === id); if (c) cockpit.userData.click(c, deckCtx(), dir || 1); return c ? cockpit.userData.desc(c, deckCtx()) : null; },
   deckInfo() { const ud = cockpit.userData; let tris = 0, calls = 0; cockpit.traverse(o => { if (o.isMesh && o.visible !== false) { calls++; const gg = o.geometry; tris += (gg.index ? gg.index.count : gg.attributes.position.count) / 3 * (o.isInstancedMesh ? o.count : 1); } }); return { controls: ud.controls ? ud.controls.length : 0, calls, tris: Math.round(tris), visible: cockpit.visible }; },

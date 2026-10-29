@@ -30,7 +30,7 @@ export class Pad {
     this.gp = gp; this.prev = this.now.slice();
     if (!gp) { this.now.fill(false); this.val.fill(0); this.axes = [0, 0, 0, 0]; return null; }
     let any = false;
-    for (let i = 0; i < 17; i++) { const b = gp.buttons[i]; const v = b == null ? 0 : typeof b === 'object' ? (b.value || (b.pressed ? 1 : 0)) : +b; this.val[i] = v; const p = !!(b && (b.pressed || v > 0.5)); this.now[i] = p; if (p && !this.prev[i]) this.pressT[i] = this.t; if (i === 6 || i === 7 ? v > 0.08 : p) any = true; }
+    for (let i = 0; i < 17; i++) { const b = gp.buttons[i]; const v = b == null ? 0 : typeof b === 'object' ? (b.value || (b.pressed ? 1 : 0)) : +b; this.val[i] = v; const p = !!(b && (b.pressed || v > 0.5)); this.now[i] = p; if (p && !this.prev[i]) { this.pressT[i] = this.t; this.used[i] = false; } if (i === 6 || i === 7 ? v > 0.08 : p) any = true; }
     for (const [a, b] of [[0, 1], [2, 3]]) {
       const x = gp.axes[a] || 0, y = gp.axes[b] || 0; this.raw[a] = x; this.raw[b] = y; const m = Math.hypot(x, y);
       if (m < this.cfg.dz) { this.axes[a] = this.axes[b] = 0; continue; } any = true;

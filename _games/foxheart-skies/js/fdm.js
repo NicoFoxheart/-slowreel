@@ -226,14 +226,18 @@ export class FDM {
       else this.ih += (0 - this.ih) * dt * 0.2;
     } else {
       if (qCmd == null) {
-        if (Math.abs(pIn) > 0.04) { qCmd = pIn * 0.105; this.gammaHold = null; }
+        const easy = this.assist === 'easy';
+        if (Math.abs(pIn) > 0.04) { qCmd = pIn * (easy ? 0.07 : 0.105); this.gammaHold = null; }
         else { if (this.gammaHold == null) this.gammaHold = gamma; qCmd = 0.55 * (this.gammaHold - gamma); }
         qCmd += (G / Math.max(V, 40)) * Math.tan(phi) * Math.sin(phi) * (Math.abs(phi) < 0.6 ? 1 : 0.4);
+        // easy: soft pitch-attitude envelope (+18 / -10 deg)
+        if (easy) { if (theta > 18 * D2R) qCmd = Math.min(qCmd, 0.8 * (18 * D2R - theta)); if (theta < -10 * D2R) qCmd = Math.max(qCmd, 0.8 * (-10 * D2R - theta)); }
         // alpha protection
-        const aProt = (this.interp('aS', this.flapPos) - 2.0) * D2R;
+        const aProt = (this.interp('aS', this.flapPos) - (easy ? 3.5 : 2.0)) * D2R;
         if (alpha > aProt) qCmd = Math.min(qCmd, -0.9 * (alpha - aProt));
-        // high-speed protection
+        // high-speed protection (and flap-limit speed protection in easy)
         if (this._ias > 345) qCmd = Math.max(qCmd, (this._ias - 345) * 0.004);
+        if (easy && this.flapIdx > 0 && this._ias > sp.vfe + 3) qCmd = Math.max(qCmd, (this._ias - sp.vfe - 3) * 0.004);
       }
       const err = qCmd - pitchRate;
       const Kp = clamp(14000 / qs, 0.6, 9), Ki = Kp * 1.3;
@@ -249,7 +253,11 @@ export class FDM {
     if (this.law === 'direct' || (!air && pCmd == null)) { this.da = rIn * 20 * D2R; this.phiHold = phi; }
     else {
       if (pCmd == null) {
-        if (Math.abs(rIn) > 0.04) { pCmd = rIn * 15 * D2R; this.phiHold = phi; }
+        if (this.assist === 'easy') { // attitude command: the stick sets the bank (max 30 deg); let go and the wings come gently level
+          if (Math.abs(rIn) > 0.04) this.phiHold = rIn * 30 * D2R; else this.phiHold -= clamp(this.phiHold, -4 * D2R * dt, 4 * D2R * dt);
+          pCmd = clamp(1.1 * (this.phiHold - phi), -0.18, 0.18);
+        } else if (Math.abs(rIn) > 0.04) { pCmd = rIn * 15 * D2R; this.phiHold = phi; }
+        else if (this.assist === 'realistic') { pCmd = clamp(0.9 * (this.phiHold - phi), -0.15, 0.15); }
         else { let tgt = this.phiHold; if (Math.abs(phi) > 33 * D2R) tgt = Math.sign(phi) * 33 * D2R; if (Math.abs(phi) < 1.5 * D2R && Math.abs(this.phiHold) < 1.5 * D2R) tgt = 0; this.phiHold = tgt; pCmd = clamp(0.9 * (tgt - phi), -0.15, 0.15); }
         if (Math.abs(phi) > 67 * D2R) pCmd = Math.min(Math.abs(pCmd), 0) * Math.sign(phi) - Math.sign(phi) * 0.1;
       }

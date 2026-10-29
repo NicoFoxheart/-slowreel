@@ -212,6 +212,13 @@ kbd{font:11px var(--f-mono);padding:2px 6px;border-radius:4px;border:1px solid v
 .palog{max-height:120px;font-family:var(--f-body),"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif}.palog .rl b{color:var(--fox2)}.palog .note{color:var(--amber);font-size:11px}
 .fcub.pab{color:var(--fox2)}.fcub.pab i{background:var(--fox2)}
 .padhint{font:11px var(--f-mono);color:var(--mute);padding:7px 9px;border:1px dashed var(--line2);border-radius:8px;margin-bottom:10px}
+.gb{display:inline-grid;place-items:center;min-width:19px;height:19px;padding:0 4px;box-sizing:border-box;border-radius:10px;font:700 10px/1 var(--f-mono);color:#0b0d11;vertical-align:-4px;margin:0 1px}
+.gA{background:#6cc04a}.gB{background:#e2483d;color:#fff}.gX{background:#3b8fe6;color:#fff}.gY{background:#f4c430}.gS{background:transparent;border:1.5px solid #dfe5ec;color:#eef2f6;border-radius:5px}.gK{background:rgba(255,255,255,.16);color:#eef2f6}
+.padfocus{outline:2px solid var(--fox)!important;outline-offset:2px;box-shadow:0 0 0 4px rgba(242,154,76,.25)!important}
+#padNext{position:fixed;left:50%;top:84px;transform:translateX(-50%);z-index:6;padding:7px 14px;font:13px var(--f-mono);color:var(--ink);pointer-events:none}
+#padHelp{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:118px;z-index:6;width:min(380px,90vw);padding:10px 12px;display:grid;gap:4px;font:12px var(--f-body);pointer-events:none;background:rgba(10,13,18,.86)}
+#padHelp b{font:700 11px var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--mute);margin-bottom:4px}#padHelp div{display:grid;grid-template-columns:118px 1fr;gap:8px;align-items:center}
+.padmap{display:grid;gap:4px}.pmrow{display:grid;grid-template-columns:1fr 70px auto;gap:8px;align-items:center;font-size:12px}.pmrow .go{padding:4px 10px;font-size:12px}.pmrow i{font:11px var(--f-mono);color:var(--fox2)}
 .padhint.on{color:var(--green);border-style:solid;border-color:rgba(85,224,143,.35)}
 #ckTip{position:fixed;z-index:7;pointer-events:none;padding:5px 9px;border-radius:6px;background:rgba(10,12,16,.88);border:1px solid var(--line2);font:12px var(--f-mono);color:var(--ink);opacity:0;transition:opacity .15s;white-space:nowrap}
 #coldList{position:absolute;left:max(16px,env(safe-area-inset-left,0px));top:110px;width:min(330px,80vw);padding:10px 12px;display:grid;gap:8px;pointer-events:auto;background:rgba(14,18,24,.88)}
@@ -335,6 +342,14 @@ kbd{font:11px var(--f-mono);padding:2px 6px;border-radius:4px;border:1px solid v
           <small style="color:var(--mute)">For the most natural ATC voices, play in Microsoft Edge: its “Online (Natural)” voices are picked automatically. Chrome uses its Google voices.</small></div>
         <label class="toggle"><input type="checkbox" id="chatterOn" checked> Background radio chatter from other aircraft</label>
         <label class="toggle"><input type="checkbox" id="hudOn" checked> Clean HUD in external views</label>
+        <div class="field padset"><span class="lab">Controller (Xbox / gamepad)</span><div class="padhint">Using an Xbox controller? Press any button on it to connect it.</div>
+          <span class="lab">Assist</span><div class="seg" id="padAssistSeg"><button data-v="easy">Easy</button><button data-v="normal">Normal</button><button data-v="realistic">Realistic</button></div>
+          <small style="color:var(--mute)">Easy: the stick sets bank and pitch, let go and the aircraft levels its wings; bank limit 30°, stall and overspeed protection. Normal: fly-by-wire. Realistic: full envelope.</small>
+          <label for="padSens">Stick sensitivity</label><input type="range" id="padSens" min="0.5" max="1.5" step="0.05" value="1">
+          <label for="padDz">Stick dead zone</label><input type="range" id="padDz" min="0.05" max="0.3" step="0.01" value="0.15">
+          <div class="seg" id="padInvSeg"><button data-v="0">Stick forward = nose down</button><button data-v="1">Stick forward = nose up</button></div>
+          <label class="toggle"><input type="checkbox" id="padRumble" checked> Vibration (touchdown, runway, stall, engine start)</label>
+          <span class="lab">Buttons</span><div id="padMap" class="padmap"></div></div>
       </div></div>
     </section>
     <section class="sec" data-sec="controls" hidden>
@@ -395,6 +410,8 @@ kbd{font:11px var(--f-mono);padding:2px 6px;border-radius:4px;border:1px solid v
 </div>
 
 <div id="subs" aria-live="polite"></div>
+<div id="padNext" class="glass" hidden></div>
+<div id="padHelp" class="glass" hidden></div>
 <div id="paLive" hidden><i></i>PA LIVE</div>
 <div id="engStart" hidden><button class="go" id="engStartBtn">Start engines</button><small>Automatic start sequence</small></div>
 <div id="pa" class="glass" hidden>

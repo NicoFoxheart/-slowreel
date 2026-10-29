@@ -66,9 +66,9 @@ export class Systems {
       if (e.st === 'start') {
         const n2 = fdm.n2[i];
         if (!this.bleedAvail && n2 < 50) { e.st = 'wait'; continue; }
-        if (n2 < 16) { fdm.n2[i] += dt * 1.5; fdm.n1[i] += (n2 * 0.12 - fdm.n1[i]) * Math.min(1, dt); }
-        else if (n2 < 50) { fdm.n2[i] += dt * 1.35; fdm.n1[i] += (n2 * 0.33 - fdm.n1[i]) * Math.min(1, dt * 0.8); fdm.egt[i] += (Math.min(690, 200 + (n2 - 16) * 18) - fdm.egt[i]) * Math.min(1, dt * 0.9); }
-        else { fdm.n2[i] += (58.6 - n2) * Math.min(1, dt * 0.35) + dt * 0.25; fdm.n1[i] += (20.5 - fdm.n1[i]) * Math.min(1, dt * 0.4); fdm.egt[i] += (470 - fdm.egt[i]) * Math.min(1, dt * 0.25); }
+        if (n2 < 16) { fdm.n2[i] += dt * 2.2; fdm.n1[i] += (n2 * 0.12 - fdm.n1[i]) * Math.min(1, dt); }
+        else if (n2 < 50) { fdm.n2[i] += dt * 2.0; fdm.n1[i] += (n2 * 0.33 - fdm.n1[i]) * Math.min(1, dt * 0.8); fdm.egt[i] += (Math.min(690, 200 + (n2 - 16) * 18) - fdm.egt[i]) * Math.min(1, dt * 0.9); }
+        else { fdm.n2[i] += (58.6 - n2) * Math.min(1, dt * 0.5) + dt * 0.35; fdm.n1[i] += (20.5 - fdm.n1[i]) * Math.min(1, dt * 0.4); fdm.egt[i] += (470 - fdm.egt[i]) * Math.min(1, dt * 0.25); }
         e.msg = n2 < 16 ? 'START VALVE OPEN' : n2 < 50 ? 'IGNITION · FUEL ON' : 'STABILISING';
         if (fdm.n2[i] >= 57.8) { e.st = 'run'; fdm.engRun[i] = true; }
       }
