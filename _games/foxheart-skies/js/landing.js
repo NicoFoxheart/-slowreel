@@ -39,7 +39,7 @@ export class LandingAids {
     if (ils !== this.ils) this.setup(ils, ground); if (!ils) return;
     const col = this.papiPts.geometry.attributes.color;
     this.units.forEach((u, i) => { const d = Math.hypot(eye.x - u.x, eye.z - u.z); const ang = Math.atan2(eye.y - u.y, Math.max(d, 1)) * R2D; const white = ang > PAPI_SET[i]; this.papiState[i] = white ? 1 : 0; const c = white ? WHITE : RED; col.setXYZ(i, c.r, c.g, c.b); });
-    col.needsUpdate = true; this.papiPts.material.size = opts.px ? 9 * opts.px : 9;
+    col.needsUpdate = true; this.papiPts.material.size = 11 * (opts.px || 1);
     // boxes
     const on = !!opts.boxes; const dg = eye.clone().sub(ils.gpip); const dist = -(dg.x * ils.dir.x + dg.z * ils.dir.z); // metres before the aiming point
     const yaw = Math.atan2(-ils.dir.x, -ils.dir.z), tan3 = Math.tan(ils.gs * D2R);
