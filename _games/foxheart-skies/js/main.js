@@ -290,7 +290,10 @@ function takeSeat() {
 }
 function parkAtGate(st) {
   const b = W.primary; placeAtStand(b, st); W.parkedAt = st; W.standB = b; W.autoTaxi = null; showTaxi(null);
-  fdm.tl = 0; fdm.parkBrake = true; audio.chime(); foot.dispose(); disposeFlightCabin(); aircraft.position.copy(fdm.pos); aircraft.quaternion.copy(fdm.q); aircraft.updateMatrixWorld(true);
+  fdm.tl = 0; fdm.parkBrake = true; audio.chime(); foot.dispose(); disposeFlightCabin();
+  // shut down at the gate: APU on, engines off, beacon off; the purser welcomes everyone, then the seat belt sign goes off
+  Object.assign(sys.sw, { master1: false, master2: false, apuMaster: true, apuBleed: true, beacon: false }); sys.apuN = 100; sys.apuFlap = 1; W.autoStart = null;
+  setTimeout(() => { if (W.parkedAt === st) paSay('arrival'); }, 1500); setTimeout(() => { if (W.parkedAt === st) setSigns(false, W.signs.smoke); }, 9000); aircraft.position.copy(fdm.pos); aircraft.quaternion.copy(fdm.q); aircraft.updateMatrixWorld(true);
   foot.build({ mode: 'arr', apt: b.apt, b, stand: st, dest: W.cfg.apt, featured: featured() }); foot.hideInteriors(false);
   toast('Parked at gate ' + st.gateName + '. Press Enter to stand up and walk out with the passengers.', 6000);
 }
@@ -1307,7 +1310,10 @@ window.__sim = {
   interact() { footInteract(); return this.footState(); },
   radio(v) { toggleRadio(v); return atc.options().map(o => o.id); },
   say(id) { atc.choose(id); }, atcState() { return { phase: atc.phase, log: atc.log.map(l => (l.who === 'ME' ? 'ME: ' : l.fac + ': ') + l.text), opts: atc.options().map(o => o.id), errors: atc.errors, push: W.push && { done: W.push.done } }; },
-  traffic, sys, speech, startEngines, padHud() { updatePadHUD(true); }, nextStep() { const s = nextStep(); return s && s.label; },
+  traffic, sys, speech, startEngines, padHud() { updatePadHUD(true); },
+  pixel(fx = 0.5, fy = 0.5) { renderFrame(0.016); const gl = renderer.getContext(), c = renderer.domElement, px = new Uint8Array(4); gl.readPixels(Math.floor(c.width * fx), Math.floor(c.height * (1 - fy)), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); return [...px]; },
+  camInfo() { const d = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion); return { p: camera.position.toArray().map(v => +v.toFixed(1)), d: d.toArray().map(v => +v.toFixed(2)), near: camera.near, far: camera.far, fov: camera.fov, exp: +sky.exposure.toFixed(2), vis: { term: foot.parts?.term.group.visible, cabin: foot.parts?.cabin.group.visible } }; },
+  parkNear() { const st = nearestFreeStand(1e6); if (!st) return null; fdm.vel.set(0, 0, 0); parkAtGate(st); return st.gateName; }, enterArrival() { parkPromptAction(); return this.footState(); }, nextStep() { const s = nextStep(); return s && s.label; },
   deckLook(y, p, fov) { look.yaw = y; look.pitch = p; if (fov) look.fov = fov; look.target = null; }, deckLights(o) { Object.assign(sys.sw, o); },
   deckClick(id, dir) { const c = cockpit.userData.controls && cockpit.userData.controls.find(c => c.id === id); if (c) cockpit.userData.click(c, deckCtx(), dir || 1); return c ? cockpit.userData.desc(c, deckCtx()) : null; },
   deckInfo() { const ud = cockpit.userData; let tris = 0, calls = 0; cockpit.traverse(o => { if (o.isMesh && o.visible !== false) { calls++; const gg = o.geometry; tris += (gg.index ? gg.index.count : gg.attributes.position.count) / 3 * (o.isInstancedMesh ? o.count : 1); } }); return { controls: ud.controls ? ud.controls.length : 0, calls, tris: Math.round(tris), visible: cockpit.visible }; },

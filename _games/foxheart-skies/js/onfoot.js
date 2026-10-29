@@ -68,7 +68,7 @@ export class OnFoot {
     this.yaw -= input.dyaw; this.pitch = THREE.MathUtils.clamp(this.pitch - input.dpitch, -1.3, 1.3);
     let fwd = input.fwd, side = input.side;
     if (this.auto) { // auto-walk along a list of points
-      const t = this.auto.pts[this.auto.i]; if (!t) { this.auto.done = true; this.auto = null; }
+      const t = this.auto.pts[this.auto.i]; if (!t) { this.auto.done = true; if (this.auto.pts === this.routeOut && this.parts) { const n = this.parts.n; this.yaw = Math.atan2(-n.x, -n.z); this.pitch = -0.04; } this.auto = null; } // at the exit, turn back to face the hall
       else { const dx = t.x - this.pos.x, dz = t.z - this.pos.z, d = Math.hypot(dx, dz); if (d < 0.35) this.auto.i++; else { this.yaw = Math.atan2(-dx, -dz); fwd = 1; side = 0; } }
     }
     const sp = (input.run ? 3.4 : 1.7) * (this.auto ? 1.6 : 1);
