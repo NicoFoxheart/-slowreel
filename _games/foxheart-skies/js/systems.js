@@ -3,8 +3,10 @@
 // AC power needs ground power, the APU generator or an engine generator; an engine start needs bleed air.
 export class Systems {
   constructor() { this.reset(false); }
-  reset(cold) {
-    const on = !cold;
+  // mode: 'run' (engines running), 'gate' (parked: APU running, engines off), 'cold' (cold & dark); booleans are accepted (true = cold)
+  reset(mode) {
+    if (typeof mode === 'boolean' || mode == null) mode = mode ? 'cold' : 'run';
+    const cold = mode === 'cold', on = !cold; this.mode = mode;
     this.cold = cold;
     this.sw = {
       bat1: on, bat2: on, extPwr: false, gen1: true, gen2: true, apuGen: true, busTie: true,
@@ -21,6 +23,10 @@ export class Systems {
     this.apuN = 0; this.apuFlap = 0; this.apuEgt = 25; this.apuAvail = false; this.extAvail = false; this._ac = on;
     this.eng = [{ st: on ? 'run' : 'off', msg: '' }, { st: on ? 'run' : 'off', msg: '' }];
     this.touched = {}; this.memo = [];
+    if (mode === 'gate') { // at the gate: APU running and supplying power and bleed air, engines off, beacon off
+      Object.assign(this.sw, { apuMaster: true, apuBleed: true, master1: false, master2: false, beacon: false, strobe: 'AUTO', nose: 'OFF' });
+      this.apuN = 100; this.apuFlap = 1; this.apuAvail = true; this.apuEgt = 420; this.eng = [{ st: 'off', msg: '' }, { st: 'off', msg: '' }];
+    }
   }
   get ac() { return this._ac; }
   get dc() { return this.sw.bat1 || this.sw.bat2 || this._ac; }

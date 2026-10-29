@@ -192,7 +192,7 @@ export function buildCockpit(displays, opts = {}) {
   { const A = polyLerp([V(0, 0.715, -16.99), WL.FL[1], V(-1.05, 0.80, -16.44)], 30); const Bv = A.map(p => V(p.x, 0.962, -16.25));
     add(strip(A, Bv), 'crackle'); add(strip(A.map(mx), Bv.map(mx)), 'crackle');
     const P2 = (z, y) => [-z, y]; const lip = new THREE.Shape(); lip.moveTo(...P2(-16.27, 0.958)); lip.lineTo(...P2(-16.185, 0.978)); lip.quadraticCurveTo(...P2(-16.124, 0.99), ...P2(-16.121, 0.955));
-    lip.lineTo(...P2(-16.112, 0.872)); lip.quadraticCurveTo(...P2(-16.112, 0.854), ...P2(-16.14, 0.854)); lip.lineTo(...P2(-16.37, 0.851)); lip.lineTo(...P2(-16.37, 0.95)); lip.closePath();
+    lip.lineTo(...P2(-16.112, 0.872)); lip.quadraticCurveTo(...P2(-16.112, 0.854), ...P2(-16.14, 0.854)); lip.lineTo(...P2(-16.37, 0.851)); lip.lineTo(...P2(-16.37, 0.875)); lip.closePath();
     const lg = new THREE.ExtrudeGeometry(lip, { depth: 2.05, bevelEnabled: true, bevelThickness: 0.015, bevelSize: 0.005, bevelSegments: 3, curveSegments: 10 }); lg.rotateY(Math.PI / 2); lg.translate(-1.025, 0, 0); add(lg, 'crackle'); }
   const FGS = faceFrame(V(-1.0, 0.873, -16.107), V(1.0, 0.873, -16.107), V(-1.0, 0.956, -16.116));
 

@@ -73,7 +73,7 @@ export class ATC {
     this.atisOn = true; const loop = () => { if (!this.atisOn) return; const m = this.atisText(); this.say('ATIS', m, () => { if (this.atisOn) this.atisTimer = setTimeout(loop, 2500); }, true); };
     loop();
   }
-  stopAtis() { this.atisOn = false; clearTimeout(this.atisTimer); if (this.speakingAtis) { try { speechSynthesis.cancel(); } catch (e) { } this.speakingAtis = false; } }
+  stopAtis() { this.atisOn = false; clearTimeout(this.atisTimer); if (this.speech) this.speech.cancel('atis'); this.speakingAtis = false; }
   // ---------------------------------------------------------------- transmissions
   me(kind, m) { this.tune(kind, true); this.dropChatter(); this.push({ who: 'ME', kind, m: this.human(m, 0.06) }); this.lastMeT = this.t; }
   atc(kind, m, delay = 1.6, then) { this.push({ who: kind, kind, m: this.human(m, 0.12), delay: delay * this.pace(), then }); }
@@ -118,11 +118,20 @@ export class ATC {
     if (!atis || !this.log.length || this.log[this.log.length - 1].text !== m.d) this.log.push(entry);
     if (this.log.length > 80) this.log.shift();
     this.emit();
-    const A = this.audio; A && A.radioOpen && A.radioOpen(kind === 'ME', kind === 'OTHER' ? 0.6 : 1);
+    const A = this.audio;
     const est = Math.min(18, 0.9 + m.d.length * 0.052 / this.pace());
     let ended = false; const fin = () => { if (ended) return; ended = true; A && A.radioClose && A.radioClose(); this.speakingAtis = false; done && done(); };
     const speak = (kind !== 'ME' || this.speakMe) && this.audio?.voice !== false && this.voiceOn !== false;
     if (!this.voices.length) this.rankVoices();
+    if (this.speech) { // shared speech manager: one queue with priorities, squelch tied to the real start / end
+      const vc = VOICE[kind === 'OTHER' ? 'APP' : kind] || VOICE.TWR; let h = 0; for (const c of (cs || kind)) h = (h * 17 + c.charCodeAt(0)) >>> 0;
+      const pitch = kind === 'OTHER' ? 0.8 + (h % 7) * 0.08 : vc.pitch, vol = Math.min(1, ((this.audio?.vol ?? 0.7) + 0.2) * (kind === 'OTHER' ? 0.72 + (h % 5) * 0.05 : 1));
+      this.speech.say({ text: m.s, display: m.d, who: kind === 'ME' ? 'YOU' : kind === 'OTHER' ? cs : fac, channel: atis ? 'atis' : kind === 'OTHER' ? 'chatter' : 'atc', voice: () => this.voiceFor(kind, cs), lang: 'en-US',
+        rate: vc.rate * (1 + this.busy() * 0.05) * (0.96 + Math.random() * 0.08), pitch, volume: vol, mute: !speak, maxWait: kind === 'OTHER' ? 10 : 0,
+        onstart: () => A && A.radioOpen && A.radioOpen(kind === 'ME', kind === 'OTHER' ? 0.6 : 1), onend: fin });
+      this.speakingAtis = !!atis; return est;
+    }
+    A && A.radioOpen && A.radioOpen(kind === 'ME', kind === 'OTHER' ? 0.6 : 1);
     if (speak && 'speechSynthesis' in window && this.voices.length) {
       try {
         const vc = VOICE[kind === 'OTHER' ? 'APP' : kind] || VOICE.TWR; const voice = this.voiceFor(kind, cs);

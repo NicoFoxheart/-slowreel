@@ -61,6 +61,13 @@ export class PA {
     this.log.push({ id: id || 'custom', text, lang, t: Date.now() }); if (this.log.length > 30) this.log.shift();
     const A = this.audio; A && A.paChime && A.paChime();
     const said = custom != null ? custom : (L[this.lang] || L.en)(this.c || {});
+    if (this.speech) { // shared speech manager: PA outranks ATC / ATIS / chatter and is never cancelled by them
+      const vl = lang === 'ko' ? 'ko' : lang === 'es' ? 'es' : 'en';
+      this.speech.say({ channel: 'pa', text, display: said, who: custom != null ? 'PA · YOU' : L && L.who === 'crew' ? 'PA · PURSER' : 'PA · CAPTAIN', delay: 1.3, voice: () => this.voiceFor(vl), lang: vl === 'ko' ? 'ko-KR' : vl === 'es' ? 'es-ES' : 'en-US',
+        rate: 0.95, pitch: L?.who === 'crew' ? 1.15 : 0.95, volume: Math.min(1, (A?.vol ?? 0.7) + 0.2), mute: A?.voice === false,
+        onstart: () => A && A.paHiss && A.paHiss(true), onend: () => A && A.paHiss && A.paHiss(false) });
+      return { text: said, spokenText: text, lang, note, boost: L ? L.boost : 1, sign: L ? L.sign : undefined };
+    }
     setTimeout(() => {
       A && A.paHiss && A.paHiss(true); let done = false; const fin = () => { if (done) return; done = true; A && A.paHiss && A.paHiss(false); };
       try {

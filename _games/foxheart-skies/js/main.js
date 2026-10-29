@@ -20,6 +20,7 @@ import { Traffic } from './traffic.js';
 import { ATC, facility, DEST_DEFAULT, SHORT } from './atc.js';
 import { OnFoot } from './onfoot.js';
 import { PA, PA_LINES } from './pa.js';
+import { Speech } from './speech.js';
 import { buildCabin } from './interiors.js';
 import { rng } from './terrain.js';
 
@@ -73,6 +74,17 @@ const traffic = new Traffic(scene);
 const atc = new ATC(audio);
 const foot = new OnFoot(scene, camera, aircraft, audio);
 const pa = new PA(audio);
+// one speech queue for PA, ATC, ATIS, chatter and callouts, with subtitles and a PA-live indicator
+const speech = new Speech(); atc.speech = speech; pa.speech = speech; audio.speech = speech;
+let subT = null;
+speech.on((ev, it) => {
+  const el = $('#subs'); if (!el) return;
+  if (ev === 'start' && it.channel !== 'gpws') { el.className = it.channel === 'pa' ? 'pa' : (it.channel === 'chatter' || it.channel === 'atis') ? 'oth' : ''; el.innerHTML = `<b>${esc(it.o.who || '')}</b>${esc(it.o.display || it.o.text || '')}`; el.style.opacity = 1; clearTimeout(subT);
+    if (!speech.canSpeak() && !W.speechNote && it.o.mute !== true) { W.speechNote = true; toast('No speech voice is available in this browser, so announcements and ATC are shown as subtitles.', 7000); } }
+  if (ev === 'end' && it.channel !== 'gpws') { clearTimeout(subT); subT = setTimeout(() => { if (!speech.cur || speech.cur.channel === 'gpws') el.style.opacity = 0; }, 1800); }
+  if (ev === 'silent' && !W.speechNote) { W.speechNote = true; toast('Speech is silent in this browser, so announcements and ATC are shown as subtitles.', 7000); }
+  const live = $('#paLive'); if (live) live.hidden = !speech.busyWith('pa');
+});
 let taxiLine = null;
 const airportsRoot = new THREE.Group(); scene.add(airportsRoot);
 // blob shadow
@@ -170,14 +182,18 @@ async function startFlight(cfg) {
   setTimeOfDay(cfg.tod ?? 1080);
   W.lastTD = null; W.scored = false; W.timeAccel = 1; W.descending = false; W.push = null; W.autoTaxi = null; W.parkedAt = null; W.tripDone = false; showTaxi(null); foot.dispose(); disposeFlightCabin(); W.onFoot = false; W.signs = { belt: true, smoke: true }; Object.assign(CC, { v: 78, cd: {}, warnT: 0, hints: {} }); paLog.length = 0; if (paOpen) togglePA(false);
   if (!(cfg.start === 'gate' || cfg.start === 'terminal')) { W.stand = null; W.standB = null; }
-  const cold = !!cfg.cold && (cfg.start === 'gate' || cfg.start === 'terminal'); sys.reset(cold); W.ndRange = null; lights._auto = undefined; W.coldDone = !cold; W.coldT = 0;
-  if (cold) { fdm.engRun = [false, false]; fdm.n1 = [0, 0]; fdm.n2 = [0, 0]; fdm.egt = [24, 24]; fdm.tl = 0; fdm.ap.on = false; fdm.ap.athr = false; }
+  // at a gate the engines are off (APU running, or everything off for cold & dark); runway and air starts keep them running
+  const atGate = cfg.start === 'gate' || cfg.start === 'terminal', cold = !!cfg.cold && atGate;
+  sys.reset(cold ? 'cold' : atGate && !cfg.menu ? 'gate' : 'run'); W.ndRange = null; lights._auto = undefined; W.coldDone = !cold; W.coldT = 0; W.autoStart = null;
+  if (atGate && !cfg.menu) { fdm.engRun = [false, false]; fdm.n1 = [0, 0]; fdm.n2 = [0, 0]; fdm.egt = [24, 24]; fdm.tl = 0; fdm.ap.on = false; fdm.ap.athr = false; }
   if (cfg.start === 'route') { W.ils = fdm.ap.ils = null; } W.simTime = 0; W.crashShown = false;
   // AI traffic on the runway in use (avoid the player's runway when on it)
   const act = activeRunwayEnd(W.primary) || E;
   traffic.setup(A, new THREE.Vector3(W.primary.x, W.primary.elev, W.primary.z), g.ends, (cfg.start === 'gate' || cfg.start === 'terminal') ? E : act === E && cfg.start !== 'final' ? (g.ends.find(e => e !== E && e !== E.other && e.length > 1800) || act) : act);
   traffic.enabled = !cfg.menu || true;
   sky.envAge = 1e9; sky.lutDirty = true;
+  // warm up shaders (flight deck included) while the loading screen is still up, so entering a view never hitches
+  if (!cfg.menu) { const vis = cockpit.visible; cockpit.visible = true; aircraft.position.copy(fdm.pos); aircraft.quaternion.copy(fdm.q); try { await renderer.compileAsync(scene, camera); } catch (e) { try { renderer.compile(scene, camera); } catch (e2) { } } cockpit.visible = vis; }
   W.started = true; showLoad(false);
   if (!cfg.menu) {
     W.dest = cfg.toApt || (cfg.dest && World.byIcao.get(cfg.dest)) || World.byIcao.get(DEST_DEFAULT[A.icao]) || nearestAirports(A.lat, A.lon, 900000, 6).find(x => x !== A && x.large) || A;
@@ -324,8 +340,7 @@ function renderRadio() {
   const opts = atc.options(); $('#rOpts').innerHTML = opts.length ? opts.map((o, i) => `<button class="ropt" data-id="${o.id}"><kbd>${i + 1}</kbd><span>${o.label}</span><small>${o.kind} ${o.freq}</small></button>`).join('') : '<div class="rnone">Nothing to say right now. Fly the aircraft; ATC will call you.</div>';
   $$('#rOpts .ropt').forEach(b => b.onclick = () => { atc.choose(b.dataset.id); canvas.focus(); });
   $('#rAuto').checked = atc.auto; $('#rSpeak').checked = atc.speakMe;
-  const last = atc.log[atc.log.length - 1];
-  if (last && last !== W.lastCap && !radioOpen && !W.onFoot && (last.who === 'ME' || last.text.includes(atc.cs))) { W.lastCap = last; const c = $('#atcCap'); c.innerHTML = `<b>${last.who === 'ME' ? 'YOU' : last.fac.toUpperCase()}</b> ${last.text}`; c.style.opacity = 1; clearTimeout(c._h); c._h = setTimeout(() => c.style.opacity = 0, 7000); }
+  // (spoken lines are shown by the shared subtitle bar, in sync with the voice)
 }
 atc.on(() => renderRadio());
 function paKey(n) { if (n === 0) setSigns(!W.signs.belt, W.signs.smoke); else { const l = PA_LINES[n - 1]; if (l) paSay(l.id); } }
@@ -432,6 +447,7 @@ const keys = {}; const inp = { pitch: 0, roll: 0, yaw: 0 }; let mouseYoke = fals
 const look = { yaw: 0, pitch: -13, fov: 70, target: null }; const orbit = { yaw: 200, pitch: 12, dist: 62 }; const chase = { yaw: 0, pitch: 0, dist: 1 };
 addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  audio.start(); // a key press is a user gesture: the audio context may start / resume now
   if (!W.started || W.menuMode) return;
   const k = e.key; keys[e.code] = true;
   if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'PageUp', 'PageDown', 'Tab', '/'].includes(k)) e.preventDefault();
@@ -440,13 +456,16 @@ addEventListener('keydown', e => {
     if (e.code === 'KeyE') footInteract();
     if (e.code === 'KeyJ') footSkip();
     if (e.code === 'KeyY') togglePA();
-    if (paOpen && /^Digit[0-9]$/.test(e.code)) paKey(+e.code.slice(5));
-    if (e.code === 'Escape') togglePause();
+    if (paOpen && /^(Digit|Numpad)\d$/.test(e.code)) paKey(+e.code.slice(-1));
+    if (e.code === 'Escape') { if (paOpen) togglePA(false); else togglePause(); }
     return;
   }
-  if (radioOpen && /^Digit[1-6]$/.test(e.code)) { const o = atc.options()[+e.code.slice(5) - 1]; if (o) atc.choose(o.id); return; }
-  if (paOpen && /^Digit[0-9]$/.test(e.code)) { paKey(+e.code.slice(5)); return; }
+  // an open panel is modal for number keys and Esc
+  if ((radioOpen || paOpen) && e.code === 'Escape') { if (radioOpen) toggleRadio(false); if (paOpen) togglePA(false); return; }
+  if (radioOpen && /^(Digit|Numpad)\d$/.test(e.code)) { const n = +e.code.slice(-1); const o = n ? atc.options()[n - 1] : null; if (o) atc.choose(o.id); return; }
+  if (paOpen && /^(Digit|Numpad)\d$/.test(e.code)) { paKey(+e.code.slice(-1)); return; }
   if (W.view === 'cockpit' && /^Digit[089]$/.test(e.code)) { quickLook(+e.code.slice(5)); return; }
+  if (/^Digit[089]$/.test(e.code)) return; // quick looks only exist on the flight deck
   if (e.code === 'KeyY') { togglePA(); return; }
   if (e.code === 'KeyT' && !e.shiftKey) { toggleRadio(); return; }
   if (e.code === 'Enter') { parkPromptAction(); return; }
@@ -515,7 +534,7 @@ function pollInput(dt) {
     const rt = pad.val[BTN.RT], lt = pad.val[BTN.LT];
     if (rt > 0.06 || lt > 0.06) { fdm.tl = THREE.MathUtils.clamp(fdm.tl + (rt * 0.5 - lt * 0.6) * dt, 0, 1); if (fdm.ap.athr) { fdm.ap.athr = false; toast('A/THR off (manual thrust)'); } }
     padLook(dt, a[2], a[3]); if (pad.down(BTN.RS)) padRecentre();
-    if (pad.down(BTN.A)) { fdm.setGear(!fdm.gearDown); if (fdm.onGround && !fdm.gearDown) { fdm.setGear(true); toast('Gear cannot retract on the ground'); } }
+    if (pad.down(BTN.A)) { if (fdm.onGround && !(fdm.engRun[0] && fdm.engRun[1])) startEngines(); else { fdm.setGear(!fdm.gearDown); if (fdm.onGround && !fdm.gearDown) { fdm.setGear(true); toast('Gear cannot retract on the ground'); } } }
     if (pad.down(BTN.X)) { fdm.setFlaps(fdm.flapIdx + 1); toast('Flaps ' + FLAPS[fdm.flapIdx].name); } if (pad.down(BTN.Y)) { fdm.setFlaps(fdm.flapIdx - 1); toast('Flaps ' + FLAPS[fdm.flapIdx].name); }
     if (pad.down(BTN.MENU)) togglePause(); if (pad.down(BTN.VIEW)) setView(VIEWS[(VIEWS.indexOf(W.view) + 1) % VIEWS.length]);
   }
@@ -524,7 +543,8 @@ function pollInput(dt) {
   inp.pitch = ramp(inp.pitch, tp, tp ? 2.2 : 4); inp.roll = ramp(inp.roll, tr, tr ? 3 : 5); inp.yaw = ramp(inp.yaw, ty, 3);
   fdm.in.pitch = inp.pitch; fdm.in.roll = inp.roll; fdm.in.yaw = inp.yaw;
   // throttle & brakes
-  const up = keys.PageUp || keys.Equal || keys.NumpadAdd || keys.ShiftLeft || keys.ShiftRight, dn = keys.PageDown || keys.Minus || keys.NumpadSubtract || keys.KeyX;
+  const shiftThr = (keys.ShiftLeft || keys.ShiftRight) && !keys.Enter && !keys.NumpadEnter && !keys.KeyT && !keys.KeyZ && !mouse.drag; // Shift+Enter / Shift+T / Shift+Z / Shift+click are not thrust
+  const up = keys.PageUp || keys.Equal || keys.NumpadAdd || shiftThr, dn = keys.PageDown || keys.Minus || keys.NumpadSubtract || keys.KeyX;
   if (up && !keys.KeyZ) { fdm.tl = Math.min(1, fdm.tl + dt * 0.45); if (fdm.ap.athr) { fdm.ap.athr = false; toast('A/THR off (manual thrust)'); } }
   if (dn) { fdm.tl = Math.max(0, fdm.tl - dt * 0.55); if (fdm.ap.athr) { fdm.ap.athr = false; toast('A/THR off (manual thrust)'); } }
   // wheel brakes: held = on, released = off (keyboard B or pad B)
@@ -658,7 +678,7 @@ function simulate(dtReal) {
   if (W.push && !W.push.finished) pushStep(simDt);
   else if (W.autoTaxi) autoTaxiStep(simDt);
   else for (let i = 0; i < steps; i++) { fdm.step(h, env); autoConfig(h); }
-  atc.update(simDt); updateComfort(simDt); sys.update(simDt, fdm, { gpu: gpuConnected(), oat: 24 });
+  atc.update(simDt); updateComfort(simDt); sys.update(simDt, fdm, { gpu: gpuConnected(), oat: 24 }); autoStartStep(simDt);
   W.simTime += simDt;
   if (W.timeAccel > 1) { W.tod = (W.tod + simDt / 60) % 1440; if ((W.todT = (W.todT || 0) + simDt) > 30) { W.todT = 0; setTimeOfDay(W.tod); } }
   handleEvents();
@@ -758,7 +778,7 @@ function frame(now) {
   if (!W.started) return;
   if (!W.menuMode) pollInput(dt); else { pad.poll(dt); fdm.in.pitch = fdm.in.roll = fdm.in.yaw = 0; }
   simulate(dt);
-  renderFrame(dt);
+  renderFrame(dt); updateEngStart();
   // dynamic resolution
   if (settings.res === 'auto' && !W.menuMode) { dynT += dt; if (dynT > 2) { dynT = 0; const old = renderScale; if (frameMs > 20 && renderScale > 0.55) renderScale *= 0.88; else if (frameMs < 13 && renderScale < 1) renderScale = Math.min(1, renderScale * 1.08); if (old !== renderScale) applyRes(); } }
 }
@@ -797,7 +817,7 @@ function renderFrame(dt) {
   dispT += dt; if (dispT > (W.view === 'cockpit' ? 0.05 : 0.08)) { dispT = 0; const S = snapshot(); const order = W.view === 'cockpit' ? [['pfd'], ['nd'], ['ewd', 'sd']] : [['pfd'], ['pfd', 'nd']]; displays.draw(S, order[dispIdx++ % order.length]); W.S = S; }
   const hc = $('#hudc'); const hx = hc.getContext('2d');
   if (!W.menuMode && !W.onFoot && settings.hud && W.view !== 'cockpit' && W.view !== 'cabin' && W.S) drawHUD(hx, hc.width, hc.height, W.S, camera, settings.units); else hx.clearRect(0, 0, hc.width, hc.height);
-  audio.update({ fdm, apuN: sys.apuN, paused: W.paused || W.menuMode && false, camDist: camera.position.distanceTo(aircraft.position), rain: W.wx === 'rain', nearAirport: true, groundH: gh, flapTarget: FLAPS[fdm.flapIdx].flap }, dt, W.view);
+  audio.update({ fdm, apuN: sys.apuN, paused: W.paused || W.menuMode, ground: fdm.onGround, camDist: camera.position.distanceTo(aircraft.position), rain: W.wx === 'rain', nearAirport: true, groundH: gh, flapTarget: FLAPS[fdm.flapIdx].flap }, dt, W.view);
   if (!W.menuMode && !W.onFoot) { updateUI(); updateParkPrompt(); }
 }
 // ---------------------------------------------------------------- flight deck: per-frame update, shadows, reflections
@@ -946,6 +966,33 @@ const COLD_STEPS = [
   ['ENG 1 MASTER on', 'pedestal', () => fdm.engRun[0]],
   ['ENG MODE back to NORM, APU BLEED off', 'pedestal + overhead', () => fdm.engRun[0] && fdm.engRun[1] && sys.sw.engMode === 'NORM' && !sys.sw.apuBleed],
 ];
+// automatic engine start (button on the ground, pad A): runs the real sequence through the systems model
+const AUTOSTART = [
+  ['Batteries on', () => { sys.sw.bat1 = sys.sw.bat2 = true; return true; }],
+  ['Ground power on', () => { if (sys.extAvail && !sys.apuAvail) sys.sw.extPwr = true; return true; }],
+  ['Starting the APU', () => { if (sys.apuAvail) return true; sys.sw.apuMaster = true; if (sys.apuFlap >= 1) sys.sw.apuStart = true; return false; }],
+  ['APU bleed on', () => { sys.sw.apuBleed = true; return true; }],
+  ['Beacon on', () => { sys.sw.beacon = true; sys.sw.nav = true; return true; }],
+  ['Engine mode IGN / START', () => { sys.sw.engMode = 'IGN'; return true; }],
+  ['Starting engine 2', () => { sys.sw.master2 = true; return fdm.engRun[1]; }],
+  ['Starting engine 1', () => { sys.sw.master1 = true; return fdm.engRun[0]; }],
+  ['Engine mode NORM, APU bleed off', () => { sys.sw.engMode = 'NORM'; sys.sw.apuBleed = false; sys.sw.extPwr = false; return true; }],
+];
+function startEngines() { if (W.autoStart || (fdm.engRun[0] && fdm.engRun[1]) || !fdm.onGround) return; audio.start(); W.autoStart = { i: 0, t: 0, shown: -1 }; }
+function autoStartStep(dt) {
+  const A = W.autoStart; if (!A) return; A.t -= dt; if (A.t > 0) return;
+  const step = AUTOSTART[A.i]; if (!step) { W.autoStart = null; W.coldDone = true; toast('Both engines running. Ready to taxi.', 3500); return; }
+  if (A.shown !== A.i) { A.shown = A.i; audio.click && audio.click('switch'); }
+  if (step[1]()) { A.i++; A.t = 0.7; }
+}
+let engStartShown = null;
+function updateEngStart() {
+  const el = $('#engStart'); if (!el) return; const show = W.started && !W.menuMode && !W.onFoot && !W.paused && fdm.onGround && !(fdm.engRun[0] && fdm.engRun[1]);
+  if (show !== engStartShown) { el.hidden = !show; engStartShown = show; } if (!show) return;
+  const b = $('#engStartBtn'), A = W.autoStart; const i = A ? Math.min(A.i, AUTOSTART.length - 1) : -1;
+  const t = A ? AUTOSTART[i][0] + (i >= 6 && i <= 7 ? ` · N2 ${Math.round(fdm.n2[i === 6 ? 1 : 0])}%` : i === 2 ? ` · ${Math.round(sys.apuN)}%` : '') : 'Start engines';
+  if (b.textContent !== t) b.textContent = t; b.disabled = !!A;
+}
 function updateColdList() {
   const el = $('#coldList'); if (!el) return; const show = sys.cold && !W.coldDone && !W.onFoot && !W.menuMode;
   if (!show) { if (!el.hidden) el.hidden = true; return; }
@@ -1026,6 +1073,7 @@ function buildMenu() {
   $('#pHelp').onclick = () => { $('#help').hidden = false; }; $('#helpClose').onclick = () => { $('#help').hidden = true; };
   $('#pSet').onclick = () => { $('#pause').hidden = true; W.paused = false; toMenu(); $('#nav button[data-sec=settings]').click(); };
   bindFCU();
+  $('#engStartBtn').onclick = () => { startEngines(); canvas.focus(); };
   $('#radioBtn').onclick = () => { toggleRadio(); canvas.focus(); }; $('#paBtn').onclick = () => { togglePA(); canvas.focus(); }; $('#rClose').onclick = () => toggleRadio(false);
   $('#rAuto').onchange = () => { atc.auto = $('#rAuto').checked; settings.atcAuto = atc.auto; store.set('settings', settings); };
   $('#rSpeak').onchange = () => { atc.speakMe = $('#rSpeak').checked; };
@@ -1096,11 +1144,15 @@ const ROUTES = [
   { title: 'Panamá skyline & canal', from: 'MPTO', to: 'MPTO', end: '03R', alt: 3500, spd: 220, tod: 1050, wx: 'scattered', desc: 'Punta Paitilla, Casco Viejo, Miraflores locks',
     start: { lat: 9.03, lon: -79.43, hdg: 250, alt: 2500 }, wps: [[8.985, -79.50, 'PAITL'], [8.952, -79.535, 'CASCO'], [8.94, -79.565, 'PUENTE'], [9.015, -79.595, 'MIRAF'], [9.07, -79.66, 'CUT'], [9.10, -79.52, 'NORTH'], [8.98, -79.47, 'BAY'], [8.93, -79.475, 'PTY03R']] },
 ];
-const KEYS = [['W S / ↑ ↓', 'Pitch (↑ nose down)'], ['A D / ← →', 'Roll'], ['Q E', 'Rudder / nose-wheel steering'], ['Shift / PgUp / =', 'Thrust up'], ['X / PgDn / −', 'Thrust down'], ['Shift T', 'TOGA thrust'], ['T', 'Radio (ATC); 1–6 picks a call'], ['Y', 'Cabin PA; 1–9 announce, 0 seat belt sign'], ['K / Enter', 'Pushback / park at gate'],
+const KEYS = [['W S / ↑ ↓', 'Pitch (↑ nose down)'], ['A D / ← →', 'Roll'], ['Q E', 'Rudder / nose-wheel steering'], ['Shift / PgUp / =', 'Thrust up'], ['X / PgDn / −', 'Thrust down'], ['Shift T', 'TOGA thrust'],
+  ['Start engines', 'Button at the top while parked (automatic start); or do it yourself on the overhead and pedestal'],
+  ['T', 'Radio (ATC): while open, 1–6 pick a call, Esc closes'], ['Y', 'Cabin PA: while open, 1–9 announce, 0 seat belt sign, Esc closes'], ['K / Enter', 'Pushback / park at gate'], ['Shift Enter', 'Auto-taxi along the magenta route'],
   ['F / V', 'Flaps extend / retract'], ['G', 'Landing gear'], ['B', 'Wheel brakes (hold)'], ['Space', 'Parking brake'], ['R', 'Reversers (on ground)'], ['/', 'Speed brake'], ['[ ]', 'Pitch trim (direct law)'],
-  ['Z', 'Autopilot on / off'], ['Shift Z', 'Autothrust on / off'], ['O', 'Arm ILS approach (LOC + G/S)'], ['L', 'Landing lights'], ['C / 1–7', 'Camera: deck, chase, orbit, tower, runway, fly-by, cabin'], ['8 / 9 / 0', 'Flight deck: look at pedestal / overhead / side window'], ['Mouse on the deck', 'Hover a switch for its name, click to operate, scroll on knobs'],
+  ['Z', 'Autopilot on / off'], ['Shift Z', 'Autothrust on / off'], ['O', 'Arm ILS approach (LOC + G/S)'], ['L', 'Landing lights'], ['C / 1–7', 'Camera: deck, chase, orbit, tower, runway, fly-by, cabin'], ['8 / 9 / 0', 'Flight deck only: look at pedestal / overhead / side window (again: ahead)'], ['Mouse on the deck', 'Hover a switch for its name, click to operate, scroll on knobs'],
   ['Mouse drag', 'Look / orbit camera'], ['Wheel', 'Zoom'], ['M', 'Mouse yoke'], ['N', 'Navigation display overlay'], ['H', 'HUD'], ['. ,', 'Time acceleration'], ['P / Esc', 'Pause / menu'], ['?', 'This help'],
-  ['Gamepad', 'Sticks fly, triggers thrust, A gear, X/Y flaps, B brakes, bumpers rudder']];
+  ['On foot', 'WASD walk, Shift run, mouse look, E interact, J skip ahead, Y PA'],
+  ['Xbox controller', 'Left stick flies, right stick looks (R3 recentres), RT / LT thrust, B brakes (hold), A start engines / gear, X / Y flaps, LB / RB rudder, View camera, Menu pause'],
+  ['Controller on foot', 'Left stick walks, right stick looks, RT run, A interact, Y skip ahead']];
 
 // ---------------------------------------------------------------- test hooks
 window.__sim = {
@@ -1124,11 +1176,12 @@ window.__sim = {
   interact() { footInteract(); return this.footState(); },
   radio(v) { toggleRadio(v); return atc.options().map(o => o.id); },
   say(id) { atc.choose(id); }, atcState() { return { phase: atc.phase, log: atc.log.map(l => (l.who === 'ME' ? 'ME: ' : l.fac + ': ') + l.text), opts: atc.options().map(o => o.id), errors: atc.errors, push: W.push && { done: W.push.done } }; },
-  traffic, sys,
+  traffic, sys, speech, startEngines,
   deckLook(y, p, fov) { look.yaw = y; look.pitch = p; if (fov) look.fov = fov; look.target = null; }, deckLights(o) { Object.assign(sys.sw, o); },
   deckClick(id, dir) { const c = cockpit.userData.controls && cockpit.userData.controls.find(c => c.id === id); if (c) cockpit.userData.click(c, deckCtx(), dir || 1); return c ? cockpit.userData.desc(c, deckCtx()) : null; },
   deckInfo() { const ud = cockpit.userData; let tris = 0, calls = 0; cockpit.traverse(o => { if (o.isMesh && o.visible !== false) { calls++; const gg = o.geometry; tris += (gg.index ? gg.index.count : gg.attributes.position.count) / 3 * (o.isInstancedMesh ? o.count : 1); } }); return { controls: ud.controls ? ud.controls.length : 0, calls, tris: Math.round(tris), visible: cockpit.visible }; },
   pick(x, y) { const c = pickControl(x, y); return c ? c.id : null; },
+  rayAt(x, y) { renderFrame(0.016); ndc.set(x * 2 - 1, -(y * 2 - 1)); camera.updateMatrixWorld(); ray.setFromCamera(ndc, camera); ray.far = 60; const hs = ray.intersectObject(scene, true).filter(h => h.object.visible !== false && h.object.material && h.object.material.visible !== false).slice(0, 3); return hs.map(h => ({ name: h.object.name || h.object.type, parent: h.object.parent?.name, local: aircraft.worldToLocal(h.point.clone()).toArray().map(v => +v.toFixed(3)), d: +h.distance.toFixed(2) })); },
   pa(id, custom) { if (!paOpen) togglePA(true); paSay(id, custom); return this.paState(); }, paOpen(v) { togglePA(v); },
   paState() { return { open: paOpen, lang: pa.lang, signs: { ...W.signs }, comfort: +CC.v.toFixed(1), why: CC.why, log: paLog.map(l => l.who + ': ' + l.text), cabin: !!cabinObj() }; },
   signs(b, sm) { setSigns(b, sm ?? W.signs.smoke); }, comfort(v) { if (v != null) CC.v = v; return CC.v; }, paLang(l) { pa.lang = l; renderPA(); }, cabLook(y, p, rear) { cabLook.yaw = y; cabLook.pitch = p; cabLook.rear = !!rear; },

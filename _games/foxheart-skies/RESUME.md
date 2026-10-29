@@ -35,7 +35,8 @@ Progress log: PROGRESS.md (one line per finished step; the last line is where to
   - PA fix: one speech manager with priorities, no cancel from ATIS, chunking, modal number keys, subtitles;
   - no engine sound at start (engines off at the gate, APU on, a Start engines button);
   - smoothness pass.
-- **P1 (lead):** cabin and boarding music (procedural); much better ATC flow.
+- **Then (Nico's pick):** full easy-mode controller → arrival flow → pushback with tug and ground crew.
+- **After that (lead):** cabin and boarding music (procedural); much better ATC flow.
 - **World artist (new, after P0 ships):** better sky and clouds, better ground, very detailed road cars seen from the air.
 - **Paused until P0 ships:** aircraft, character and environment artists. Resume each with SendMessage when ready.
 

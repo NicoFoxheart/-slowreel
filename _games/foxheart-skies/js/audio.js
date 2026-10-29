@@ -53,7 +53,9 @@ export class Audio {
     const apu = (S.apuN || 0) / 100; this.apuO.frequency.setTargetAtTime(120 + apu * 380, t, 0.3); this.apuF.frequency.setTargetAtTime(900 + apu * 2600, t, 0.3); this.apuG.gain.setTargetAtTime(apu * 0.022 * (view === 'cockpit' ? 0.5 : 1), t, 0.4);
     const inside = view === 'cockpit'; this.cabin.frequency.setTargetAtTime(inside ? 1800 : 16000, t, 0.2);
     const dist = S.camDist || 30; const att = inside ? 0.45 : Math.min(1, 60 / Math.max(20, dist));
-    this.rumbleG.gain.setTargetAtTime((0.05 + n1 * n1 * 0.5) * att * (inside ? 1.6 : 1), t, k);
+    this.rumbleG.gain.setTargetAtTime((0.05 * Math.min(1, n1 / 0.2) + n1 * n1 * 0.5) * att * (inside ? 1.6 : 1), t, k); // silent until the engines spool
+    // ground ambience: now and then a distant jet spooling up or taxiing past
+    if (S.ground && S.nearAirport) { this.jetT = (this.jetT ?? 6) - dt; if (this.jetT < 0) { this.jetT = 16 + Math.random() * 28; this.distantJet(inside); } }
     this.rumble.frequency.setTargetAtTime(60 + n1 * 140, t, k);
     this.roarG.gain.setTargetAtTime(Math.pow(n1, 2.6) * 0.55 * att * (1 + f.reverser), t, k); this.roar.frequency.setTargetAtTime(250 + n1 * 900, t, k);
     this.whine.frequency.setTargetAtTime(400 + n1 * 2100, t, k); this.whine2.frequency.setTargetAtTime(800 + n1 * 4200, t, k);
@@ -94,12 +96,18 @@ export class Audio {
     for (let k = 0; k < 40; k++) { let tt = Math.random() * 0.4 + k * 0.03; const rate = 3.2 + Math.random() * 2.2, amp = 0.4 + Math.random() * 0.6; while (tt < dur - 0.05) { const i0 = Math.floor(tt * sr), env = Math.min(1, tt / 0.6, (dur - tt) / 1.6); for (let i = 0; i < 300 && i0 + i < n; i++) d[i0 + i] += (Math.random() * 2 - 1) * Math.exp(-i / 55) * amp * env; tt += 1 / rate * (0.85 + Math.random() * 0.3); } }
     const s = c.createBufferSource(); s.buffer = b; const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1400; bp.Q.value = 0.6; const g = c.createGain(); g.gain.value = gain; s.connect(bp); bp.connect(g); g.connect(this.cabin); s.start();
   }
+  distantJet(inside) {
+    const c = this.ctx; if (!c) return; const s = c.createBufferSource(); s.buffer = this.bufs.pink; s.loop = true; const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 420 + Math.random() * 300;
+    const bp = c.createBiquadFilter(); bp.type = 'peaking'; bp.frequency.value = 900 + Math.random() * 800; bp.gain.value = 6; const g = c.createGain(); const t = c.currentTime, peak = (0.025 + Math.random() * 0.03) * (inside ? 0.5 : 1), up = 3 + Math.random() * 3, hold = 2 + Math.random() * 4, down = 5 + Math.random() * 4;
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(peak, t + up); g.gain.setValueAtTime(peak, t + up + hold); g.gain.linearRampToValueAtTime(0.0001, t + up + hold + down);
+    lp.frequency.linearRampToValueAtTime(lp.frequency.value * 1.6, t + up); s.connect(lp); lp.connect(bp); bp.connect(g); g.connect(this.master); s.start(t, Math.random() * 2); s.stop(t + up + hold + down + 0.2);
+  }
   click(kind = 'switch') { if (!this.ctx) return; this.noiseHit(0.025, kind === 'switch' ? 3600 : 2600, 1400, kind === 'switch' ? 0.14 : 0.08); this.blip(kind === 'pb' ? 1900 : 1100, 0.012, 'square', 0.025); }
   chime() { this.blip(660, 0.25, 'sine', 0.1); this.blip(880, 0.35, 'sine', 0.08, 0.12); }
   call(text) {
     let spoke = false;
-    if (this.voice && 'speechSynthesis' in window) {
-      try { const u = new SpeechSynthesisUtterance(text.toLowerCase().replace('2500', 'twenty five hundred')); u.rate = 1.15; u.pitch = 0.7; u.volume = Math.min(1, this.vol + 0.2); if (!this.paBusy) speechSynthesis.cancel(); speechSynthesis.speak(u); spoke = speechSynthesis.getVoices().length > 0; } catch (e) { spoke = false; }
+    if (this.voice && this.speech && this.speech.canSpeak() && this.speech.voices().length) { // shared speech manager (callouts never talk over a PA)
+      spoke = this.speech.say({ channel: 'gpws', text: text.toLowerCase().replace('2500', 'twenty five hundred'), rate: 1.15, pitch: 0.7, volume: Math.min(1, this.vol + 0.2), maxWait: 1.2 }) != null;
     }
     if (!spoke) { if (text === 'RETARD') { this.blip(740, 0.12, 'square', 0.07); this.blip(740, 0.12, 'square', 0.07, 0.18); } else if (text === 'MINIMUMS') this.blip(980, 0.4, 'triangle', 0.08); else this.blip(1180 - Math.min(600, +text || 0) * 0.3, 0.09, 'triangle', 0.07); }
   }

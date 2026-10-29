@@ -189,6 +189,11 @@ kbd{font:11px var(--f-mono);padding:2px 6px;border-radius:4px;border:1px solid v
 .ropts{display:grid;gap:5px}.ropt{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;text-align:left;padding:8px 10px;border-radius:7px;border:1px solid var(--line2);background:rgba(255,255,255,.03);font-size:12.5px}
 .ropt:hover{border-color:var(--fox)}.ropt small{font:10px var(--f-mono);color:var(--mute)}.rnone{color:var(--mute);font-size:12px}
 .rfoot{display:flex;gap:14px;flex-wrap:wrap;align-items:center;font:11px var(--f-mono);color:var(--mute)}
+#subs{position:fixed;left:50%;bottom:118px;transform:translateX(-50%);z-index:6;max-width:min(820px,90vw);padding:8px 14px;border-radius:8px;background:rgba(8,10,14,.74);color:#f4f6f8;font:14px/1.45 var(--f-body);text-align:center;opacity:0;transition:opacity .25s;pointer-events:none;text-wrap:pretty}
+#subs b{font:700 11px var(--f-mono);letter-spacing:.08em;color:var(--amber);margin-right:8px}#subs.pa b{color:var(--fox2)}#subs.oth{color:#b9c2cf;font-size:13px}#subs.oth b{color:#8e99a8}
+#paLive{position:fixed;left:50%;bottom:74px;transform:translateX(-50%);z-index:6;display:flex;gap:7px;align-items:center;padding:4px 11px;border-radius:20px;background:rgba(190,40,30,.88);color:#fff;font:700 11px var(--f-mono);letter-spacing:.14em;pointer-events:none}
+#paLive i{width:8px;height:8px;border-radius:50%;background:#fff;animation:plive 1s ease-in-out infinite}@keyframes plive{50%{opacity:.25}}
+#engStart{position:fixed;left:50%;top:132px;transform:translateX(-50%);z-index:6;display:grid;justify-items:center;gap:2px}#engStart .go{padding:8px 18px;font-size:16px}#engStart small{font:10px var(--f-mono);color:var(--mute);background:rgba(8,10,14,.6);padding:1px 6px;border-radius:4px}
 #pa{position:fixed;z-index:6;right:max(16px,env(safe-area-inset-right,0px));top:170px;width:min(470px,92vw);max-height:calc(100vh - 210px);overflow:auto;padding:12px;display:grid;gap:10px;pointer-events:auto;background:rgba(14,18,24,.92)}
 .pasigns{display:flex;gap:6px;flex:1;justify-content:flex-end}
 .sgn{display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:6px;border:1px solid var(--line2);font:10px var(--f-mono);color:var(--mute);background:#0b0d11}
@@ -389,6 +394,9 @@ kbd{font:11px var(--f-mono);padding:2px 6px;border-radius:4px;border:1px solid v
   <div class="fkeys glass">WASD walk · Shift run · drag or click for mouse look · E interact · J skip ahead · Y cabin PA · Esc menu</div>
 </div>
 
+<div id="subs" aria-live="polite"></div>
+<div id="paLive" hidden><i></i>PA LIVE</div>
+<div id="engStart" hidden><button class="go" id="engStartBtn">Start engines</button><small>Automatic start sequence</small></div>
 <div id="pa" class="glass" hidden>
     <div class="rhead"><span class="rlab">CABIN PA</span><span class="pasigns"><button class="sgn" id="pBelt" aria-pressed="true" title="Fasten seat belt sign"><svg viewBox="0 0 128 64" aria-hidden="true"><g fill="currentColor"><rect x="10" y="28" width="36" height="8"/><rect x="82" y="28" width="36" height="8"/><rect x="55" y="27" width="18" height="10"/></g><rect x="46" y="19" width="36" height="26" fill="none" stroke="currentColor" stroke-width="5"/></svg>SEAT BELTS</button><button class="sgn" id="pSmoke" aria-pressed="true" title="No smoking sign"><svg viewBox="0 0 128 64" aria-hidden="true"><rect x="34" y="29" width="44" height="8" fill="currentColor"/><rect x="78" y="29" width="10" height="8" fill="#ff8b3d"/><circle cx="64" cy="32" r="25" fill="none" stroke="#ff5050" stroke-width="5"/><path d="M46 14 82 50" stroke="#ff5050" stroke-width="5"/></svg>NO SMOKING</button></span><button id="pClose" aria-label="Close PA">✕</button></div>
     <div class="pamood"><span class="rlab">CABIN MOOD</span><div class="meter"><i id="pMeter"></i></div><span id="pMood">--</span></div>
