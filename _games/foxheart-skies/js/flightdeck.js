@@ -21,14 +21,15 @@ const S3 = (x, y, z) => new THREE.Matrix4().makeScale(x, y, z);
 const mul = (...m) => m.reduce((a, b) => a.multiply(b), new THREE.Matrix4());
 
 // ------------------------------------------------ flood / dome / display-spill lights (shader terms, no extra three.js lights)
-export const FLOOD = { p: [...Array(6)].map(() => new THREE.Vector4(0, 0, 0, 8)), c: [...Array(6)].map(() => new THREE.Vector3()) };
-const FL_LOCAL = [V(0, 1.80, -15.2), V(-0.55, 0.84, -16.2), V(0.55, 0.84, -16.2), V(0, 1.50, -15.6), V(-0.6, 0.66, -16.15), V(0.6, 0.66, -16.15)];
-const FL_FALL = [1.0, 26, 26, 3.5, 12, 12];
+export const FLOOD = { p: [...Array(6)].map(() => new THREE.Vector4(0, 0, 0, 8)), c: [...Array(6)].map(() => new THREE.Vector3()), amb: new THREE.Vector3(0.3, 0.3, 0.32) };
+const FL_LOCAL = [V(0, 1.80, -15.2), V(-0.55, 0.84, -16.2), V(0.55, 0.84, -16.2), V(0, 1.12, -15.5), V(-0.6, 0.66, -16.15), V(0.6, 0.66, -16.15)];
+const FL_FALL = [1.4, 26, 26, 10, 12, 12];
 function patchFlood(m) {
   m.onBeforeCompile = sh => {
-    sh.uniforms.uFlP = { value: FLOOD.p }; sh.uniforms.uFlC = { value: FLOOD.c };
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec4 uFlP[6]; uniform vec3 uFlC[6];')
+    sh.uniforms.uFlP = { value: FLOOD.p }; sh.uniforms.uFlC = { value: FLOOD.c }; sh.uniforms.uAmb = { value: FLOOD.amb };
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec4 uFlP[6]; uniform vec3 uFlC[6]; uniform vec3 uAmb;')
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+      reflectedLight.indirectDiffuse += diffuseColor.rgb * uAmb - BRDF_Lambert(diffuseColor.rgb) * ambientLightColor; // own daylight bounce instead of the scene's flat ambient
       { vec3 fpos = -vViewPosition; for (int i = 0; i < 6; i++) { vec3 L = uFlP[i].xyz - fpos; float d2 = max(dot(L, L), 1e-4); float ndl = max(dot(normal, L * inversesqrt(d2)), 0.0) * 0.85 + 0.15;
         reflectedLight.indirectDiffuse += diffuseColor.rgb * uFlC[i] * ndl / (1.0 + d2 * uFlP[i].w); } }`);
   };
@@ -107,14 +108,14 @@ void main() {
 export function buildCockpit(displays, opts = {}) {
   const g = new THREE.Group(); g.name = 'cockpit';
   // ---------- materials (procedural sets) ----------
-  const SETS = { shell: matSet('vinyl', '#c3c2bc'), frame: matSet('leather', '#787e86'), paint: matSet('paint', '#4a5662'), crackle: matSet('crackle', '#16181b'), carpet: matSet('carpet', '#2f343b'),
-    leather: matSet('leather', '#2a2d33'), sheep: matSet('sheep', '#e3d8c3'), metal: matSet('brushed', '#b4b9bf'), dark: matSet('rubber', '#202328'), rubber: matSet('rubber', '#151618') };
+  const SETS = { shell: matSet('vinyl', '#ccc9c0'), frame: matSet('satin', '#b3b0a7'), paint: matSet('paint', '#4a5662'), crackle: matSet('crackle', '#141518'), carpet: matSet('carpet', '#2a2e34'),
+    leather: matSet('leather', '#2a2d33'), sheep: matSet('sheep', '#ede4d3'), metal: matSet('brushed', '#b4b9bf'), dark: matSet('rubber', '#202328'), rubber: matSet('rubber', '#151618'), plastic: matSet('satin', '#34383e') };
   const mk = (k, o = {}) => { const s = SETS[k]; const m = deckMat({ map: s.map, normalMap: s.normalMap, roughnessMap: s.roughnessMap, roughness: 1, metalness: 0, envMapIntensity: 1, ...o }); m.userData.scale = s.scale; return m; };
-  const MATS = { shell: mk('shell', { side: THREE.DoubleSide }), frame: mk('frame', { side: THREE.DoubleSide }), paint: mk('paint'), crackle: mk('crackle', { side: THREE.DoubleSide }), carpet: mk('carpet'),
+  const MATS = { shell: mk('shell', { side: THREE.DoubleSide }), frame: mk('frame', { side: THREE.DoubleSide }), paint: mk('paint'), crackle: mk('crackle', { side: THREE.DoubleSide }), carpet: mk('carpet'), plastic: mk('plastic'),
     leather: mk('leather', { envMapIntensity: 0.8 }), sheep: mk('sheep', { envMapIntensity: 0.9 }), metal: mk('metal', { metalness: 1, envMapIntensity: 1.2 }), dark: mk('dark'), rubber: mk('rubber'),
     red: deckMat({ color: 0xb3261c, roughness: 0.35 }), white: deckMat({ color: 0xe9e8e2, roughness: 0.45 }), yellow: deckMat({ color: 0xd9a514, roughness: 0.5 }) };
   // ---------- atlases ----------
-  const AT = { main: new Atlas(2048, 2048, 940), ovh: new Atlas(1024, 1392, 1150), ped: new Atlas(2048, 2048, 980) };
+  const AT = { main: new Atlas(2048, 2048, 940), ovh: new Atlas(1024, 1392, 1150), ped: new Atlas(2048, 2048, 950) };
   const ao = (p, n) => {
     let a = 0.5 + 0.5 * sm(FLOOR, FLOOR + 0.5, p.y);
     if (p.z < -16.1 && p.y < 0.86 && p.y > 0.2 && Math.abs(p.x) < 1.1) a *= 0.62 + 0.38 * sm(0, 0.3, 0.86 - p.y);
@@ -129,12 +130,13 @@ export function buildCockpit(displays, opts = {}) {
 
   // ======================================================= SHELL: windows, frames, posts, roof, sills
   const WL = {
-    FL: [V(-0.045, 0.78, -16.98), V(-0.98, 0.83, -16.48), V(-0.86, 1.50, -16.00), V(-0.045, 1.50, -16.42)],
-    S1: [V(-1.06, 0.88, -16.34), V(-1.22, 0.92, -15.62), V(-1.10, 1.49, -15.52), V(-0.93, 1.50, -15.92)],
+    FL: [V(-0.032, 0.72, -16.98), V(-0.98, 0.78, -16.48), V(-0.86, 1.50, -16.00), V(-0.032, 1.50, -16.42)],
+    S1: [V(-1.04, 0.83, -16.39), V(-1.22, 0.90, -15.62), V(-1.10, 1.49, -15.52), V(-0.925, 1.50, -15.935)],
     S2: [V(-1.24, 0.94, -15.50), V(-1.27, 0.98, -14.95), V(-1.17, 1.42, -14.92), V(-1.12, 1.46, -15.42)],
   };
   const END_T = V(-1.20, 1.38, -14.45), END_B = V(-1.29, 1.00, -14.45);
-  const PROFILE = [[-0.008, 0.003], [-0.002, 0.016], [0.008, 0.03], [0.024, 0.04], [0.046, 0.044], [0.07, 0.04], [0.09, 0.029], [0.104, 0.013], [0.112, 0.0]];
+  // flattened window trim with rounded edges (seal lip tucked over the glass), ~3 cm wide, 1.4 cm proud
+  const PROFILE = [[-0.006, 0.0015], [-0.0035, 0.0075], [0.002, 0.012], [0.009, 0.014], [0.021, 0.0138], [0.027, 0.01], [0.0305, 0.004], [0.032, 0.0]];
   const glassGeos = [], windows = [];
   for (const k in WL) for (const side of [-1, 1]) windows.push({ k, side, pts: WL[k].map(p => side < 0 ? p.clone() : mx(p)) });
   const frameFor = (pts, n, r = 0.075) => add(sweepFrame(densify(filletOutline(pts, r, 5), 0.04), () => n, PROFILE), 'frame');
@@ -144,14 +146,20 @@ export function buildCockpit(displays, opts = {}) {
     w.n = n; w.c = c; frameFor(w.pts, n);
     const o = n.clone().multiplyScalar(-0.004); glassGeos.push(quad(...w.pts.map(p => p.clone().add(o))));
   }
-  // posts between panes (padded lining under the frames)
+  // posts between panes: a flattened section with rounded edges, bulging slightly into the cockpit
+  const post = (A0, A1, B0, B1, bulge, key = 'frame') => add(gridSurface((s, t) => { const a = A0.clone().lerp(A1, s), b = B0.clone().lerp(B1, s); const p = a.clone().lerp(b, t); return p.addScaledVector(CENTER.clone().sub(p).normalize(), bulge * Math.pow(Math.sin(Math.PI * t), 0.45)); }, 12, 8), key);
   for (const sd of [1, -1]) {
     const f = p => sd < 0 ? p.clone() : mx(p); const { FL, S1, S2 } = WL;
-    add(strip(polyLerp([f(FL[1]), f(FL[2])], 10), polyLerp([f(S1[0]), f(S1[3])], 10)), 'shell');
-    add(strip(polyLerp([f(S1[1]), f(S1[2])], 10), polyLerp([f(S2[0]), f(S2[3])], 10)), 'shell');
+    post(f(FL[1]), f(FL[2]), f(S1[0]), f(S1[3]), 0.022); post(f(S1[1]), f(S1[2]), f(S2[0]), f(S2[3]), 0.02);
     add(strip(polyLerp([f(S2[1]), f(S2[2])], 10), polyLerp([f(END_B), f(END_T)], 10)), 'shell');
+    // flat sills under the side windows (rounded ledge instead of a pipe)
+    for (const [b0, b1] of [[S1[0], S1[1]], [S2[0], S2[1]]]) {
+      const A = f(b0), B = f(b1), along = B.clone().sub(A); const len = along.length(); along.normalize(); const up = V(0, 1, 0).addScaledVector(along, -along.y).normalize();
+      const inw = along.clone().cross(up).normalize(); const mid = A.clone().add(B).multiplyScalar(0.5); if (inw.dot(CENTER.clone().sub(mid)) < 0) inw.negate();
+      add(RB(len + 0.03, 0.018, 0.08, 0.007), 'frame', new THREE.Matrix4().makeBasis(along, up, inw).setPosition(mid.clone().addScaledVector(inw, 0.036).addScaledVector(up, -0.012)));
+    }
   }
-  add(strip(polyLerp([WL.FL[0], WL.FL[3]], 10), polyLerp([mx(WL.FL[0]), mx(WL.FL[3])], 10)), 'shell');
+  post(WL.FL[0], WL.FL[3], mx(WL.FL[0]), mx(WL.FL[3]), 0.016);
   // roof: sections at constant z from the left window-top line over the crown to the right one
   const TOP = [WL.FL[3], WL.FL[2], WL.S1[3], WL.S1[2], WL.S2[3], WL.S2[2], END_T];
   const TL = [0]; for (let i = 1; i < TOP.length; i++) TL.push(TL[i - 1] + TOP[i].distanceTo(TOP[i - 1])); const TLEN = TL[TL.length - 1];
@@ -176,16 +184,17 @@ export function buildCockpit(displays, opts = {}) {
     add(new THREE.BoxGeometry(0.9, 0.05, 0.04), 'paint', T(-0.2, 1.745, -14.47)); for (const x of [-0.645, 0.245]) add(new THREE.BoxGeometry(0.05, 1.9, 0.04), 'paint', T(x, FLOOR + 0.95, -14.47)); }
   // floor, nose bulkhead, corner walls
   add(new THREE.PlaneGeometry(2.6, 2.2).rotateX(-Math.PI / 2), 'carpet', T(0, FLOOR, -15.55));
-  add(new THREE.PlaneGeometry(2.6, 1.1), 'dark', T(0, FLOOR + 0.5, -16.62));
+  add(new THREE.PlaneGeometry(2.6, 0.86), 'dark', T(0, FLOOR + 0.43, -16.62)); // nose bulkhead, kept below the glareshield top
   for (const sd of [-1, 1]) add(new THREE.PlaneGeometry(0.32, 0.6), 'paint', T(sd * 1.14, 0.56, -16.46));
 
   // ======================================================= GLARESHIELD
-  { const A = polyLerp([V(0, 0.775, -16.99), WL.FL[1], V(-1.05, 0.845, -16.44)], 30); const Bv = A.map(p => V(p.x, 1.0, -16.31));
+  // sloped top from the windshield base up to a rounded padded lip; short, so the view over the nose stays open
+  { const A = polyLerp([V(0, 0.715, -16.99), WL.FL[1], V(-1.05, 0.80, -16.44)], 30); const Bv = A.map(p => V(p.x, 0.962, -16.25));
     add(strip(A, Bv), 'crackle'); add(strip(A.map(mx), Bv.map(mx)), 'crackle');
-    const P2 = (z, y) => [-z, y]; const lip = new THREE.Shape(); lip.moveTo(...P2(-16.34, 1.0)); lip.lineTo(...P2(-16.17, 1.0)); lip.quadraticCurveTo(...P2(-16.115, 1.0), ...P2(-16.115, 0.97));
-    lip.lineTo(...P2(-16.1, 0.885)); lip.quadraticCurveTo(...P2(-16.1, 0.862), ...P2(-16.13, 0.862)); lip.lineTo(...P2(-16.37, 0.858)); lip.lineTo(...P2(-16.37, 0.97)); lip.closePath();
-    const lg = new THREE.ExtrudeGeometry(lip, { depth: 2.05, bevelEnabled: true, bevelThickness: 0.015, bevelSize: 0.006, bevelSegments: 3, curveSegments: 8 }); lg.rotateY(Math.PI / 2); lg.translate(-1.025, 0, 0); add(lg, 'crackle'); }
-  const FGS = faceFrame(V(-1.0, 0.885, -16.10), V(1.0, 0.885, -16.10), V(-1.0, 0.97, -16.115));
+    const P2 = (z, y) => [-z, y]; const lip = new THREE.Shape(); lip.moveTo(...P2(-16.27, 0.958)); lip.lineTo(...P2(-16.185, 0.978)); lip.quadraticCurveTo(...P2(-16.124, 0.99), ...P2(-16.121, 0.955));
+    lip.lineTo(...P2(-16.112, 0.872)); lip.quadraticCurveTo(...P2(-16.112, 0.854), ...P2(-16.14, 0.854)); lip.lineTo(...P2(-16.37, 0.851)); lip.lineTo(...P2(-16.37, 0.95)); lip.closePath();
+    const lg = new THREE.ExtrudeGeometry(lip, { depth: 2.05, bevelEnabled: true, bevelThickness: 0.015, bevelSize: 0.005, bevelSegments: 3, curveSegments: 10 }); lg.rotateY(Math.PI / 2); lg.translate(-1.025, 0, 0); add(lg, 'crackle'); }
+  const FGS = faceFrame(V(-1.0, 0.873, -16.107), V(1.0, 0.873, -16.107), V(-1.0, 0.956, -16.116));
 
   // ======================================================= MAIN PANEL faces (atlas) + knee panels
   const MP = { L: [V(-1.04, 0.30, -16.20), V(-0.25, 0.30, -16.27), V(-1.04, 0.855, -16.275)], C: [V(-0.25, 0.30, -16.27), V(0.25, 0.30, -16.27), V(-0.25, 0.855, -16.345)], R: [V(0.25, 0.30, -16.27), V(1.04, 0.30, -16.20), V(0.25, 0.855, -16.345)] };
@@ -286,22 +295,24 @@ export function buildCockpit(displays, opts = {}) {
 
   // ======================================================= GLARESHIELD units: FCU, EFIS ×2, master warning/caution
   const fcuCv = canvas(1024, 96);
-  { add(bevelBox(0.62, 0.088, 0.05, 0.008, 0.004), 'paint', fmat(FGS, 1.0, 0.044, 0.025)); const F = face('fcu', 'main', fpt(FGS, 0.69, 0.0, 0.0505), fpt(FGS, 1.31, 0.0, 0.0505), fpt(FGS, 0.69, 0.088, 0.0505));
-    for (const [x, t] of [[0.065, 'SPD'], [0.215, 'HDG'], [0.395, 'ALT'], [0.535, 'V/S']]) { lab(F, t, x, 0.012, 0.0072, { weight: 700 }); }
-    readout(F, 0.065, 0.032, 0.07, 0.022, fcuCv, 0, 0, 0.25, 1); readout(F, 0.215, 0.032, 0.07, 0.022, fcuCv, 0.25, 0, 0.5, 1); readout(F, 0.395, 0.032, 0.09, 0.022, fcuCv, 0.5, 0, 0.75, 1); readout(F, 0.535, 0.032, 0.085, 0.022, fcuCv, 0.75, 0, 1, 1);
-    knobCtl(F, 0.065, 0.066, { id: 'fcuSpd', name: 'Speed knob', scale: false }); knobCtl(F, 0.215, 0.066, { id: 'fcuHdg', name: 'Heading knob', scale: false }); knobCtl(F, 0.395, 0.066, { id: 'fcuAlt', name: 'Altitude knob', scale: false }); knobCtl(F, 0.535, 0.066, { id: 'fcuVs', name: 'Vertical speed knob', scale: false });
-    pb(F, 0.135, 0.066, { id: 'fcuLoc', top: 'BAR', bot: 'LOC', w: 0.026, h: 0.02, name: 'LOC' }); pb(F, 0.30, 0.03, { id: 'fcuAp1', top: 'BAR', bot: 'AP1', w: 0.026, h: 0.02, name: 'Autopilot 1' }); pb(F, 0.335, 0.03, { id: 'fcuAp2', top: 'BAR', bot: 'AP2', w: 0.026, h: 0.02, name: 'Autopilot 2' });
-    pb(F, 0.3175, 0.066, { id: 'fcuAthr', top: 'BAR', bot: 'A/THR', w: 0.03, h: 0.02, name: 'Autothrust' }); pb(F, 0.465, 0.066, { id: 'fcuExped', top: 'BAR', bot: 'EXPED', w: 0.028, h: 0.02, name: 'EXPED' }); pb(F, 0.6, 0.066, { id: 'fcuAppr', top: 'BAR', bot: 'APPR', w: 0.026, h: 0.02, name: 'Approach' });
-    F.P.seam(0.27, 0.005, 0.27, 0.083); F.P.seam(0.365, 0.005, 0.365, 0.083); }
+  // one continuous, nearly flush unit across the centre of the glareshield face: EFIS L | FCU | EFIS R
+  add(bevelBox(1.42, 0.078, 0.012, 0.006, 0.003), 'paint', fmat(FGS, 1.0, 0.0415, 0.006));
+  const GSC = face('gsc', 'main', fpt(FGS, 0.29, 0.0025, 0.0122), fpt(FGS, 1.71, 0.0025, 0.0122), fpt(FGS, 0.29, 0.0805, 0.0122));
+  { const F = GSC, X = 0.36; F.P.seam(0.33, 0.004, 0.33, 0.074); F.P.seam(1.09, 0.004, 1.09, 0.074);
+    for (const [x, t] of [[0.065, 'SPD'], [0.215, 'HDG'], [0.395, 'ALT'], [0.535, 'V/S']]) { lab(F, t, X + x, 0.009, 0.0068, { weight: 700 }); }
+    readout(F, X + 0.065, 0.026, 0.07, 0.019, fcuCv, 0, 0, 0.25, 1); readout(F, X + 0.215, 0.026, 0.07, 0.019, fcuCv, 0.25, 0, 0.5, 1); readout(F, X + 0.395, 0.026, 0.09, 0.019, fcuCv, 0.5, 0, 0.75, 1); readout(F, X + 0.535, 0.026, 0.085, 0.019, fcuCv, 0.75, 0, 1, 1);
+    knobCtl(F, X + 0.065, 0.056, { id: 'fcuSpd', name: 'Speed knob', scale: false }); knobCtl(F, X + 0.215, 0.056, { id: 'fcuHdg', name: 'Heading knob', scale: false }); knobCtl(F, X + 0.395, 0.056, { id: 'fcuAlt', name: 'Altitude knob', scale: false }); knobCtl(F, X + 0.535, 0.056, { id: 'fcuVs', name: 'Vertical speed knob', scale: false });
+    pb(F, X + 0.135, 0.056, { id: 'fcuLoc', top: 'BAR', bot: 'LOC', w: 0.026, h: 0.019, name: 'LOC' }); pb(F, X + 0.30, 0.025, { id: 'fcuAp1', top: 'BAR', bot: 'AP1', w: 0.026, h: 0.019, name: 'Autopilot 1' }); pb(F, X + 0.335, 0.025, { id: 'fcuAp2', top: 'BAR', bot: 'AP2', w: 0.026, h: 0.019, name: 'Autopilot 2' });
+    pb(F, X + 0.3175, 0.056, { id: 'fcuAthr', top: 'BAR', bot: 'A/THR', w: 0.03, h: 0.019, name: 'Autothrust' }); pb(F, X + 0.465, 0.056, { id: 'fcuExped', top: 'BAR', bot: 'EXPED', w: 0.028, h: 0.019, name: 'EXPED' }); pb(F, X + 0.62, 0.056, { id: 'fcuAppr', top: 'BAR', bot: 'APPR', w: 0.026, h: 0.019, name: 'Approach' });
+    F.P.seam(X + 0.27, 0.006, X + 0.27, 0.072); F.P.seam(X + 0.365, 0.006, X + 0.365, 0.072); }
   const efisCv = canvas(256, 64);
   for (const sd of [-1, 1]) {
-    const cx = 1.0 + sd * 0.53; add(bevelBox(0.30, 0.080, 0.035, 0.008, 0.004), 'paint', fmat(FGS, cx, 0.043, 0.0175));
-    const F = face(sd < 0 ? 'efisL' : 'efisR', 'main', fpt(FGS, cx - 0.15, 0.003, 0.0355), fpt(FGS, cx + 0.15, 0.003, 0.0355), fpt(FGS, cx - 0.15, 0.083, 0.0355));
-    lab(F, 'BARO', 0.05, 0.012, 0.0065, { weight: 700 }); readout(F, 0.05, 0.03, 0.055, 0.018, efisCv, sd < 0 ? 0 : 0.5, 0, sd < 0 ? 0.5 : 1, 1);
-    knobCtl(F, 0.05, 0.062, { id: 'baro' + sd, name: 'Baro knob', scale: false });
-    ['FD', 'LS'].forEach((t, i) => pb(F, 0.105, 0.025 + i * 0.03, { id: t.toLowerCase() + sd, top: 'BAR', bot: t, w: 0.022, h: 0.019, name: t === 'FD' ? 'Flight director' : 'Landing system' }));
-    ['CSTR', 'WPT', 'VOR.D', 'NDB', 'ARPT'].forEach((t, i) => pb(F, 0.14 + i * 0.026, 0.022, { id: 'efis' + t + sd, top: 'BAR', bot: t, w: 0.022, h: 0.018, name: t }));
-    rot(F, 0.17, 0.06, { id: 'ndMode' + sd, label: '', pos: ['LS', 'VOR', 'NAV', 'ARC', 'PLAN'], name: 'ND mode', spread: 1.1 }); rot(F, 0.245, 0.06, { id: 'ndRange' + sd, label: '', pos: ['10', '20', '40', '80', '160'], name: 'ND range', spread: 1.1 });
+    const F = GSC, o = sd < 0 ? 0.0 : 1.12;
+    lab(F, 'BARO', o + 0.045, 0.009, 0.006, { weight: 700 }); readout(F, o + 0.045, 0.025, 0.055, 0.017, efisCv, sd < 0 ? 0 : 0.5, 0, sd < 0 ? 0.5 : 1, 1);
+    knobCtl(F, o + 0.045, 0.056, { id: 'baro' + sd, name: 'Baro knob', scale: false });
+    ['FD', 'LS'].forEach((t, i) => pb(F, o + 0.1, 0.022 + i * 0.033, { id: t.toLowerCase() + sd, top: 'BAR', bot: t, w: 0.022, h: 0.018, name: t === 'FD' ? 'Flight director' : 'Landing system' }));
+    ['CSTR', 'WPT', 'VOR.D', 'NDB', 'ARPT'].forEach((t, i) => pb(F, o + 0.137 + i * 0.026, 0.02, { id: 'efis' + t + sd, top: 'BAR', bot: t, w: 0.022, h: 0.017, name: t }));
+    rot(F, o + 0.17, 0.056, { id: 'ndMode' + sd, label: '', pos: ['LS', 'VOR', 'NAV', 'ARC', 'PLAN'], name: 'ND mode', spread: 1.1 }); rot(F, o + 0.245, 0.056, { id: 'ndRange' + sd, label: '', pos: ['10', '20', '40', '80', '160'], name: 'ND range', spread: 1.1 });
     const mw = pb(FGS, 1.0 + sd * 0.84, 0.062, { id: 'mw' + sd, top: 'MASTER', bot: 'WARN', w: 0.042, h: 0.026, big: true, name: 'Master warning' });
     const mc = pb(FGS, 1.0 + sd * 0.84, 0.03, { id: 'mc' + sd, top: 'MASTER', bot: 'CAUT', w: 0.042, h: 0.026, big: true, name: 'Master caution' });
     add(bevelBox(0.06, 0.07, 0.012, 0.006, 0.003), 'dark', fmat(FGS, 1.0 + sd * 0.84, 0.046, 0.0)); mw.o.z0 = mc.o.z0 = 0.006;
@@ -430,6 +441,9 @@ export function buildCockpit(displays, opts = {}) {
     const B = mul(T(x, 0.37, zc + 0.235), RX(0.2));
     add(RB(0.46, 0.66, 0.11, 0.04), 'leather', mul(B.clone(), T(0, 0.36, 0.03))); for (const s of [-1, 1]) add(RB(0.07, 0.58, 0.12, 0.03), 'leather', mul(B.clone(), T(s * 0.205, 0.36, -0.005)));
     add(RB(0.34, 0.56, 0.03, 0.012), 'sheep', mul(B.clone(), T(0, 0.37, -0.035))); add(RB(0.28, 0.17, 0.10, 0.045), 'leather', mul(B.clone(), T(0, 0.80, 0.02)));
+    // moulded seat-back shell and headrest shell
+    add(new THREE.ExtrudeGeometry(rrShape(0.44, 0.70, 0.09), { depth: 0.01, bevelEnabled: true, bevelThickness: 0.026, bevelSize: 0.02, bevelSegments: 4, curveSegments: 6 }), 'plastic', mul(B.clone(), T(0, 0.37, 0.108)));
+    add(new THREE.ExtrudeGeometry(rrShape(0.24, 0.13, 0.05), { depth: 0.006, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.016, bevelSegments: 3, curveSegments: 5 }), 'plastic', mul(B.clone(), T(0, 0.80, 0.085)));
     for (const s of [-1, 1]) add(new THREE.CylinderGeometry(0.008, 0.008, 0.07, 8), 'metal', mul(B.clone(), T(s * 0.07, 0.70, 0.03)));
     for (const s of [-1, 1]) { add(RB(0.06, 0.05, 0.30, 0.022), 'leather', T(x + s * 0.265, 0.62, zc - 0.03)); add(new THREE.BoxGeometry(0.02, 0.17, 0.03), 'dark', T(x + s * 0.265, 0.53, zc + 0.12)); }
     add(new THREE.BoxGeometry(0.12, 0.012, 0.012), 'metal', T(x + 0.2, 0.27, zc - 0.22)); add(RB(0.03, 0.03, 0.03, 0.012), 'dark', T(x + 0.265, 0.27, zc - 0.22));
@@ -442,11 +456,10 @@ export function buildCockpit(displays, opts = {}) {
   for (const y of [0.15, 0.36]) add(new THREE.TorusGeometry(0.058, 0.006, 6, 20).rotateX(Math.PI / 2), 'metal', T(-0.98, y, -14.53));
   add(new THREE.TorusGeometry(0.022, 0.005, 6, 12, Math.PI * 1.3).rotateY(Math.PI / 2), 'metal', T(-0.85, 1.48, -14.475)); add(new THREE.BoxGeometry(0.03, 0.05, 0.01), 'metal', T(-0.85, 1.5, -14.452));
   add(bevelBox(0.42, 0.30, 0.20, 0.03, 0.01), 'leather', mul(T(-0.78, FLOOR + 0.155, -14.72), RY(0.2))); add(new THREE.TorusGeometry(0.06, 0.012, 8, 16, Math.PI), 'leather', mul(T(-0.78, FLOOR + 0.31, -14.72), RY(0.2)));
-  for (const sd of [-1, 1]) for (const [y, z] of [[0.86, -16.1], [0.9, -15.28]]) { const p = V(sd * 1.235, y, z); add(new THREE.TorusGeometry(0.03, 0.009, 8, 20).rotateY(Math.PI / 2), 'dark', T(p.x, p.y, p.z)); add(new THREE.SphereGeometry(0.022, 14, 10), 'metal', T(p.x - sd * 0.006, p.y, p.z)); }
   add(RB(0.07, 0.06, 0.06, 0.012), 'dark', T(0, 1.455, -16.41)); add(new THREE.PlaneGeometry(0.04, 0.02).translate(0, 0, 0.031), 'white', T(0, 1.455, -16.41));
   for (const sd of [-1, 1]) { add(new THREE.CylinderGeometry(0.025, 0.03, 0.05, 14), 'dark', T(sd * 0.6, 1.76, -15.42)); add(new THREE.CylinderGeometry(0.022, 0.022, 0.004, 14), 'white', T(sd * 0.6, 1.733, -15.42)); }
   // window crank & release handle on the sliding windows
-  for (const sd of [-1, 1]) { add(new THREE.BoxGeometry(0.012, 0.012, 0.11), 'metal', T(sd * 1.14, 0.95, -15.74)); add(new THREE.CylinderGeometry(0.012, 0.012, 0.035, 10).rotateZ(Math.PI / 2), 'dark', T(sd * 1.12, 0.95, -15.69)); add(RB(0.03, 0.06, 0.02, 0.008), 'red', T(sd * 0.99, 1.38, -15.9)); }
+  for (const sd of [-1, 1]) { add(RB(0.12, 0.05, 0.012, 0.005), 'dark', mul(T(sd * 1.13, 0.86, -15.92), RY(sd * -0.25))); add(RB(0.085, 0.012, 0.022, 0.005), 'plastic', mul(T(sd * 1.123, 0.872, -15.915), RY(sd * -0.25))); add(RB(0.014, 0.034, 0.012, 0.005), 'red', T(sd * 0.962, 1.40, -15.93)); }
   // rudder pedals
   for (const x0 of [-0.56, 0.56]) for (const s of [-1, 1]) add(RB(0.09, 0.19, 0.025, 0.01), 'dark', mul(T(x0 + s * 0.11, 0.0, -16.42), RX(-0.5)));
 
@@ -559,7 +572,7 @@ export function buildCockpit(displays, opts = {}) {
     const z = sky.skyApprox(), sunUp = THREE.MathUtils.smoothstep(sky.sunElev, -6, 12);
     envWin.color.setRGB(z.r * 3.2 + 0.6 * sunUp, z.g * 3.0 + 0.62 * sunUp, z.b * 2.6 + 0.66 * sunUp);
     envGnd.color.setRGB(0.12 * sunUp + 0.01, 0.12 * sunUp + 0.01, 0.11 * sunUp + 0.012);
-    const wall = 0.05 + 0.32 * sunUp + light.dome * 0.35 + light.flood * 0.15; envRoomMat.color.setRGB(wall, wall * 0.98, wall * 0.95);
+    const wall = 0.003 + 0.30 * sunUp + light.dome * 0.2 + light.flood * 0.03; envRoomMat.color.setRGB(wall, wall * 0.98, wall * 0.95);
     envDisp.color.setRGB(0.05 * light.disp, 0.2 * light.disp, 0.35 * light.disp);
     const old = envRT; envRT = pmrem.fromScene(envScene, 0, 0.05, 20); for (const m of deckMats) m.envMap = envRT.texture; if (old) old.dispose();
   }
@@ -671,12 +684,13 @@ export function buildCockpit(displays, opts = {}) {
     for (const m of screenMats) m.color.setScalar(dispK); if (clockS) clockS.mat.color.setScalar(Math.min(1.2, 0.62 / ctx.exposure + 0.15));
     legMat.uniforms.uPow.value = dc ? (sw.annLt === 'DIM' ? 0.35 : 1) * (night > 0.5 ? 0.55 : 1) : 0; legMat.uniforms.uDay.value = THREE.MathUtils.clamp(1.6 / ctx.exposure * 0.55, 0.15, 1.2) * (0.4 + 0.6 * (1 - night)) + sw.integ * dc * 0.9;
     const integ = (dc ? sw.integ : 0) * 0.55; for (const k in atlasMat) atlasMat[k].emissiveIntensity = integ;
-    const dome = dc ? { OFF: 0, DIM: 0.35, BRT: 1 }[sw.dome] : 0; const flood = dc ? sw.floodMain : 0, ped = dc ? sw.floodPed : 0;
+    const dome = dc ? ({ OFF: 0, DIM: 0.35, BRT: 1 }[sw.dome] ?? 0) : 0; const flood = dc ? (+sw.floodMain || 0) : 0, ped = dc ? (+sw.floodPed || 0) : 0;
     const cam = ctx.camera; const vm = cam.matrixWorldInverse;
     FL_LOCAL.forEach((p, i) => { vTmp.copy(p); g.localToWorld(vTmp); vTmp.applyMatrix4(vm); FLOOD.p[i].set(vTmp.x, vTmp.y, vTmp.z, FL_FALL[i]); });
     FLOOD.c[0].set(1.0, 0.9, 0.76).multiplyScalar(1.5 * dome); FLOOD.c[1].set(1.0, 0.92, 0.8).multiplyScalar(1.1 * flood); FLOOD.c[2].copy(FLOOD.c[1]); FLOOD.c[3].set(1.0, 0.92, 0.8).multiplyScalar(0.9 * ped + (dc ? sw.console : 0) * 0.35);
     const spill = ac ? 0.05 * night : 0; FLOOD.c[4].set(0.4, 0.62, 0.85).multiplyScalar(spill); FLOOD.c[5].copy(FLOOD.c[4]);
     st.light = { dome, flood, disp: ac ? 1 : 0 };
+    const day = THREE.MathUtils.clamp(ctx.daylight ?? 1, 0, 1); FLOOD.amb.set(0.30, 0.31, 0.33).multiplyScalar(0.88 * day * day);
     // readouts (throttled)
     st.rd += dt; if (st.rd > 0.25) { st.rd = 0; st.k = (st.k || 0) + 1; drawFcu(ctx); if (st.k % 2 === 0) drawEfis(ctx); if (st.k % 4 === 0) { drawRmp(ctx); drawElec(ctx); drawClock(ctx.tod, st.t); clockS.mat.map.needsUpdate = true; } if (st.k % 12 === 1) drawMcdu(ctx); if (ac && ctx.S) { drawIsis(ctx.S); isisS.mat.map.needsUpdate = true; } }
   }

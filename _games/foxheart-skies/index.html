@@ -206,6 +206,8 @@ kbd{font:11px var(--f-mono);padding:2px 6px;border-radius:4px;border:1px solid v
 .pacustom .go{padding:7px 16px;font-size:15px}
 .palog{max-height:120px;font-family:var(--f-body),"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif}.palog .rl b{color:var(--fox2)}.palog .note{color:var(--amber);font-size:11px}
 .fcub.pab{color:var(--fox2)}.fcub.pab i{background:var(--fox2)}
+.padhint{font:11px var(--f-mono);color:var(--mute);padding:7px 9px;border:1px dashed var(--line2);border-radius:8px;margin-bottom:10px}
+.padhint.on{color:var(--green);border-style:solid;border-color:rgba(85,224,143,.35)}
 #ckTip{position:fixed;z-index:7;pointer-events:none;padding:5px 9px;border-radius:6px;background:rgba(10,12,16,.88);border:1px solid var(--line2);font:12px var(--f-mono);color:var(--ink);opacity:0;transition:opacity .15s;white-space:nowrap}
 #coldList{position:absolute;left:max(16px,env(safe-area-inset-left,0px));top:110px;width:min(330px,80vw);padding:10px 12px;display:grid;gap:8px;pointer-events:auto;background:rgba(14,18,24,.88)}
 #coldList ol{list-style:none;margin:0;padding:0;display:grid;gap:4px}#coldList li{display:grid;grid-template-columns:20px 1fr;gap:6px;font-size:12px;color:var(--mute)}
@@ -264,6 +266,7 @@ kbd{font:11px var(--f-mono);padding:2px 6px;border-radius:4px;border:1px solid v
       <button data-sec="controls"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h1M10 10h1M14 10h1M18 10h0M7 14h10"/></svg><b>Controls</b><small>Keyboard, mouse yoke and gamepad</small></button>
     </nav>
     <div class="railfoot">
+      <div class="padhint">Using an Xbox controller? Press any button on it to connect it.</div>
       <div class="stats"><div><b id="stA">–</b>airports</div><div><b id="stR">–</b>runways</div><div><b id="stN">–</b>navaids</div></div>
       <div>Runway geometry: OurAirports open data (public domain). Terrain, coastlines, cities and buildings are hand-made approximations.</div>
     </div>

@@ -29,6 +29,16 @@ Progress log: PROGRESS.md (one line per finished step; the last line is where to
   - read the diff for sloppy work (blocky placeholders, dead code, perf traps, broken exports);
   - send fixes back, or fix small issues directly.
 
+## Nico's requests (29 Oct, 2:50 UTC), in priority order
+- **P0 (lead, ship first):**
+  - pad quick fix and cockpit polish;
+  - PA fix: one speech manager with priorities, no cancel from ATIS, chunking, modal number keys, subtitles;
+  - no engine sound at start (engines off at the gate, APU on, a Start engines button);
+  - smoothness pass.
+- **P1 (lead):** cabin and boarding music (procedural); much better ATC flow.
+- **World artist (new, after P0 ships):** better sky and clouds, better ground, very detailed road cars seen from the air.
+- **Paused until P0 ships:** aircraft, character and environment artists. Resume each with SendMessage when ready.
+
 ## Rules
 - After each step: publish to the live link with the full `files` list (index.html, data/world.json, every js/*.js), then copy the folder into the backup repo, commit and push.
 - Runtime hosts: three.js 0.160.0 from jsdelivr and Google Fonts only. No new hosts.

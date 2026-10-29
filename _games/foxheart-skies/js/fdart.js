@@ -53,20 +53,26 @@ export function matSet(kind, hex) {
       const n = fbm(u * 32, v * 32, 32, 3); const sp = rand(); H[k] = n * 0.6 + (sp > 0.985 ? 0.6 : 0); A[k] = (sp > 0.992 ? 0.08 : sp < 0.006 ? -0.07 : 0) + (n - 0.5) * 0.05; R[k] = n;
       nStr = 1.6; rough = [0.62, 0.12]; scale = 0.18;
     } else if (kind === 'crackle') { // wrinkle-finish anti-glare black
-      const a = fbm(u * 24, v * 24, 24, 4), b = fbm(u * 24 + 7.3, v * 24 + 3.1, 24, 4); const r = 1 - Math.abs(a - b) * 4; H[k] = Math.max(0, r) ** 3 + fbm(u * 64, v * 64, 64, 2) * 0.25; A[k] = H[k] * 0.06; R[k] = 1 - H[k] * 0.3;
-      nStr = 4; rough = [0.86, 0.12]; scale = 0.12;
+      const a = fbm(u * 32, v * 32, 32, 3), b = fbm(u * 32 + 7.3, v * 32 + 3.1, 32, 3); const r = 1 - Math.abs(a - b) * 4; H[k] = Math.max(0, r) ** 3 * 0.6 + fbm(u * 96, v * 96, 96, 2) * 0.2; A[k] = H[k] * 0.015; R[k] = 1 - H[k] * 0.15;
+      nStr = 0.8; rough = [0.84, 0.05]; scale = 0.05;
     } else if (kind === 'leather') { // pebble grain
       const a = fbm(u * 40, v * 40, 40, 3); const cell = vnoise(u * 90, v * 90, 90); H[k] = cell * 0.7 + a * 0.4; A[k] = (a - 0.5) * 0.12; R[k] = 1 - cell;
       nStr = 2.4; rough = [0.5, 0.18]; scale = 0.16;
     } else if (kind === 'carpet') { // short-pile loop carpet
-      const f = vnoise(u * 128, v * 128, 128), m = fbm(u * 8, v * 8, 8, 3); H[k] = f * 0.8 + ((i + j) % 4 < 2 ? 0.15 : 0); A[k] = (f - 0.5) * 0.25 + (m - 0.5) * 0.12; R[k] = 0.5;
-      nStr = 3.2; rough = [0.95, 0.04]; scale = 0.2;
-    } else if (kind === 'sheep') { // sheepskin curls
-      const c1 = fbm(u * 20, v * 20, 20, 4), c2 = vnoise(u * 60 + c1 * 3, v * 60, 60); const curl = Math.sin((c1 * 9 + c2 * 2) * Math.PI) * 0.5 + 0.5; H[k] = curl * 0.8 + c2 * 0.3; A[k] = (curl - 0.5) * 0.22; R[k] = 0.5;
-      nStr = 5; rough = [0.97, 0.03]; scale = 0.14;
-    } else if (kind === 'vinyl') { // soft-touch wall lining
-      const n = fbm(u * 48, v * 48, 48, 3); H[k] = n; A[k] = (fbm(u * 6, v * 6, 6, 2) - 0.5) * 0.06 + (n - 0.5) * 0.03; R[k] = n;
-      nStr = 1.4; rough = [0.72, 0.1]; scale = 0.3;
+      // fine loop pile: a regular grid of rounded loops with a little fibre noise
+      const lx = Math.sin(u * Math.PI * 2 * 64), ly = Math.sin(v * Math.PI * 2 * 64); const loop = (lx * lx * 0.5 + ly * ly * 0.5); const f = vnoise(u * 256, v * 256, 256);
+      H[k] = loop * 0.7 + f * 0.3; A[k] = (loop - 0.5) * 0.05 + (f - 0.5) * 0.03 + (fbm(u * 4, v * 4, 4, 2) - 0.5) * 0.03; R[k] = 0.5;
+      nStr = 1.0; rough = [0.95, 0.03]; scale = 0.12;
+    } else if (kind === 'sheep') { // sheepskin: dense soft fibres, gently directional
+      const w = fbm(u * 6, v * 6, 6, 3); const fib = vnoise(u * 200 + w * 6, v * 70, 200) * 0.6 + vnoise(u * 400, v * 140 + w * 9, 400) * 0.4; const tuft = fbm(u * 24, v * 24, 24, 3);
+      H[k] = fib * 0.55 + tuft * 0.45; A[k] = (fib - 0.5) * 0.06 + (tuft - 0.5) * 0.05; R[k] = 0.5;
+      nStr = 1.3; rough = [0.98, 0.02]; scale = 0.1;
+    } else if (kind === 'vinyl') { // soft-touch wall lining: smooth, very fine grain
+      const n = fbm(u * 96, v * 96, 96, 2); H[k] = n * 0.5; A[k] = (fbm(u * 4, v * 4, 4, 2) - 0.5) * 0.012 + (n - 0.5) * 0.006; R[k] = n;
+      nStr = 0.12; rough = [0.7, 0.03]; scale = 0.08;
+    } else if (kind === 'satin') { // smooth satin paint (window trims, posts)
+      const n = fbm(u * 128, v * 128, 128, 2); H[k] = n * 0.4; A[k] = (n - 0.5) * 0.008; R[k] = n;
+      nStr = 0.08; rough = [0.5, 0.03]; scale = 0.06;
     } else if (kind === 'brushed') { // brushed aluminium, streaks along u
       const s = vnoise(u * 3, v * 220, 220) * 0.6 + vnoise(u * 1, v * 600, 600) * 0.4; H[k] = s * 0.4; A[k] = (s - 0.5) * 0.12; R[k] = s;
       nStr = 0.8; rough = [0.32, 0.16]; scale = 0.15;
