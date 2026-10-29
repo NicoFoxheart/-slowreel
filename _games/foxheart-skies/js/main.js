@@ -21,6 +21,7 @@ import { ATC, facility, DEST_DEFAULT, SHORT } from './atc.js';
 import { OnFoot } from './onfoot.js';
 import { PA, PA_LINES } from './pa.js';
 import { Speech } from './speech.js';
+import { GroundCrew } from './groundcrew.js';
 import { buildCabin } from './interiors.js';
 import { rng } from './terrain.js';
 
@@ -73,6 +74,7 @@ const audio = new Audio(); audio.vol = settings.vol; audio.voice = settings.voic
 const traffic = new Traffic(scene);
 const atc = new ATC(audio);
 const foot = new OnFoot(scene, camera, aircraft, audio);
+const crew = new GroundCrew(scene); // tug, chocks, cones, GPU and ramp crew at the stand
 const pa = new PA(audio);
 // one speech queue for PA, ATC, ATIS, chatter and callouts, with subtitles and a PA-live indicator
 const speech = new Speech(); atc.speech = speech; pa.speech = speech; audio.speech = speech;
@@ -182,6 +184,7 @@ async function startFlight(cfg) {
   setTimeOfDay(cfg.tod ?? 1080);
   W.lastTD = null; W.scored = false; W.timeAccel = 1; W.descending = false; W.push = null; W.autoTaxi = null; W.parkedAt = null; W.tripDone = false; showTaxi(null); foot.dispose(); disposeFlightCabin(); W.onFoot = false; W.signs = { belt: true, smoke: true }; Object.assign(CC, { v: 78, cd: {}, warnT: 0, hints: {} }); paLog.length = 0; if (paOpen) togglePA(false);
   if (!(cfg.start === 'gate' || cfg.start === 'terminal')) { W.stand = null; W.standB = null; }
+  crew.clear(); if (!cfg.menu && W.stand) { aircraft.position.copy(fdm.pos); aircraft.quaternion.copy(fdm.q); aircraft.updateMatrixWorld(true); crew.atStand(aircraft, ground); W.stand.jb?.userData?.setDocked?.(true); }
   // at a gate the engines are off (APU running, or everything off for cold & dark); runway and air starts keep them running
   const atGate = cfg.start === 'gate' || cfg.start === 'terminal', cold = !!cfg.cold && atGate;
   sys.reset(cold ? 'cold' : atGate && !cfg.menu ? 'gate' : 'run'); W.ndRange = null; lights._auto = undefined; W.coldDone = !cold; W.coldT = 0; W.autoStart = null;
@@ -246,14 +249,19 @@ function startPushback() {
   const b = W.standB; if (!b || !fdm.onGround) { toast('Pushback is only available at a gate'); return; }
   foot.dispose(); W.onFoot = false; const fr = b.b.frame; const n = V3(fr.nx, 0, fr.nz), u = pushDir();
   const P0 = fdm.pos.clone(), P1 = P0.clone().addScaledVector(n, 30), Rr = 26, C = P1.clone().addScaledVector(n, Rr), P2 = C.clone().addScaledVector(u, -Rr);
-  W.push = { t: 0, T1: 20, T2: 24, P0, P1, C, P2, n, u, done: false }; fdm.parkBrake = false; toast('Pushback in progress… brakes released');
+  // ground crew first: jet bridge retracts, cones and chocks come away, GPU off, the tug drives in and hooks up (about 7 s)
+  W.stand?.jb?.userData?.setDocked?.(false); W.parkedAt?.jb?.userData?.setDocked?.(false);
+  aircraft.position.copy(fdm.pos); aircraft.quaternion.copy(fdm.q); aircraft.updateMatrixWorld(true); if (crew.state === 'off') crew.atStand(aircraft, ground); crew.startPush(aircraft);
+  W.push = { t: -7, T1: 20, T2: 24, P0, P1, C, P2, n, u, done: false }; toast('Pushback: the bridge is retracting and the tug is connecting…');
 }
 function pushStep(dt) {
   const P = W.push; P.t += dt; let pos, nose;
+  if (P.t < 0) { fdm.vel.set(0, 0, 0); fdm.w.set(0, 0, 0); fdm.parkBrake = true; return; }
+  if (!P.started) { P.started = true; fdm.parkBrake = false; toast('Pushback in progress… brakes released'); }
   if (P.t < P.T1) { const k = P.t / P.T1; const e = k * k * (3 - 2 * k); pos = P.P0.clone().lerp(P.P1, e); nose = P.n.clone().negate(); }
   else { const s = Math.min(1, (P.t - P.T1) / P.T2); const a = P.P1.clone().multiplyScalar((1 - s) * (1 - s)).add(P.C.clone().multiplyScalar(2 * s * (1 - s))).add(P.P2.clone().multiplyScalar(s * s));
-    const tan = P.C.clone().sub(P.P1).multiplyScalar(2 * (1 - s)).add(P.P2.clone().sub(P.C).multiplyScalar(2 * s)); pos = a; nose = tan.lengthSq() > 1e-6 ? tan.normalize().negate() : P.u.clone(); if (s >= 1) { P.done = true; fdm.parkBrake = true; toast('Pushback complete. Request taxi (radio) or release the parking brake and taxi.'); } }
-  fdm.pos.x = pos.x; fdm.pos.z = pos.z; fdm.vel.set(0, 0, 0); fdm.w.set(0, 0, 0);
+    const tan = P.C.clone().sub(P.P1).multiplyScalar(2 * (1 - s)).add(P.P2.clone().sub(P.C).multiplyScalar(2 * s)); pos = a; nose = tan.lengthSq() > 1e-6 ? tan.normalize().negate() : P.u.clone(); if (s >= 1) { P.done = true; fdm.parkBrake = true; toast('Pushback complete. Request taxi (radio) or release the parking brake and taxi.'); crew.release(); } }
+  fdm.vel.set((pos.x - fdm.pos.x) / Math.max(dt, 1e-3), 0, (pos.z - fdm.pos.z) / Math.max(dt, 1e-3)); if (P.done) fdm.vel.set(0, 0, 0); fdm.pos.x = pos.x; fdm.pos.z = pos.z; fdm.w.set(0, 0, 0);
   fdm.q.setFromEuler(new THREE.Euler(0, -Math.atan2(nose.x, -nose.z), 0, 'YXZ'));
   if (P.done) W.push = Object.assign(P, { finished: true });
 }
@@ -295,6 +303,7 @@ function parkAtGate(st) {
   Object.assign(sys.sw, { master1: false, master2: false, apuMaster: true, apuBleed: true, beacon: false }); sys.apuN = 100; sys.apuFlap = 1; W.autoStart = null;
   setTimeout(() => { if (W.parkedAt === st) paSay('arrival'); }, 1500); setTimeout(() => { if (W.parkedAt === st) setSigns(false, W.signs.smoke); }, 9000); aircraft.position.copy(fdm.pos); aircraft.quaternion.copy(fdm.q); aircraft.updateMatrixWorld(true);
   foot.build({ mode: 'arr', apt: b.apt, b, stand: st, dest: W.cfg.apt, featured: featured() }); foot.hideInteriors(false);
+  crew.atStand(aircraft, ground, true); st.jb?.userData?.setDocked?.(true);
   toast('Parked at gate ' + st.gateName + '. Press Enter to stand up and walk out with the passengers.', 6000);
 }
 function finishTrip() {
@@ -320,7 +329,7 @@ const atcCtx = {
     return { busy: false };
   },
   pushFace() { const u = pushDir(); return u ? compass(u) : 'west'; },
-  startPushback, pushDone: () => !!(W.push && W.push.done),
+  startPushback, pushDone: () => !!(W.push && W.push.done), crewState: () => ({ state: crew.state, t: +crew.t.toFixed(1), push: W.push && +W.push.t.toFixed(1), tug: crew.tug.visible, cones: crew.cones.filter(c => c.visible).length, chocks: crew.chocks.filter(c => c.visible).length }),
   taxiOut() { return taxiOutRoute(); }, taxiIn() { return taxiInRoute(); }, showTaxi,
   nearHold() { return !!(W.taxiR && W.taxiR.holdPt && fdm.pos.distanceTo(W.taxiR.holdPt) < 200); },
   armIls(hdg, alt) { const A = atc.arr, E = atcCtx.arrEnd(); W.ils = fdm.ap.ils = ilsFor(A, E, aptPos(A)); atc.setAssigned(alt);
@@ -809,6 +818,7 @@ function simulate(dtReal) {
   if (W.push && !W.push.finished) pushStep(simDt);
   else if (W.autoTaxi) autoTaxiStep(simDt);
   else for (let i = 0; i < steps; i++) { fdm.step(h, env); autoConfig(h); }
+  if (crew.state !== 'off') { aircraft.position.copy(fdm.pos); aircraft.quaternion.copy(fdm.q); aircraft.updateMatrixWorld(true); crew.update(simDt, aircraft, fdm, ground); }
   atc.update(simDt); updateComfort(simDt); sys.update(simDt, fdm, { gpu: gpuConnected(), oat: 24 }); autoStartStep(simDt);
   W.simTime += simDt;
   if (W.timeAccel > 1) { W.tod = (W.tod + simDt / 60) % 1440; if ((W.todT = (W.todT || 0) + simDt) > 30) { W.todT = 0; setTimeOfDay(W.tod); } }
@@ -1143,7 +1153,7 @@ function bindFCU() {
     case 'loc': if (!W.ils) armAppr(); ap.locArmed = true; break; case 'appr': armAppr(); break; } canvas.focus(); }));
 }
 function togglePause() { if (!W.started || W.menuMode) return; const p = $('#pause'); p.hidden = !p.hidden; W.paused = !p.hidden; }
-function toMenu() { foot.dispose(); disposeFlightCabin(); if (paOpen) togglePA(false); W.onFoot = false; $('#foot').hidden = true; $('#radio').hidden = true; radioOpen = false; showTaxi(null); W.push = null; W.autoTaxi = null; try { document.exitPointerLock && document.exitPointerLock(); } catch (e) { } $('#pause').hidden = true; W.paused = false; $('#flight').hidden = true; $('#menu').hidden = false; W.menuMode = true; startMenuScene(); }
+function toMenu() { foot.dispose(); disposeFlightCabin(); if (paOpen) togglePA(false); W.onFoot = false; $('#foot').hidden = true; $('#radio').hidden = true; radioOpen = false; showTaxi(null); W.push = null; W.autoTaxi = null; crew.clear(); try { document.exitPointerLock && document.exitPointerLock(); } catch (e) { } $('#pause').hidden = true; W.paused = false; $('#flight').hidden = true; $('#menu').hidden = false; W.menuMode = true; startMenuScene(); }
 
 // ---- menu
 const featured = () => World.featured.map(i => World.byIcao.get(i)).filter(Boolean);
@@ -1309,7 +1319,7 @@ window.__sim = {
   footLookAt(yaw, pitch) { foot.yaw = yaw; foot.pitch = pitch; foot.update(0.001, { fwd: 0, side: 0, dyaw: 0, dpitch: 0 }, sky.exposure); },
   interact() { footInteract(); return this.footState(); },
   radio(v) { toggleRadio(v); return atc.options().map(o => o.id); },
-  say(id) { atc.choose(id); }, atcState() { return { phase: atc.phase, log: atc.log.map(l => (l.who === 'ME' ? 'ME: ' : l.fac + ': ') + l.text), opts: atc.options().map(o => o.id), errors: atc.errors, push: W.push && { done: W.push.done } }; },
+  say(id) { atc.choose(id); }, startPushback() { startPushback(); }, pushDone() { return !!(W.push && W.push.done); }, crewState: () => atcCtx.crewState(), atcState() { return { phase: atc.phase, log: atc.log.map(l => (l.who === 'ME' ? 'ME: ' : l.fac + ': ') + l.text), opts: atc.options().map(o => o.id), errors: atc.errors, push: W.push && { done: W.push.done } }; },
   traffic, sys, speech, startEngines, padHud() { updatePadHUD(true); },
   pixel(fx = 0.5, fy = 0.5) { renderFrame(0.016); const gl = renderer.getContext(), c = renderer.domElement, px = new Uint8Array(4); gl.readPixels(Math.floor(c.width * fx), Math.floor(c.height * (1 - fy)), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); return [...px]; },
   camInfo() { const d = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion); return { p: camera.position.toArray().map(v => +v.toFixed(1)), d: d.toArray().map(v => +v.toFixed(2)), near: camera.near, far: camera.far, fov: camera.fov, exp: +sky.exposure.toFixed(2), vis: { term: foot.parts?.term.group.visible, cabin: foot.parts?.cabin.group.visible } }; },
