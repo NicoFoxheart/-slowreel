@@ -6,6 +6,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ATM, ATM_GLSL, NOISE_GLSL, atmos } from './sky.js';
 import { airportGeometry, FT, D2R, ilsFreq } from './data.js';
 import { TERMINAL_HINTS } from './surroundings.js';
+import { trafficAirliner } from './ac-traffic.js';
 import { facadeMaterial, rng } from './terrain.js';
 
 const GLYPHS = '0123456789LRC';
@@ -215,6 +216,7 @@ void main(){ vec2 q = gl_PointCoord - 0.5; float r = dot(q, q) * 4.0; float a = 
 let _parkedGeo = null;
 export function parkedAirlinerGeometry() {
   if (_parkedGeo) return _parkedGeo;
+  try { return (_parkedGeo = trafficAirliner('high')); } catch (e) { console.warn('ac-traffic airliner failed, using the simple one', e); } // detailed airliner (ac-traffic.js); the simple one below is the fallback
   const parts = [], col = (g, r, gg, b) => { const n = g.attributes.position.count; const c = new Float32Array(n * 3); for (let i = 0; i < n; i++) c.set([r, gg, b], i * 3); g.setAttribute('color', new THREE.BufferAttribute(c, 3)); return g.index ? g.toNonIndexed() : g; };
   const fus = new THREE.CapsuleGeometry(1.95, 32, 6, 14).rotateX(Math.PI / 2); parts.push(col(fus, 0.93, 0.94, 0.95));
   const wing = new THREE.BufferGeometry(); const wv = [];

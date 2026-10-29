@@ -152,6 +152,8 @@ select{background:rgba(0,0,0,.35);color:var(--ink);border:1px solid var(--line2)
 #pfdwrap canvas{width:250px;height:250px;border-radius:8px;border:1px solid rgba(255,255,255,.08);box-shadow:0 10px 30px rgba(0,0,0,.4);background:#000}
 #note{position:absolute;left:max(16px,env(safe-area-inset-left,0px));top:max(12px,env(safe-area-inset-top,0px));font:10.5px var(--f-mono);color:rgba(232,237,245,.72);max-width:300px;padding:8px 10px;line-height:1.4}
 #note b{color:var(--fox2);font-weight:700}
+#coach{position:absolute;left:50%;top:31%;transform:translateX(-50%);max-width:min(760px,92vw);padding:7px 16px;border-radius:22px;background:rgba(8,12,18,.62);font:600 15px/1.35 var(--f-mono);color:#7dffb0;text-align:center;pointer-events:none;letter-spacing:.02em}
+#coach.warn{color:var(--amber)}#coach.bad{color:#ff7a66}#coach.flare{color:#ffe600;font-size:22px;animation:flr .7s ease-in-out infinite}@keyframes flr{50%{opacity:.55}}
 #callout{position:absolute;top:22%;left:50%;transform:translateX(-50%);font:800 44px/1 var(--f-display);letter-spacing:.12em;color:var(--amber);text-shadow:0 2px 20px rgba(0,0,0,.6);opacity:0;transition:opacity .25s}
 #toast{position:absolute;bottom:120px;left:50%;transform:translateX(-50%);padding:9px 16px;font:12.5px var(--f-mono);opacity:0;transition:opacity .3s;white-space:nowrap}
 #yoke{position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border:2px solid var(--cyan);border-radius:50%;left:50%;top:50%;opacity:.8}
@@ -300,7 +302,7 @@ kbd{font:11px var(--f-mono);padding:2px 6px;border-radius:4px;border:1px solid v
             </div>
             <div style="display:grid;gap:16px;min-width:0">
               <div class="field"><span class="lab">Runway</span><div class="rwlist" id="rwlist"></div></div>
-              <div class="field"><span class="lab">Start</span><div class="seg" id="startSeg"><button data-v="terminal">In the terminal</button><button data-v="gate">Gate</button><button data-v="runway" aria-pressed="true">Runway</button><button data-v="final">10 nm final</button></div><label class="toggle"><input type="checkbox" id="coldDark"> Cold &amp; dark (gate or terminal): start the aircraft yourself from the overhead panel</label></div>
+              <div class="field"><span class="lab">Start</span><div class="seg" id="startSeg"><button data-v="terminal">In the terminal</button><button data-v="gate">Gate</button><button data-v="runway" aria-pressed="true">Runway</button><button data-v="final">10 nm final</button><button data-v="hand10">Land it yourself · 10 nm</button><button data-v="hand5">Land it yourself · 5 nm</button></div><label class="toggle"><input type="checkbox" id="coldDark"> Cold &amp; dark (gate or terminal): start the aircraft yourself from the overhead panel</label><label class="toggle"><input type="checkbox" id="landBoxes" checked> Land it yourself: glide path boxes in the sky</label><label class="toggle"><input type="checkbox" id="landAutoSpd" checked> Land it yourself: auto-speed (autothrust holds the speed, you steer)</label></div>
               <div class="field timeline"><label for="tod">Local time <span id="todv" class="mono" style="color:var(--ink);margin-left:6px"></span></label><input id="tod" type="range" min="0" max="1439" step="5" value="1080"><div class="chips" id="sunchips"></div></div>
               <div class="field"><span class="lab">Weather</span><div class="seg" id="wxSeg"><button data-v="clear" aria-pressed="true">Clear</button><button data-v="scattered">Scattered</button><button data-v="overcast">Overcast</button><button data-v="rain">Rain</button><button data-v="fog">Fog</button></div></div>
               <div class="row2">
@@ -388,6 +390,7 @@ kbd{font:11px var(--f-mono);padding:2px 6px;border-radius:4px;border:1px solid v
     <div class="c"><span class="v" id="sTrim">0.0</span><span class="k">TRIM</span></div>
   </div>
   <div id="callout"></div>
+  <div id="coach" hidden></div>
   <div id="toast" class="glass"></div>
   <div id="yoke" hidden></div>
   <div id="camname"></div>

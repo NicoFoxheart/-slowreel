@@ -41,6 +41,7 @@ export class Displays {
     c.save(); c.rotate(-e.bank * D2R); c.fillStyle = YEL; c.beginPath(); c.moveTo(0, -114); c.lineTo(-10, -98); c.lineTo(10, -98); c.closePath(); c.fill();
     c.fillRect(-10 + Math.max(-20, Math.min(20, f.beta * R2D * 3)), -95, 20, 5); c.restore();
     // flight directors
+    if (S.fd && S.fd.flare) { c.save(); c.font = `bold 22px ${MONO}`; c.fillStyle = (Date.now() / 300 | 0) % 2 ? YEL : GRN; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('FLARE', 0, 98); c.restore(); }
     if (S.fd) { c.strokeStyle = GRN; c.lineWidth = 3; const dx = Math.max(-80, Math.min(80, S.fd.roll * 4)), dy = Math.max(-80, Math.min(80, -S.fd.pitch * pp)); c.beginPath(); c.moveTo(dx, -70); c.lineTo(dx, 70); c.moveTo(-70, dy); c.lineTo(70, dy); c.stroke(); }
     // aircraft symbol
     c.fillStyle = '#000'; c.strokeStyle = YEL; c.lineWidth = 3;
@@ -53,7 +54,7 @@ export class Displays {
       for (let i = -2; i <= 2; i++) { if (!i) continue; c.beginPath(); c.arc(cx + i * 38, 392, 4, 0, 7); c.stroke(); c.beginPath(); c.arc(378, cy + i * 38, 4, 0, 7); c.strokeStyle = WHT; c.lineWidth = 2; c.stroke(); }
       c.fillStyle = YEL; c.fillRect(cx - 1, 384, 2, 16); c.fillRect(370, cy - 1, 16, 2);
       const dia = (x, y) => { c.fillStyle = MAG; c.beginPath(); c.moveTo(x, y - 9); c.lineTo(x + 7, y); c.lineTo(x, y + 9); c.lineTo(x - 7, y); c.closePath(); c.fill(); };
-      dia(cx + d.locDots * 38, 392); dia(378, cy + d.gsDots * 38);
+      dia(cx + d.locDots * 38, 392); dia(378, cy - d.gsDots * 38);
       c.font = `14px ${MONO}`; c.fillStyle = MAG; c.textAlign = 'left'; c.fillText(S.ils.apt.icao + ' ' + S.ils.ident, 146, 410); c.fillText(S.ils.freq.toFixed(2) + (S.ils.real ? '' : '*'), 146, 428);
       c.fillText((Math.max(0, d.thrDist) / 1852).toFixed(1) + ' NM', 146, 446);
     }
@@ -305,7 +306,7 @@ export function buildCockpit(displays) {
 export const COCKPIT_EYE = new THREE.Vector3(-0.52, 1.02, -15.0);
 
 // ------------------------------------------------ HUD (2D overlay, external views): compact and non-conformal
-export function drawHUD(ctx, W, H, S, cam, units) {
+export function drawHUD(ctx, W, H, S, cam, units, mode = 'full') {
   ctx.clearRect(0, 0, W, H);
   const f = S.fdm, e = S.e; const sc = Math.min(W / 1600, H / 900) * 1.0;
   ctx.save(); ctx.lineWidth = 1.5 * sc; ctx.textBaseline = 'middle'; ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 5 * sc;
@@ -318,8 +319,13 @@ export function drawHUD(ctx, W, H, S, cam, units) {
     ctx.textAlign = 'center'; ctx.font = `bold ${Math.round(26 * sc)}px ${MONO}`; ctx.fillText(big, x, cy + 1 * sc);
     ctx.font = `${Math.round(13 * sc)}px ${MONO}`; ctx.fillText(sub, x, cy + 38 * sc); if (sub2) ctx.fillText(sub2, x, cy + 56 * sc);
   };
+  const raShow = S.raFt < 2500, altBig = raShow ? Math.round(S.raFt / (S.raFt > 100 ? 10 : 1)) * (S.raFt > 100 ? 10 : 1) : Math.round(alt / 10) * 10, altLab = raShow ? (units === 'metric' ? 'M RADIO' : 'FT RADIO') : units === 'metric' ? 'M' : 'FT';
+  if (mode === 'min') { // clean outside view: one quiet line, ILS dots on approach, modes
+    ctx.textAlign = 'center'; ctx.font = `600 ${Math.round(15 * sc)}px ${MONO}`; const vsTxt = (vs >= 0 ? '▲' : '▼') + Math.abs(Math.round(vs / 10) * 10);
+    ctx.fillText(`${Math.round(spd)} ${units === 'metric' ? 'KM/H' : 'KT'}    ${raShow ? 'RA ' + (units === 'metric' ? Math.round(S.raFt * FT) : altBig) : Math.round(alt / 10) * 10} ${units === 'metric' ? 'M' : 'FT'}    ${vsTxt} FPM`, cx, H * 0.80);
+  } else {
   box(cx - 420 * sc, Math.round(spd), (units === 'metric' ? 'KM/H IAS' : 'KT IAS'), 'GS ' + Math.round(Math.hypot(f.vel.x, f.vel.z) / KT) + (S.ap.athr ? '  ▸' + Math.round(S.ap.spd) : ''));
-  box(cx + 420 * sc, Math.round(alt / 10) * 10, units === 'metric' ? 'M' : 'FT', (vs >= 0 ? '▲ ' : '▼ ') + Math.abs(Math.round(units === 'metric' ? vs * FT / 60 : vs / 10) * (units === 'metric' ? 1 : 10)) + (units === 'metric' ? ' M/S' : ' FPM'));
+  box(cx + 420 * sc, raShow && units === 'metric' ? Math.round(S.raFt * FT) : altBig, altLab, (vs >= 0 ? '▲ ' : '▼ ') + Math.abs(Math.round(units === 'metric' ? vs * FT / 60 : vs / 10) * (units === 'metric' ? 1 : 10)) + (units === 'metric' ? ' M/S' : ' FPM'));
   // heading strip
   ctx.textAlign = 'center'; ctx.font = `bold ${Math.round(17 * sc)}px ${MONO}`; const hy = H * 0.1;
   ctx.fillText(String(Math.round(e.hdg) % 360).padStart(3, '0'), cx, hy);
@@ -327,14 +333,14 @@ export function drawHUD(ctx, W, H, S, cam, units) {
   for (let d = -40; d <= 40; d += 5) { const h = Math.round(e.hdg / 5) * 5 + d; const x = cx + (wrap360(h - e.hdg + 180) - 180) * 6 * sc; if (Math.abs(x - cx) < 30 * sc) continue; ctx.globalAlpha = 0.65; ctx.beginPath(); ctx.moveTo(x, hy + 14 * sc); ctx.lineTo(x, hy + (h % 10 === 0 ? 24 : 19) * sc); ctx.stroke(); if (h % 30 === 0) ctx.fillText(String(wrap360(h) / 10 | 0).padStart(2, '0'), x, hy + 34 * sc); ctx.globalAlpha = 1; }
   // bank / pitch readout
   ctx.font = `${Math.round(13 * sc)}px ${MONO}`; ctx.fillText(`PITCH ${e.pitch >= 0 ? '+' : ''}${e.pitch.toFixed(1)}°   BANK ${Math.abs(e.bank).toFixed(0)}°${Math.abs(e.bank) > 1 ? (e.bank > 0 ? 'R' : 'L') : ''}`, cx, hy + 52 * sc);
+  }
   // ILS deviation mini scales beside the altitude box
   if (S.ilsDev && S.ilsDev.valid && S.ilsDev.dist < 30000 && !f.onGround) {
     const d = S.ilsDev, gx = cx + 510 * sc, lx = cx + 420 * sc, ly = cy - 52 * sc;
     ctx.globalAlpha = 0.75; for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.arc(gx, cy + i * 14 * sc, 2.5 * sc, 0, 7); ctx.stroke(); ctx.beginPath(); ctx.arc(lx + i * 18 * sc, ly, 2.5 * sc, 0, 7); ctx.stroke(); }
-    ctx.globalAlpha = 1; ctx.fillStyle = '#ff7bff'; ctx.beginPath(); ctx.arc(gx, cy + d.gsDots * 14 * sc, 5.5 * sc, 0, 7); ctx.fill(); ctx.beginPath(); ctx.arc(lx + d.locDots * 18 * sc, ly, 5.5 * sc, 0, 7); ctx.fill(); ctx.fillStyle = col;
+    ctx.globalAlpha = 1; ctx.fillStyle = '#ff7bff'; ctx.beginPath(); ctx.arc(gx, cy - d.gsDots * 14 * sc, 5.5 * sc, 0, 7); ctx.fill(); ctx.beginPath(); ctx.arc(lx + d.locDots * 18 * sc, ly, 5.5 * sc, 0, 7); ctx.fill(); ctx.fillStyle = col;
     ctx.font = `${Math.round(12 * sc)}px ${MONO}`; ctx.fillText('ILS ' + S.ils.ident + ' ' + (Math.max(0, d.thrDist) / 1852).toFixed(1) + ' NM', lx, ly - 16 * sc);
   }
-  if (S.raFt < 2500 && !f.onGround) { ctx.font = `bold ${Math.round(18 * sc)}px ${MONO}`; ctx.fillText('RA ' + Math.round(S.raFt), cx + 420 * sc, cy + 80 * sc); }
   // modes
   const fm = f.fma(); ctx.font = `${Math.round(14 * sc)}px ${MONO}`; ctx.textAlign = 'center';
   ctx.fillText([fm.thr, fm.vert, fm.lat, fm.arm && '(' + fm.arm + ')', fm.eng].filter(Boolean).join('    '), cx, H * 0.86);

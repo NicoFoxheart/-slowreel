@@ -230,6 +230,11 @@ export class FDM {
         if (Math.abs(pIn) > 0.04) { qCmd = pIn * (easy ? 0.07 : 0.105); this.gammaHold = null; }
         else { if (this.gammaHold == null) this.gammaHold = gamma; qCmd = 0.55 * (this.gammaHold - gamma); }
         qCmd += (G / Math.max(V, 40)) * Math.tan(phi) * Math.sin(phi) * (Math.abs(phi) < 0.6 ? 1 : 0.4);
+        // easy flare (gear down, below 50 ft): the stick sets the pitch attitude around the approach attitude, gently and predictably;
+        // let go and the nose returns to the approach attitude
+        if (easy && this.gearDown && this.ra < 15) { if (this._flTheta == null) this._flTheta = clamp(theta, -1 * D2R, 4 * D2R);
+          const tgt = clamp(this._flTheta + clamp(pIn, -0.4, 1) * 5.5 * D2R, -2 * D2R, 9 * D2R); qCmd = clamp(1.1 * (tgt - theta), -2.5 * D2R, 3 * D2R); this.gammaHold = null; }
+        else if (this.ra > 20) this._flTheta = null;
         // easy: soft pitch-attitude envelope (+18 / -10 deg)
         if (easy) { if (theta > 18 * D2R) qCmd = Math.min(qCmd, 0.8 * (18 * D2R - theta)); if (theta < -10 * D2R) qCmd = Math.max(qCmd, 0.8 * (-10 * D2R - theta)); }
         // alpha protection
@@ -345,10 +350,12 @@ export class FDM {
   }
   autothrottle(dt, sp) {
     const ap = this.ap;
+    if (!ap.on && !ap.retard && !this.onGround && this.gearDown && this.ra < 20 * FT && this.airTime > 3) ap.retard = true; // hand-flown with auto-speed: idle for the flare
+    if (!ap.on && ap.retard && this.onGround && this.tl <= 0.001) { ap.athr = false; ap.retard = false; return; }
     if (ap.retard || ap.vert === 'ROLL OUT') { this.tl = Math.max(0, this.tl - dt * 0.6); if (this.onGround && ap.rollout) { if (this.gndTime > 1.5 && Math.hypot(this.vel.x, this.vel.z) / KT > 75) { this.revCmd = true; this.tl = 0.55; } else if (Math.hypot(this.vel.x, this.vel.z) / KT < 70) { this.tl = 0; if (Math.hypot(this.vel.x, this.vel.z) / KT < 50) { this.revCmd = false; ap.athr = false; } } } return; }
     const tgt = Math.max(ap.spd, sp.vls + 3);
     const err = tgt - this._ias;
-    const rate = clamp(err * 0.05 - this.accel * 0.12, -0.2, 0.2);
+    const rate = ap.on ? clamp(err * 0.05 - this.accel * 0.12, -0.2, 0.2) : clamp(err * 0.035 - this.accel * 0.1, -0.12, 0.12); // softer when hand-flying
     this.tl = clamp(this.tl + rate * dt, 0, 0.98);
   }
   callouts() {
