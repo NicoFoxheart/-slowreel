@@ -244,6 +244,14 @@ function taxiOutRoute() {
   const pts = [fdm.pos.clone().setY(b.elev + 0.6)]; if (link) pts.push(W3(link.b), W3(link.a)); pts.push(W3(net.P(sEnd)), W3(holdL));
   return { via: link ? [link.name, net.name] : [net.name], hold: conn.name, pts, holdPt: W3(holdL), linkB: link && W3(link.b) };
 }
+function exitConn() { // the runway exit ahead of the aircraft on the landing roll
+  const b = W.primary; if (!b || !b.b.taxiNet.length) return null; const p = fdm.pos; let best = null, bd = 1e12;
+  for (const net of b.b.taxiNet) { const r = net.r; const vx = p.x - b.x - r.a.x, vz = p.z - b.z - r.a.z; const s = vx * r.dir.x + vz * r.dir.z; const d = Math.abs(-vx * r.dir.z + vz * r.dir.x); if (s > -100 && s < r.L + 100 && d < bd) { bd = d; best = { net, s }; } }
+  if (!best) best = { net: b.b.taxiNet[0], s: 0 }; const { net, s } = best; const fwdSign = Math.sign(fdm.vel.x * net.r.dir.x + fdm.vel.z * net.r.dir.z) || 1;
+  const conn = net.conns.filter(c => (c.s - s) * fwdSign > 30).sort((p, q) => Math.abs(p.s - s) - Math.abs(q.s - s))[0] || net.conns.slice().sort((p, q) => Math.abs(p.s - s) - Math.abs(q.s - s))[0];
+  return conn ? { net, conn } : null;
+}
+function onRunwayOf(il) { if (!il || !fdm.onGround) return false; const d = ilsDeviation(il, fdm.pos); return Math.abs(d.cross) < Math.max(15, (il.width || 45) / 2 + 2) && d.thrDist < 15 && d.thrDist > -(il.length || 2500) - 15; }
 function taxiInRoute() {
   const b = W.primary; const p = fdm.pos; let best = null, bd = 1e12;
   for (const net of b.b.taxiNet) { const r = net.r; const vx = p.x - b.x - r.a.x, vz = p.z - b.z - r.a.z; const s = vx * r.dir.x + vz * r.dir.z; const d = Math.abs(-vx * r.dir.z + vz * r.dir.x); if (s > -100 && s < r.L + 100 && d < bd) { bd = d; best = { net, s }; } }
@@ -334,7 +342,21 @@ function finishTrip() {
 function nearestFreeStand(maxD) { const b = W.primary; if (!b || !b.full) return null; let best = null, bd = maxD; for (const st of b.b.stands) { if (st.used && st !== W.arrStand) continue; const d = Math.hypot(b.x + st.x - fdm.pos.x, b.z + st.z - fdm.pos.z); if (d < bd) { bd = d; best = st; } } return best; }
 const atcCtx = {
   state() { const d = W.ils ? ilsDeviation(W.ils, fdm.pos) : null; const arr = atc.arr; const ll = W.geo.toLatLon(fdm.pos.x, fdm.pos.z);
-    return { onGround: fdm.onGround, gsKt: Math.hypot(fdm.vel.x, fdm.vel.z) / KT, altFt: fdm.pos.y / FT, aglFt: fdm.ra / FT, vsFpm: fdm.vel.y / FT * 60, distArrNm: arr ? haversine(ll.lat, ll.lon, arr.lat, arr.lon) / NM : 999, thrNm: d && d.valid ? d.thrDist / NM : 99, locCaptured: fdm.ap.lat === 'LOC' }; },
+    const gs = Math.hypot(fdm.vel.x, fdm.vel.z); const arrIls = W.ils && W.ils.apt === arr && W.ils !== W.depIls ? W.ils : (W.cfg?.start === 'final' ? W.ils : null);
+    return { onGround: fdm.onGround, gsKt: gs / KT, altFt: fdm.pos.y / FT, aglFt: fdm.ra / FT, vsFpm: fdm.vel.y / FT * 60, distArrNm: arr ? haversine(ll.lat, ll.lon, arr.lat, arr.lon) / NM : 999, thrNm: d && d.valid ? d.thrDist / NM : 99, locCaptured: fdm.ap.lat === 'LOC',
+      lat: ll.lat, lon: ll.lon, ias: fdm.ias, trk: gs > 15 ? (Math.atan2(fdm.vel.x, -fdm.vel.z) * R2D + 360) % 360 : fdm.euler().hdg, tl: fdm.tl, gearDown: fdm.gearDown, flaps: fdm.flapIdx, apOn: fdm.ap.on,
+      locDots: d && d.valid ? d.locDots : 0, gsDots: d && d.valid ? d.gsDots : 0, onDepRwy: onRunwayOf(W.depIls), onArrRwy: onRunwayOf(arrIls) }; },
+  assist: () => fdm.assist, pushing: () => !!W.push, onRoute: () => !!(W.route && fdm.ap.lat === 'NAV'),
+  fcu(o) { // the first officer sets what ATC assigned (not in Realistic assist)
+    if (fdm.assist === 'realistic') return false; const ap = fdm.ap, parts = [];
+    if (o.alt != null && !['G/S', 'FLARE', 'ROLL OUT'].includes(ap.vert)) { ap.alt = o.alt; parts.push('ALT ' + o.alt.toLocaleString('en-US')); }
+    if (o.hdg != null && ap.lat !== 'LOC' && !(W.route && ap.lat === 'NAV')) { ap.hdg = Math.round(o.hdg) % 360 || 360; if (ap.on && ap.lat === 'NAV') ap.lat = 'HDG'; parts.push('HDG ' + String(ap.hdg).padStart(3, '0')); }
+    if (o.spd != null) { ap.spd = o.spd; parts.push('SPD ' + o.spd); }
+    if (parts.length) toast('First officer set ' + parts.join(' · '), 3000); return true; },
+  fixNear(A) { const k = 'fix_' + A.icao; if (k in W) return W[k]; let best = null, bd = 40; for (const n of World.navaids) { if (n.type[0] !== 'V' || Math.abs(n.lat - A.lat) > 0.8) continue; const d = haversine(A.lat, A.lon, n.lat, n.lon) / NM; if (d < bd) { bd = d; best = n; } } return (W[k] = best && { id: best.id, lat: best.lat, lon: best.lon }); },
+  approachGeo() { const A = atc.arr, E = atcCtx.arrEnd(); const il = ilsFor(A, E, aptPos(A)); const d = ilsDeviation(il, fdm.pos); const ix = il.thr.x - il.dir.x * 14 * NM - fdm.pos.x, iz = il.thr.z - il.dir.z * 14 * NM - fdm.pos.z;
+    return { ipHdg: (Math.atan2(ix, -iz) * R2D + 360) % 360, ipNm: Math.hypot(ix, iz) / NM, thrNm: d.thrDist / NM, crossNm: d.cross / NM }; },
+  exitInfo() { const e = exitConn(); return { side: atcCtx.exitSide(), name: e ? e.conn.name : null }; },
   weather() { const A = atc.apt(); const temp = Math.round(({ desert: 31, tropical: 29, subtropical: 26, mediterranean: 21, temperate: 13, 'temperate-green': 12, boreal: 4 })[climateFor(A.lat, A.lon)] ?? 18) - (W.wx === 'rain' ? 3 : 0);
     return { kind: W.wx, dir: W.windFrom, kt: W.windKt, gust: W.gust > 2.5, vis: sky.weather.vis, temp, utcMin: W.tod - tzFor(A) * 60, localMin: W.tod }; },
   traffic() { const e = fdm.euler(); return traffic.list.map(a => { if (!a.type) a.type = [['737', 'seven three seven'], ['A320', 'Airbus three twenty'], ['E175', 'Embraer one seventy five'], ['787', 'seven eight seven'], ['A350', 'Airbus three fifty']][(Math.random() * 5) | 0]; const dx = a.x - fdm.pos.x, dz = a.z - fdm.pos.z; const brg = Math.atan2(dx, -dz) * R2D; let rel = ((brg - e.hdg) % 360 + 360) % 360; a.clock = String(Math.round(rel / 30) || 12); a.distNm = Math.hypot(dx, dz) / NM; a.dAltFt = (a.y - fdm.pos.y) / FT; a.vs = a.kind === 'arr' ? -700 : a.h > 1 ? 1800 : 0; return a; }); },
@@ -351,7 +373,7 @@ const atcCtx = {
   taxiOut() { return taxiOutRoute(); }, taxiIn() { return taxiInRoute(); }, showTaxi,
   nearHold() { return !!(W.taxiR && W.taxiR.holdPt && fdm.pos.distanceTo(W.taxiR.holdPt) < 200); },
   armIls(hdg, alt) { const A = atc.arr, E = atcCtx.arrEnd(); W.ils = fdm.ap.ils = ilsFor(A, E, aptPos(A)); atc.setAssigned(alt);
-    if (fdm.ap.on) { fdm.ap.lat = 'HDG'; fdm.ap.hdg = hdg; fdm.ap.alt = alt; fdm.ap.locArmed = fdm.ap.gsArmed = fdm.ap.appr = true; if (fdm.ap.route) fdm.ap.route = null; } },
+    if (fdm.ap.on) { if (hdg != null) { fdm.ap.lat = 'HDG'; fdm.ap.hdg = hdg; if (fdm.ap.route) fdm.ap.route = null; } fdm.ap.alt = alt; fdm.ap.locArmed = fdm.ap.gsArmed = fdm.ap.appr = true; } },
   vectorHeading() { const A = atc.arr, E = atcCtx.arrEnd(); const il = ilsFor(A, E, aptPos(A)); const d = ilsDeviation(il, fdm.pos); const c = E.hdg; const h = Math.abs(d.cross) < 600 ? c : c + (d.cross > 0 ? -30 : 30); const hh = Math.round(((h % 360) + 360) % 360 / 10) * 10 || 360;
     const cur = fdm.euler().hdg; return { hdg: hh, turn: (((hh - cur + 540) % 360) - 180) >= 0 ? 'right' : 'left' }; },
   exitSide() { const E = atcCtx.arrEnd(); const b = W.built.find(x => x.apt === atc.arr); const net = b?.b.taxiNet.find(t => t.r.a === E || t.r.b === E); if (!net) return 'right'; return (net.r.a === E) === (net.sd > 0) ? 'right' : 'left'; },
@@ -363,7 +385,7 @@ function renderRadio() {
   const r = $('#radio'); if (!r) return;
   const t = atc.tuned; $('#rFreq').textContent = t ? t.mhz.toFixed(t.mhz * 100 % 5 ? 3 : 2) + (t.real ? '' : '*') : '---.--'; $('#rName').textContent = t ? t.name.toUpperCase() : '';
   const A = atc.apt ? atc.apt() : null;
-  $('#rFacs').innerHTML = A ? ['ATIS', 'DEL', 'GND', 'TWR', 'DEP', 'APP'].map(k => { const f = facility(A, k); return `<button class="rfac" data-k="${k}" aria-pressed="${t && t.kind === k}"><b>${k}</b><span>${f.mhz.toFixed(f.mhz * 100 % 5 ? 3 : 2)}${f.real ? '' : '*'}</span></button>`; }).join('') : '';
+  $('#rFacs').innerHTML = A ? ['ATIS', 'DEL', 'GND', 'TWR', 'DEP', 'CTR', 'APP'].map(k => { const f = k === 'CTR' ? atc.fac('CTR') : facility(A, k); return `<button class="rfac" data-k="${k}" aria-pressed="${t && t.kind === k}"><b>${k}</b><span>${f.mhz.toFixed(f.mhz * 100 % 5 ? 3 : 2)}${f.real ? '' : '*'}</span></button>`; }).join('') : '';
   $$('#rFacs .rfac').forEach(b => b.onclick = () => { atc.tune(b.dataset.k); canvas.focus(); });
   $('#rLog').innerHTML = atc.log.slice(-9).map(l => `<div class="rl ${l.who === 'ME' ? 'me' : l.other ? 'oth' : ''}"><b>${l.who === 'ME' ? 'YOU' : l.fac.toUpperCase()}</b> ${l.text}</div>`).join('') || '<div class="rl"><b>RADIO</b> Pick a call below. Frequencies marked * are simulated; the rest are from the airport data.</div>';
   const lg = $('#rLog'); lg.scrollTop = lg.scrollHeight;
@@ -372,7 +394,7 @@ function renderRadio() {
   $('#rAuto').checked = atc.auto; $('#rSpeak').checked = atc.speakMe;
   // (spoken lines are shown by the shared subtitle bar, in sync with the voice)
 }
-atc.on(() => renderRadio());
+atc.on(() => renderRadio()); atc.onNote = t => toast(t, 4000);
 function paKey(n) { if (n === 0) setSigns(!W.signs.belt, W.signs.smoke); else { const l = PA_LINES[n - 1]; if (l) paSay(l.id); } }
 function toggleRadio(v) { radioOpen = v ?? !radioOpen; $('#radio').hidden = !radioOpen; if (radioOpen && paOpen) togglePA(false); if (radioOpen) $('#atcCap').style.opacity = 0; renderRadio(); }
 // ---------------------------------------------------------------- cabin PA, signs, passenger comfort, cabin camera
@@ -617,11 +639,11 @@ function onDepRunway() {
 function nextStep() {
   if (W.menuMode || W.onFoot || !W.started) return null;
   const f = fdm, gs = Math.hypot(f.vel.x, f.vel.z) / KT, eng = f.engRun[0] && f.engRun[1], agl = (f.pos.y - (f.gnd?.h || 0)) / FT, vs = f.vel.y / FT * 60;
-  const opts = atc.options(), o = opts.find(x => !/atis/i.test(x.id + ' ' + x.label)) || opts[0], atcStep = o ? { label: o.label, run: () => atc.choose(o.id) } : null;
+  const opts = atc.options(), o = opts.find(x => x.pri), atcStep = o ? { label: o.label, run: () => atc.choose(o.id) } : null;
   if (f.onGround) {
     if (W.parkedAt) return { label: 'Stand up and walk out', run: () => enterFoot('arr') };
     if (W.autoStart) return { label: (AUTOSTART[Math.min(W.autoStart.i, AUTOSTART.length - 1)][0]) + '…', run: null };
-    if (atcStep && /clear|push|atis|deliv/i.test(o.id + ' ' + o.label)) return atcStep;
+    if (atcStep && ['rb', 'ho', 'clr', 'push'].includes(o.id)) return atcStep;
     if (!eng) return { label: 'Start engines', run: startEngines };
     if (W.push && !W.push.done) return { label: 'Pushback in progress…', run: null };
     if (f.td && gs < 4) { const st = nearestFreeStand(120); if (st) return { label: 'Park at gate ' + (st.gateName || ''), run: () => parkAtGate(st) }; }
@@ -982,11 +1004,16 @@ function renderFrame(dt) {
   const hc = $('#hudc'); const hx = hc.getContext('2d');
   if (!W.menuMode && !W.onFoot && settings.hud && W.view !== 'cockpit' && W.view !== 'cabin' && W.S) drawHUD(hx, hc.width, hc.height, W.S, camera, settings.units, settings.extHud); else hx.clearRect(0, 0, hc.width, hc.height);
   audio.update({ fdm, apuN: sys.apuN, paused: W.paused || W.menuMode, ground: fdm.onGround, camDist: camera.position.distanceTo(aircraft.position), rain: W.wx === 'rain', nearAirport: true, groundH: gh, flapTarget: FLAPS[fdm.flapIdx].flap }, dt, W.view);
-  music.update(dt, musicWant());
+  music.update(dt, musicWant()); musicNowUI();
   if (!W.menuMode && !W.onFoot) { updateUI(); updateParkPrompt(); updateCoach(); } else if (!$('#coach').hidden) $('#coach').hidden = true;
 }
 // boarding / deplaning music in the cabin while parked with power on; ambient music in the terminal halls
 const MOOD_NAME = { bossa: 'bossa nova', pentatonic: 'pentatonic', lounge: 'lounge jazz' };
+function musicNowUI() { // PA panel 'now playing' readout
+  const el = $('#pMusicNow'); if (!el) return; const p = music.now;
+  const t = settings.music === false ? 'off' : p ? '♪ ' + (p === 'ambient' ? 'terminal ambient' : MOOD_NAME[p] || p) : 'plays at the gate';
+  if (el._t !== t) { el._t = t; el.textContent = t; }
+}
 function musicWant() {
   if (W.menuMode || !W.started || W.paused || W.crashShown) return null;
   const mood = moodFor((W.primary?.apt || W.apt)?.icao);
@@ -1357,7 +1384,7 @@ window.__sim = {
   render(n = 1) { for (let i = 0; i < n; i++) renderFrame(1 / 30); return true; },
   runwayCheck(icao, ident) { const A = World.byIcao.get(icao); const g = airportGeometry(A); const E = g.ends.find(e => e.ident === ident); return { csv: E.hdgCsv, geo: E.hdg, derived: E.derived, len: E.length / FT }; },
   menu() { toMenu(); }, pause(p) { W.paused = p; }, setRes(v) { settings.res = String(v); applyRes(); }, orbitSet(y, p, d) { orbit.yaw = y; orbit.pitch = p; orbit.dist = d; }, chaseSet(y, p, d) { chase.yaw = y; chase.pitch = p; chase.dist = d; chasePos = null; }, lookSet(y, p, f) { look.yaw = y; look.pitch = p; look.fov = f; },
-  score: () => lastScore, displays, terrain, city, sky, atc, foot,
+  score: () => lastScore, music, audio, musicWant: () => musicWant(), displays, terrain, city, sky, atc, foot,
   footState() { return { onFoot: W.onFoot, tag: W.onFoot ? foot.zoneTag() : '', prompt: foot.prompt, boarding: !!foot.boarding, boarded: !!foot.boardingDone, pos: foot.pos.toArray().map(v => +v.toFixed(2)) }; },
   footWalk(which, sec = 90) { foot.autoWalk(which === 'out' ? foot.routeOut : foot.routeToCockpit); const n = Math.round(sec * 30); let i = 0; for (; i < n && foot.auto; i++) foot.update(1 / 30, { fwd: 0, side: 0, dyaw: 0, dpitch: 0 }, sky.exposure); return { steps: i, done: !foot.auto, tag: foot.zoneTag(), distSeat: +foot.pos.distanceTo(foot.seat).toFixed(2) }; },
   footStep(sec) { for (let i = 0; i < sec * 30; i++) foot.update(1 / 30, { fwd: 0, side: 0, dyaw: 0, dpitch: 0 }, sky.exposure); },
@@ -1365,7 +1392,12 @@ window.__sim = {
   interact() { footInteract(); return this.footState(); },
   radio(v) { toggleRadio(v); return atc.options().map(o => o.id); },
   say(id) { atc.choose(id); }, fd() { const dev = W.ils ? ilsDeviation(W.ils, fdm.pos) : null; return fdGuide(fdm, W.ils, dev, fdm.euler()); }, coach() { coachN = 0; updateCoach(); const d = W.ils && ilsDeviation(W.ils, fdm.pos); return { text: $('#coach').textContent, cls: $('#coach').className, hidden: $('#coach').hidden, papi: aids.papiText(), papiState: aids.papiState.slice(), gsDots: d && +d.gsDots.toFixed(2), locDots: d && +d.locDots.toFixed(2), nm: d && +(d.thrDist / NM).toFixed(2), boxes: aids.boxes.filter(b => b.visible).length }; }, handFly() { return handFly(); }, startPushback() { startPushback(); }, pushDone() { return !!(W.push && W.push.done); }, crewState: () => atcCtx.crewState(), atcState() { return { phase: atc.phase, log: atc.log.map(l => (l.who === 'ME' ? 'ME: ' : l.fac + ': ') + l.text), opts: atc.options().map(o => o.id), errors: atc.errors, push: W.push && { done: W.push.done } }; },
-  traffic, sys, speech, startEngines, padHud() { updatePadHUD(true); },
+  traffic, sys, speech, startEngines, padHud() { updatePadHUD(true); }, atcCtx, W, fdm, toggleRadio,
+  air(o) { // test: put the aircraft in the air (o: { agl, kt, hdg, x, z, ap }) relative to the departure runway when x/z are omitted
+    const E = W.end, b = W.primary, P = W.depIls ? W.depIls.thr : fdm.pos; const hdg = o.hdg ?? E.hdg; const x = o.x ?? P.x + E.dir.x * 2500, z = o.z ?? P.z + E.dir.z * 2500;
+    fdm.reset({ x, y: ground(x, z).h + (o.agl ?? 1500) * FT, z, hdg, speed: (o.kt ?? 200) * KT, gear: !!o.gear, flaps: o.flaps ?? 1, tl: 0.6, n1: 70, onGround: false, spdSel: o.kt ?? 200, altSel: fdm.ap.alt });
+    fdm.engRun = [true, true]; W.push = null; W.autoTaxi = null; if (o.ap !== false) { fdm.ap.on = true; fdm.ap.athr = true; fdm.ap.lat = 'HDG'; fdm.ap.vert = 'ALT'; fdm.ap.hdg = Math.round(hdg); fdm.ap.spd = o.kt ?? 200; } return this.state(); },
+  place(o) { if (o.x != null) fdm.pos.x = o.x; if (o.z != null) fdm.pos.z = o.z; if (o.hdg != null) fdm.q.setFromEuler(new THREE.Euler(0, -o.hdg * D2R, 0, 'YXZ')); if (o.v != null) { const h = (o.hdg ?? fdm.euler().hdg) * D2R; fdm.vel.set(Math.sin(h) * o.v, 0, -Math.cos(h) * o.v); } return this.state(); },
   pixel(fx = 0.5, fy = 0.5) { renderFrame(0.016); const gl = renderer.getContext(), c = renderer.domElement, px = new Uint8Array(4); gl.readPixels(Math.floor(c.width * fx), Math.floor(c.height * (1 - fy)), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); return [...px]; },
   camInfo() { const d = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion); return { p: camera.position.toArray().map(v => +v.toFixed(1)), d: d.toArray().map(v => +v.toFixed(2)), near: camera.near, far: camera.far, fov: camera.fov, exp: +sky.exposure.toFixed(2), vis: { term: foot.parts?.term.group.visible, cabin: foot.parts?.cabin.group.visible } }; },
   parkNear() { const st = nearestFreeStand(1e6); if (!st) return null; fdm.vel.set(0, 0, 0); parkAtGate(st); return st.gateName; }, enterArrival() { parkPromptAction(); return this.footState(); }, nextStep() { const s = nextStep(); return s && s.label; },

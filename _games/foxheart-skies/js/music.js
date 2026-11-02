@@ -24,12 +24,13 @@ export class Music {
     this.bus = c.createGain(); this.bus.gain.value = 1;
     this.conv = c.createConvolver(); this.conv.buffer = this.impulse(2.6); this.wet = c.createGain(); this.wet.gain.value = 0.2;
     this.lp = c.createBiquadFilter(); this.lp.type = 'lowpass'; this.lp.frequency.value = 7000; this.hp = c.createBiquadFilter(); this.hp.type = 'highpass'; this.hp.frequency.value = 90;
-    this.duckG = c.createGain(); this.duckG.gain.value = 1; this.out = c.createGain(); this.out.gain.value = 0;
+    this.duckG = c.createGain(); this.duckG.gain.value = this.ducked ? 0.2 : 1; this.out = c.createGain(); this.out.gain.value = 0;
     this.bus.connect(this.lp); this.bus.connect(this.conv); this.conv.connect(this.wet); this.wet.connect(this.lp); this.lp.connect(this.hp); this.hp.connect(this.duckG); this.duckG.connect(this.out); this.out.connect(this.audio.master);
     const n = c.sampleRate * 2; this.noise = c.createBuffer(1, n, c.sampleRate); const d = this.noise.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
     return true;
   }
   impulse(sec) { const c = this.audio.ctx, n = Math.floor(c.sampleRate * sec), b = c.createBuffer(2, n, c.sampleRate); for (let ch = 0; ch < 2; ch++) { const d = b.getChannelData(ch); for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3.2) * (i < 120 ? i / 120 : 1); } return b; }
+  get now() { return this.prog && this.g > 0.004 ? this.prog : null; } // programme currently audible (bossa / pentatonic / lounge / ambient)
   duck(on) { this.ducked = on; if (this.duckG) this.duckG.gain.setTargetAtTime(on ? 0.2 : 1, this.audio.ctx.currentTime, on ? 0.12 : 0.7); }
   // want: { kind: 'cabin' | 'terminal' | null, mood, level 0..1 }
   update(dt, want) {
@@ -47,6 +48,7 @@ export class Music {
     const ahead = clamp(dt * 2, 0.25, 1.0);
     if (this.prog === 'ambient') { this.ambient(now, ahead); return; }
     const D = this.def, beat = 60 / D.bpm, stepDur = beat * 4 / D.grid;
+    if (this.nextT < now) { const k = Math.ceil((now - this.nextT) / stepDur); this.step += k; this.nextT += k * stepDur; } // skip, never burst, after a stall
     while (this.nextT < now + ahead) { let t = this.nextT; const s = this.step; if (D.swing && s % 2 === 1) t += stepDur * (D.swing - 0.5) * 2 * 0.5; this[this.prog](t, s, stepDur); this.step++; this.nextT += stepDur; }
   }
   // ---------- instruments (all into this.bus)
@@ -105,7 +107,8 @@ export class Music {
   ambient(now, ahead) { // Eno-style tape loops of different lengths drifting against each other, with a slow drone
     const penta = this.key === 'terminal:penta'; const notes = penta ? [62, 66, 69, 71, 74, 78, 81] : [65, 69, 72, 76, 79, 81, 84];
     if (!this.loops) { const P = [17.9, 20.3, 23.1, 19.4, 26.7, 21.8, 29.3]; this.loops = notes.map((n, i) => ({ n, p: P[i], next: now + 0.5 + i * 2.7 })); this.droneT = now; }
-    for (const L of this.loops) if (L.next < now + ahead) { this.bell(L.next, midi(L.n), 0.05); if (this.R() < 0.4) this.ep(L.next + 0.02, midi(L.n - 12), 0.025, 2.2); L.next += L.p; }
+    for (const L of this.loops) { if (L.next < now) L.next = now + 0.2 + this.R() * 3; if (L.next < now + ahead) { this.bell(L.next, midi(L.n), 0.05); if (this.R() < 0.4) this.ep(L.next + 0.02, midi(L.n - 12), 0.025, 2.2); L.next += L.p; } }
+    if (this.droneT < now - 1) this.droneT = now + 0.1;
     if (this.droneT < now + ahead) { const r = penta ? [50, 57] : [53, 60]; this.pad(this.droneT, [midi(r[0]), midi(r[1])], 0.008, 28); this.droneT += 30; }
   }
 }

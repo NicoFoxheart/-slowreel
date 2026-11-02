@@ -2,6 +2,7 @@
 // Body frame: x = right wing, y = up, z = aft (nose points to -z). Origin ~ centre of gravity.
 import * as THREE from 'three';
 import { atmos, ATM } from './sky.js';
+import { buildPlayerAircraft } from './ac-model.js';
 
 export const DIM = { length: 37.6, span: 35.8, noseZ: -18.6, tailZ: 19.0, R: 1.98, wheelY: -3.62, mainZ: 1.25, mainX: 3.8, noseGearZ: -12.9 };
 
@@ -136,7 +137,12 @@ function finCanvas() {
   return cv;
 }
 
+// Player aircraft: the detailed model in ac-model.js; the legacy builder below is only a fallback if that build throws.
 export function buildAircraft(quality) {
+  try { return buildPlayerAircraft(quality); } catch (e) { console.error('aircraft: detailed exterior failed, using the legacy model', e); }
+  return buildAircraftLegacy(quality);
+}
+function buildAircraftLegacy(quality) {
   const root = new THREE.Group(); root.name = 'aircraft';
   const model = new THREE.Group(); root.add(model);
   const { cv, emis } = liveryCanvas();
@@ -331,4 +337,5 @@ export function animateAircraft(ac, st, dt, t, night) {
   P.taxiLight.intensity = on.taxi && gp > 0.9 ? (night ? 900 : 200) : 0;
   P.mats.bodyMat.emissiveIntensity = night * 1.6;
   P.mats.finMat.emissiveIntensity = on.logo ? night * 0.35 : 0;
+  if (P.anim) P.anim(st, dt, t, night, ac); // detailed model: reverser sleeves, gear doors, contrails
 }

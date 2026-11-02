@@ -32,7 +32,7 @@ export function insideHull(p, pad = 0) { const s = SEC(p.z); if (s.w <= 0) retur
 // ------------------------------------------------------------------ cabin windows, doors
 export const FLOOR_Y = -0.55, WIN_Y = 0.40, WIN_PITCH = 0.535;
 export const WINDOWS = []; // { z, side, exit }
-for (let k = -21; k <= 19; k++) { const z = 0.2675 + k * WIN_PITCH; for (const side of [1, -1]) WINDOWS.push({ z, side, exit: k === -1 || k === 0, i: WINDOWS.length }); }
+for (let k = -21; k <= 19; k++) { const z = 0.3725 + k * WIN_PITCH; /* centred between the cabin-wall window pillars (interiors.js) */ for (const side of [1, -1]) WINDOWS.push({ z, side, exit: k === -1 || k === 0, i: WINDOWS.length }); }
 // passenger doors (centre z, side), plug doors 0.81 x 1.85 m with 0.18 m corners; L1 is the working one
 export const DOOR = { w: 0.81, h: 1.85, r: 0.18, y0: FLOOR_Y, y1: FLOOR_Y + 1.85 };
 export const DOORS = [{ id: 'L1', z: -13.0, side: -1 }, { id: 'R1', z: -13.0, side: 1 }, { id: 'L2', z: 11.6, side: -1 }, { id: 'R2', z: 11.6, side: 1 }];
