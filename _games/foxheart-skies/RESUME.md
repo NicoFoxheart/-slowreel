@@ -61,3 +61,9 @@ Progress log: PROGRESS.md (one line per finished step; the last line is where to
 - Runtime hosts: three.js 0.160.0 from jsdelivr and Google Fonts only. No new hosts.
 - Real OSM mapping is blocked (the proxy tunnel drops). Keep the procedural surroundings and never fake real map data.
 - Keep 60 fps on a mid-range PC by using quality tiers and LOD.
+
+## Nico's requests (2 Nov 2026), in progress
+- Lead (running): verify and finish the cabin music → much better ATC flow → emergencies (MAYDAY/PAN-PAN with ATC, engine failure/fire, gear won't extend + belly landing, hydraulics, bird strike, depressurisation, electrical, stuck flap; Failures menu, challenge starts, fire trucks, evacuation).
+- Aircraft artist (running): the player aircraft exterior (finishing ac-livery/ac-shape/ac-util and wiring them into aircraft.js).
+- Environment artist (queued; starts when a slot frees, max two agents at a time): HUGE airport upgrade + big ground-service upgrade. groundcrew.js now belongs to the environment artist. Real turnaround: fuel truck/hydrant dispenser, catering hi-lift trucks, belt loaders, baggage tug + carts, container loader, lav and water trucks, GPU, cleaning crew, pushback. Vehicles drive in on service roads.
+- Smoke test now: scratchpad smoke.cjs (see the agent briefs); the TEAM.md paths are stale; the game folder is this one.
