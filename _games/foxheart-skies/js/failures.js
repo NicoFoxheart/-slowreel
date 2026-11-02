@@ -2,7 +2,7 @@
 // will not extend, green hydraulic failure, bird strike, cabin depressurisation, double generator failure and jammed flaps.
 // Each one sets the aircraft up in the FDM / systems, raises the ECAM warning (red: master warning + continuous chime;
 // amber: master caution + single chime) and the first officer calls the procedure one line at a time ("ECAM actions");
-// the next line runs from the smart A button, the E key, or the matching flight-deck control (fire pushbuttons).
+// the next line runs from the smart A button, the J key, or the matching flight-deck control (fire pushbuttons).
 export const FAILS = [
   { id: 'eng', label: 'Engine failure' }, { id: 'v1', label: 'Engine failure at V1 (next takeoff)' }, { id: 'fire', label: 'Engine fire' },
   { id: 'gear', label: 'Landing gear will not extend' }, { id: 'hyd', label: 'Hydraulic failure (green system)' }, { id: 'bird', label: 'Bird strike' },
@@ -95,7 +95,7 @@ export class Failures {
     // bird strike: vibration and a hot engine until it is brought to idle
     if (this.vib && f.fail.thr[this.vib.i] > 0.2 && f.engRun[this.vib.i]) { const i = this.vib.i; f.n1[i] += (Math.random() - 0.5) * 6 * dt * 10; f.egt[i] = Math.min(1100, f.egt[i] + dt * 6); }
     // depressurisation: the cabin climbs toward the aircraft altitude; red above 9,550 ft; resolved once below 10,000 ft
-    if (this.decomp) { this.cabAlt += Math.sign(alt - this.cabAlt) * Math.min(Math.abs(alt - this.cabAlt), dt * 6000); const x = this.list.find(x => x.id === 'depress' && !x.cleared); if (x && this.cabAlt < 9550 && alt < 10500 && x.step > 1) { x.cleared = true; this.foQ.push('Ten thousand feet. Cabin altitude is safe, masks can come off.'); f.speedbrake = 0; if (f.ap.vert === 'V/S') { f.ap.vert = 'ALT'; } } }
+    if (this.decomp) { this.cabAlt += Math.sign(alt - this.cabAlt) * Math.min(Math.abs(alt - this.cabAlt), dt * 6000); const x = this.list.find(x => x.id === 'depress' && !x.cleared); if (x && this.cabAlt < 9550 && alt < 10500 && (x.step > 1 || this.t - x.t > 4)) { x.cleared = true; this.foQ.push(x.step > 1 ? 'Ten thousand feet. Cabin altitude is safe, masks can come off.' : 'We are low enough, the cabin altitude is safe.'); f.speedbrake = 0; if (f.ap.vert === 'V/S') { f.ap.vert = 'ALT'; } } }
     // electrics: the APU generator restores AC power
     if (s.emerElec && s.apuAvail && s.sw.apuGen) { s.emerElec = false; f.fail.noAP = false; const x = this.list.find(x => x.id === 'elec'); if (x) { x.c = 'a'; x.title = 'ELEC GEN 1+2 FAULT (APU GEN ON)'; x.sev = 'pan'; } this.foQ.push('A P U generator is on line. We have the autopilot back.'); }
     // aural: continuous repetitive chime for a red warning until silenced or a procedure line is run

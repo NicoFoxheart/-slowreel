@@ -100,7 +100,7 @@ export class ATC {
   idM(kind, apt) { const F = this.fac(kind, apt); if (this.contacted.has(F.name)) return ''; this.contacted.add(F.name); return F.name + ', '; } // a unit names itself on first contact only
   hello() { const m = this.o.ctx.weather().localMin ?? 720; return m < 690 ? 'good morning' : m < 1050 ? 'good afternoon' : 'good evening'; }
   maybeHi(p = 0.45) { return Math.random() < p ? this.hello() + ', ' : ''; }
-  altRep(s, tgt, A) { const a = r100(s.altFt); if (tgt == null || Math.abs(s.altFt - tgt) < 250 || Math.abs(s.vsFpm) < 250) return M('level ', this.Am(Math.abs(s.altFt - (tgt ?? a)) < 250 ? (tgt ?? a) : a, A)); return M(this.Am(a, A), s.vsFpm > 0 ? ' climbing ' : ' descending ', this.Am(tgt, A)); }
+  altRep(s, tgt, A) { const a = r100(s.altFt); if (tgt == null && Math.abs(s.vsFpm) >= 250) return M(this.Am(a, A), s.vsFpm > 0 ? ' climbing' : ' descending'); if (tgt == null || Math.abs(s.altFt - tgt) < 250 || Math.abs(s.vsFpm) < 250) return M('level ', this.Am(Math.abs(s.altFt - (tgt ?? a)) < 250 ? (tgt ?? a) : a, A)); return M(this.Am(a, A), s.vsFpm > 0 ? ' climbing ' : ' descending ', this.Am(tgt, A)); }
   pick(key, arr) { this._last = this._last || {}; let i = Math.floor(Math.random() * arr.length); if (arr.length > 1 && i === this._last[key]) i = (i + 1) % arr.length; this._last[key] = i; return arr[i]; }
   bye(apt) {
     const c = (apt || this.apt()).icao; const pools = {
@@ -383,10 +383,10 @@ export class ATC {
         const A = this.arr, re = c.arrEnd(), R = this.rwyM(re.ident);
         this.me('APP', M(F.name, ', ', CS, ', ', this.flags.ga ? M('missed approach, ', this.altRep(s, this.alt?.ft ?? this.appAlt, A)) : this.altRep(s, this.alt?.ft ?? null, A), this.flags.ga ? '' : this.infoM(A), '.'), d);
         const g = c.approachGeo(); const tgtAlt = this.appAlt;
-        const hd = Math.round(g.ipHdg / 5) * 5; const spd = !this.flags.ga && s.ias > 228 ? 210 : null;
-        const ins = M(tgtAlt < s.altFt - 300 ? M(this.cmdAlt(tgtAlt, s.altFt, A), ', ') : M('maintain ', this.Am(tgtAlt, A), ', '), this.hdgM(hd, s.trk), ', vectors I L S runway ', R, spd ? M(', reduce speed to ', [spd + ' kt', digits(spd) + ' knots']) : '');
+        const onRoute = c.onRoute && c.onRoute(); const hd = Math.round(g.ipHdg / 5) * 5; const spd = !this.flags.ga && s.ias > 228 ? 210 : null;
+        const ins = M(tgtAlt < s.altFt - 300 ? M(this.cmdAlt(tgtAlt, s.altFt, A), ', ') : M('maintain ', this.Am(tgtAlt, A), ', '), onRoute ? M('continue on your route, expect the I L S runway ', R) : M(this.hdgM(hd, s.trk), ', vectors I L S runway ', R), spd ? M(', reduce speed to ', [spd + ' kt', digits(spd) + ' knots']) : '');
         this.atc('APP', M(CS, ', ', this.idM('APP'), this.flags.ga ? 'radar contact. ' : this.infoChk(A), ins, '.'), 2.2, () => { this.setPhase('app'); this.flags.vecT = this.t; },
-          { reply: true, rb: { label: `${altD(tgtAlt, this.ta(A))}, heading ${hdgD(hd)}${spd ? ', ' + spd + ' kt' : ''}`, m: M(cap(ins), ', ', CS, '.'), fcu: { alt: tgtAlt, hdg: hd, spd }, then: () => { this.assignAlt(tgtAlt); this.assignHdg(hd); this.assignSpd(spd); } } });
+          { reply: true, rb: { label: `${altD(tgtAlt, this.ta(A))}${onRoute ? ', own navigation' : ', heading ' + hdgD(hd)}${spd ? ', ' + spd + ' kt' : ''}`, m: M(cap(ins), ', ', CS, '.'), fcu: { alt: tgtAlt, hdg: onRoute ? null : hd, spd }, then: () => { this.assignAlt(tgtAlt); this.assignHdg(onRoute ? null : hd); this.assignSpd(spd); } } });
         this.flags.ga = false; return; }
       case 'GND': {
         const A = this.arr, re = c.arrEnd(), ex = this.exitName; this.me('GND', M(F.name, ', ', CS, ', clear of runway ', this.rwyM(re.ident), ex ? M(' at ', [ex, twyS(ex)]) : '', ', request taxi to the gate.'), d);
@@ -461,7 +461,7 @@ export class ATC {
     // arrival tower: no check-in on short final, continue → land, unstable approach, go-around, vacate
     if (ARR_TWR.has(p) && !s.onGround) {
       if (s.thrNm < 9 && s.aglFt < 2500) this.minAgl = Math.min(this.minAgl, s.aglFt);
-      if (p === 'to_twr_arr' && (s.aglFt < 1000 || s.thrNm < 4.5) && !this.flags.twrCall) { this.flags.twrCall = true; this.rb = null; this.clearLanding(0.3, M(this.fac('TWR', this.arr).name, ', how do you read? ')); return; }
+      if (p === 'to_twr_arr' && (s.aglFt < 1000 || s.thrNm < 4.5) && !this.flags.twrCall) { this.flags.twrCall = true; this.rb = null; this.clearLanding(0.3, 'how do you read? '); return; }
       if (p === 'twr_continue' && this.t - this.phT > 3 && !c.runwayBusy(this.arr, c.arrEnd()).busy) { this.clearLanding(0.3); return; }
       const ga = this.minAgl < 1200 && s.aglFt > this.minAgl + 300 && s.vsFpm > 500;
       if (ga && p !== 'go_around') { this.goAround(false); return; }
@@ -474,6 +474,7 @@ export class ATC {
         if (!this.flags.gaCmd && s.aglFt < 600 && ((busy && s.aglFt < 500) || (gearBad && s.aglFt < 450) || (far > (easy ? 2.3 : 1.8)))) { this.goAround(true, busy ? 'traffic on the runway' : gearBad ? 'your gear appears up' : 'you are not established on the approach'); return; }
       }
     }
+    const emNow = c.emergency && c.emergency(); if (!this.flags.emer && emNow && emNow.kind === 'mayday' && s.onGround && ARR_TWR.has(p)) { this.flags.emer = 'mayday'; this.flags.emerT = this.t - 6; } // the tower saw it happen
     if (this.flags.emer && s.onGround && s.gsKt < 40 && !this.flags.emerGnd && this.t - (this.flags.emerT || 0) > 5) { this.flags.emerGnd = this.flags.vacate = true; this.rb = this.ho = null; c.rescue && c.rescue(); this.setPhase('emer_gnd');
       this.atc('TWR', M(CS, ', ', this.idM('TWR'), 'fire and rescue are on their way to you. Hold position and advise intentions.'), 1.2, null, { instr: true }); return; }
     if ((ARR_TWR.has(p) || p === 'app') && s.onGround && s.gsKt < 60 && !this.flags.vacate && s.distArrNm < 8) {
@@ -550,5 +551,5 @@ export class ATC {
     this.flags.emer = null;
     if (s.onGround) { const ex = c.exitInfo(); this.exitName = ex.name; this.atc('TWR', M(CS, ', vacate ', ex.side, ex.name ? M(' via ', [ex.name, twyS(ex.name)]) : ' when able', ', ', this.contactM('GND', this.arr), '.'), 0.8, () => this.setPhase('to_gnd'), { ho: { to: 'GND', from: 'TWR' } }); }
   }
-  curK() { const k = this.tuned?.kind; return k && k !== 'ATIS' ? k : this.phase === 'dep' ? 'DEP' : this.phase === 'ctr' ? 'CTR' : 'APP'; }
+  curK() { const k = this.tuned?.kind, air = this.o && !this.ctxS().onGround; if (k && k !== 'ATIS' && !(air && (k === 'DEL' || k === 'GND'))) return k; return { to_dep: 'TWR', takeoff_clr: 'TWR', dep: 'DEP', to_ctr: 'DEP', ctr: 'CTR', to_app: 'CTR', app: 'APP', to_twr_arr: 'APP', land_clr: 'TWR', twr_continue: 'TWR', go_around: 'TWR' }[this.phase] || (air ? 'APP' : 'GND'); }
 }

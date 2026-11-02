@@ -162,6 +162,7 @@ select{background:rgba(0,0,0,.35);color:var(--ink);border:1px solid var(--line2)
 #camname{position:absolute;bottom:max(16px,env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);font:11px var(--f-mono);letter-spacing:.16em;color:rgba(232,237,245,.65);text-transform:uppercase}
 
 /* overlays */
+[hidden]{display:none!important} /* overlays use display:grid, which would otherwise beat the hidden attribute */
 .overlay{position:fixed;inset:0;display:grid;place-items:center;background:rgba(3,6,12,.55);backdrop-filter:blur(4px);z-index:20;padding:16px}
 .dialog{width:min(560px,100%);max-height:calc(100vh - 32px);overflow:auto;padding:24px;display:grid;gap:16px;background:rgba(10,16,28,.92)}
 .dialog h2{margin:0;font:800 30px/1 var(--f-display);text-transform:uppercase;letter-spacing:.05em}
@@ -181,13 +182,13 @@ kbd{font:11px var(--f-mono);padding:2px 6px;border-radius:4px;border:1px solid v
 #atcCap{position:absolute;left:50%;bottom:150px;transform:translateX(-50%);max-width:min(760px,90vw);padding:8px 14px;font:12.5px var(--f-mono);opacity:0;transition:opacity .4s}
 #atcCap b,.rl b{color:var(--amber);font-weight:700;margin-right:6px}
 #parkPrompt{position:absolute;left:50%;top:84px;transform:translateX(-50%);padding:9px 16px;font:13px var(--f-mono);color:var(--fox2)}
-#radio{position:absolute;right:max(16px,env(safe-area-inset-right,0px));top:190px;width:min(440px,92vw);padding:12px;display:grid;gap:10px;pointer-events:auto;background:rgba(14,18,24,.9)}
+#radio{position:absolute;right:max(16px,env(safe-area-inset-right,0px));top:190px;width:min(440px,92vw);max-height:calc(100vh - 200px);overflow:auto;padding:12px;display:grid;gap:10px;pointer-events:auto;background:rgba(14,18,24,.9)}
 .rhead{display:flex;align-items:baseline;gap:10px}.rlab{font:10px var(--f-mono);letter-spacing:.14em;color:var(--mute)}
 .rfreq{font:700 22px var(--f-mono);color:var(--amber);text-shadow:0 0 8px rgba(255,184,77,.35)}.rname{font:12px var(--f-mono);color:var(--ink);flex:1}
 #rClose{padding:2px 8px;color:var(--mute)}
-.rfacs{display:grid;grid-template-columns:repeat(6,1fr);gap:4px}.rfac{display:grid;padding:5px 2px;border-radius:6px;border:1px solid var(--line);font:10px var(--f-mono);color:var(--mute)}
+.rfacs{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}.rfac{display:grid;padding:5px 2px;border-radius:6px;border:1px solid var(--line);font:10px var(--f-mono);color:var(--mute)}
 .rfac b{font-size:11px;color:var(--ink)}.rfac[aria-pressed=true]{border-color:var(--amber);background:rgba(255,184,77,.1)}
-.rlog{max-height:170px;overflow:auto;display:grid;gap:6px;font:12px/1.4 var(--f-mono);padding:8px;border-radius:6px;background:rgba(0,0,0,.35)}
+.rlog{max-height:max(64px,min(170px,calc(100vh - 480px)));overflow:auto;display:grid;gap:6px;font:12px/1.4 var(--f-mono);padding:8px;border-radius:6px;background:rgba(0,0,0,.35)}
 .rl.me{color:var(--cyan)}.rl.oth{color:var(--mute)}.rl.oth b{color:#9aa6b8}.rl.me b{color:var(--cyan)}
 .ropts{display:grid;gap:5px}.ropt{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;text-align:left;padding:8px 10px;border-radius:7px;border:1px solid var(--line2);background:rgba(255,255,255,.03);font-size:12.5px}
 .ropt:hover{border-color:var(--fox)}.ropt small{font:10px var(--f-mono);color:var(--mute)}.rnone{color:var(--mute);font-size:12px}
@@ -350,7 +351,7 @@ kbd{font:11px var(--f-mono);padding:2px 6px;border-radius:4px;border:1px solid v
         <div class="field"><span class="lab">Failures and emergencies</span><span class="lab" style="font-weight:400;color:var(--mute)">Random failure during a flight</span>
           <div class="seg" id="failRandSeg"><button data-v="off">Off</button><button data-v="rare">Rare</button><button data-v="sometimes">Sometimes</button></div>
           <div style="display:flex;gap:6px;margin-top:6px"><select id="failPick" style="flex:1;min-width:0" aria-label="Failure"></select><button class="go ghost" id="failNow" style="padding:6px 10px;font-size:13px">Trigger now</button></div>
-          <small style="color:var(--mute)">“Trigger now” works in flight (pause, then Settings). Engine failure at V1 arms for the next takeoff. The first officer calls the checklist; press E (or A on a controller) for the next action, and declare MAYDAY or PAN-PAN from the radio (T / X).</small></div>
+          <small style="color:var(--mute)">“Trigger now” works in flight (pause, then Settings). Engine failure at V1 arms for the next takeoff. The first officer calls the checklist; press J (or A on a controller) for the next action, and declare MAYDAY or PAN-PAN from the radio (T / X).</small></div>
         <label class="toggle"><input type="checkbox" id="hudOn" checked> Clean HUD in external views</label>
         <div class="field padset"><span class="lab">Controller (Xbox / gamepad)</span><div class="padhint">Using an Xbox controller? Press any button on it to connect it.</div>
           <span class="lab">Assist</span><div class="seg" id="padAssistSeg"><button data-v="easy">Easy</button><button data-v="normal">Normal</button><button data-v="realistic">Realistic</button></div>

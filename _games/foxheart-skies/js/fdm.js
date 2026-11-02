@@ -130,8 +130,8 @@ export class FDM {
     if (this.stall > 0.3 && !this.onGround) { Cl += (Math.random() - 0.5) * 0.02 * this.stall; Cm += (Math.random() - 0.5) * 0.03 * this.stall; }
     let Mx = qbar * S * CBAR * Cm + T * 1.6 * 0.5 * (this.reverser > 0.1 ? 0 : 1) / 1;
     const Nasym = Tasym * 5.75; // engine thrust off the centreline (yaw-right positive when the left engine pulls harder)
-    if (this.autoTrim) { const tgt = clamp(-Nasym / (Math.max(qbar, 400) * S * B * 0.07), -25 * D2R, 25 * D2R); this.rudTrim += clamp(tgt - this.rudTrim, -dt * 5 * D2R, dt * 5 * D2R); } else this.rudTrim += clamp(-this.rudTrim, -dt * D2R, dt * D2R);
-    let Lr = qbar * S * B * Cl, Nn = qbar * S * B * Cn + Nasym;
+    if (this.autoTrim) { const tgt = clamp(-Nasym / (Math.max(qbar, 400) * S * B * 0.11), -25 * D2R, 25 * D2R) * (this.onGround ? 0.5 : 1); this.rudTrim += clamp(tgt - this.rudTrim, -dt * 5 * D2R, dt * 5 * D2R); } else this.rudTrim += clamp(-this.rudTrim, -dt * D2R, dt * D2R); // on the runway the nose wheel helps, so half the trim
+    let Lr = qbar * S * B * Cl, Nn = qbar * S * B * (Cn + 0.04 * this.rudTrim) + Nasym; // trim tab + full rudder authority (Cn_dr ~0.11) against engine-out yaw
     // body-frame torque accumulator
     const tq = new THREE.Vector3(Mx, -Nn, -Lr);
     // ground contact
@@ -192,9 +192,9 @@ export class FDM {
       const e0 = this.euler(); if (!this.belly) { const near = [[5.75, -3.0, -5], [-5.75, -3.0, -5], [0, -2.1, 0]].some(pr => { const pw = new THREE.Vector3(...pr).applyQuaternion(this.q).add(this.pos); return pw.y < env.ground(pw.x, pw.z).h + 0.05; });
         if (near && this.vel.y > -3.2 && Math.abs(e0.bank) < 9 && !env.ground(this.pos.x, this.pos.z).water) { this.belly = { vs: this.vel.y, t: this.time }; if (!this.td) { this.td = { vs: this.vel.y, ias: this._ias, t: this.time, x: this.pos.x, z: this.pos.z, pitch: e0.pitch, bank: e0.bank, ils: this.ap.ils, gs: Math.hypot(this.vel.x, this.vel.z), belly: true }; } this.events.push({ t: 'belly', v: this.vel.y }); } }
       if (this.belly) { this.scrape = 0;
-        for (const pr of [[5.75, -3.0, -5], [-5.75, -3.0, -5], [0, -2.1, 0], [0, -2.0, -14]]) { const rw = new THREE.Vector3(...pr).applyQuaternion(this.q), pw = rw.clone().add(this.pos), g = env.ground(pw.x, pw.z), c = g.h - pw.y + 0.03; if (c <= 0) continue;
+        for (const pr of [[5.75, -3.0, -5], [-5.75, -3.0, -5], [0, -2.1, 0], [0, -2.0, -14], [0, -1.08, 12]]) { /* nacelles, belly, nose, tail cone */ const rw = new THREE.Vector3(...pr).applyQuaternion(this.q), pw = rw.clone().add(this.pos), g = env.ground(pw.x, pw.z), c = g.h - pw.y + 0.03; if (c <= -0.3) continue; anyMain = any = true; if (c <= 0) continue; // within 30 cm counts as on the ground (no liftoff flicker)
           const vw = this.vel.clone().add(new THREE.Vector3().crossVectors(this.w.clone().applyQuaternion(this.q), rw)); const Fn = Math.max(0, 2.2e6 * c - 3e5 * vw.y); const vh = new THREE.Vector3(vw.x, 0, vw.z); const sp = vh.length();
-          const Ff = sp > 0.05 ? vh.multiplyScalar(-Math.min(0.42 * Fn, sp * 4e5) / sp) : vh.set(0, 0, 0); const Fw = new THREE.Vector3(0, Fn, 0).add(Ff); F.add(Fw); tq.add(new THREE.Vector3().crossVectors(rw, Fw).applyQuaternion(qinv)); anyMain = any = true; this.scrape = Math.max(this.scrape, sp); }
+          const Ff = sp > 0.05 ? vh.multiplyScalar(-Math.min(0.42 * Fn, sp * 4e5) / sp) : vh.set(0, 0, 0); const Fw = new THREE.Vector3(0, Fn, 0).add(Ff); F.add(Fw); tq.add(new THREE.Vector3().crossVectors(rw, Fw).applyQuaternion(qinv)); this.scrape = Math.max(this.scrape, sp); }
         this.w.multiplyScalar(1 - Math.min(1, dt * 2)); }
     } else this.scrape = 0;
     this.onGround = anyMain || (any && this.onGround);
@@ -205,7 +205,7 @@ export class FDM {
     for (let j = 0; j < probes.length; j++) {
       const pr = probes[j]; const pw = new THREE.Vector3(...pr).applyQuaternion(this.q).add(this.pos); const g = env.ground(pw.x, pw.z);
       if (pw.y < g.h + 0.02) {
-        if (this.belly && (j === 2 || j === 3 || j === 6 || j === 0)) continue; // sliding on the belly / nacelles
+        if (this.belly && (j === 2 || j === 3 || j === 6 || j === 0 || j === 1)) continue; // sliding on the belly / nacelles
         if (j === 1 && this.vel.y > -3 && !g.water) { if (!this.tailStrike) { this.tailStrike = true; this.events.push({ t: 'tailstrike' }); } const push = g.h + 0.02 - pw.y; this.pos.y += push; if (this.vel.y < 0) this.vel.y = 0; continue; }
         if (j === 6 && !gearOk && this.vel.y > -4 && !g.water) { this.crash('Gear-up landing'); return; }
         this.crash(g.water ? 'Crashed into the water' : j >= 4 ? 'Wingtip struck the ground' : j >= 2 ? 'Engine struck the ground' : 'Crashed'); return;

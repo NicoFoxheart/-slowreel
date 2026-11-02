@@ -63,6 +63,7 @@ Progress log: PROGRESS.md (one line per finished step; the last line is where to
 - Keep 60 fps on a mid-range PC by using quality tiers and LOD.
 
 ## Nico's requests (2 Nov 2026), in progress
+- **Live v8 (2 Nov):** the lead's ATC rebuild, failures + MAYDAY/PAN-PAN, fire and rescue, evacuation, and the music fixes, with the OLD v7 aircraft/cabin files (the new ones were still in progress). Known nit: background chatter can clear traffic for takeoff after an emergency has been cancelled while the rescue is still on the runway.
 - Lead (running): verify and finish the cabin music → much better ATC flow → emergencies (MAYDAY/PAN-PAN with ATC, engine failure/fire, gear won't extend + belly landing, hydraulics, bird strike, depressurisation, electrical, stuck flap; Failures menu, challenge starts, fire trucks, evacuation).
 - Aircraft artist (running): the player aircraft exterior (finishing ac-livery/ac-shape/ac-util and wiring them into aircraft.js).
 - Environment artist (queued; starts when a slot frees, max two agents at a time): HUGE airport upgrade + big ground-service upgrade. groundcrew.js now belongs to the environment artist. Real turnaround: fuel truck/hydrant dispenser, catering hi-lift trucks, belt loaders, baggage tug + carts, container loader, lav and water trucks, GPU, cleaning crew, pushback. Vehicles drive in on service roads.

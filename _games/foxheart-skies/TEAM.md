@@ -13,10 +13,10 @@ Foxheart Skies is an HD browser flight sim made for Nico (PC, Chrome or Edge, op
 ## Several artists work in this tree at the same time. File ownership:
 | Who | Owns (only you edit these) |
 |---|---|
-| Lead / systems (cockpit, Xbox controls, arrival, pushback) | main.js, flightdeck.js, fdart.js, systems.js, cockpit.js, fdm.js, onfoot.js, pa.js, atc.js, audio.js, traffic.js, data.js, index.html |
+| Lead / systems (cockpit, Xbox controls, arrival, pushback) | main.js, flightdeck.js, fdart.js, systems.js, cockpit.js, fdm.js, onfoot.js, pa.js, atc.js, audio.js, traffic.js, data.js, index.html, failures.js, rescue.js, speech.js, music.js, landing.js |
 | Aircraft artist (exterior + cabin) | aircraft.js; the CABIN section of interiors.js (from the `cabin (aircraft body frame)` divider comment down to, not including, `export function boardRows`); any new files you create, prefix `ac-` |
 | Character artist (crew + passengers) | people.js; any new files you create, prefix `ppl-` |
-| Environment artist (airport exterior + terminal) | airport.js, surroundings.js; the atlas, geometry-builder, Crowd, WalkMap, terminal and jet-bridge sections of interiors.js (everything before the `cabin (aircraft body frame)` divider, plus boardRows); any new files you create, prefix `env-` |
+| Environment artist (airport exterior + terminal) | airport.js, surroundings.js; the atlas, geometry-builder, Crowd, WalkMap, terminal and jet-bridge sections of interiors.js (everything before the `cabin (aircraft body frame)` divider, plus boardRows); groundcrew.js (since 2 Nov); any new files you create, prefix `env-` |
 | World artist (sky, clouds, terrain, ground detail, road traffic seen from the air) | sky.js, terrain.js; any new files you create, prefix `wld-`. Keep the exports used by other modules (grep `from './sky.js'` and `from './terrain.js'`) stable |
 
 - **Keep the exports and their signatures stable.** Other modules import these:

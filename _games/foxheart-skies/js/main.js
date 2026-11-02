@@ -566,7 +566,7 @@ addEventListener('keydown', e => {
     case 'Comma': W.timeAccel = Math.max(1, W.timeAccel / 2); toast('Time ×' + W.timeAccel); break;
     case 'KeyT': if (e.shiftKey) { fdm.tl = 1; ap.athr = false; toast('TOGA'); } break;
     case 'KeyB': break;
-    case 'KeyE': { const s = nextStep(); if (s && s.run) { audio.start(); s.run(); toast(s.label, 2500); } else toast(s ? s.label : 'Nothing to do right now', 2000); break; } // smart next step on the keyboard (checklists, ATC, ECAM actions)
+    case 'KeyJ': { const s = nextStep(); if (s && s.run) { audio.start(); s.run(); toast(s.label, 2500); } else toast(s ? s.label : 'Nothing to do right now', 2000); break; } // smart next step on the keyboard (checklists, ATC, ECAM actions)
   }
   if (k === '?') $('#help').hidden = !$('#help').hidden;
 });
@@ -1152,7 +1152,7 @@ function updateParkPrompt() {
   const gs = Math.hypot(fdm.vel.x, fdm.vel.z) / KT;
   if (W.parkedAt && !W.onFoot) txt = 'Enter  Stand up and walk out with the passengers';
   else if (fdm.onGround && gs < 4 && !W.push && W.mode !== 'challenge' && fdm.td) { const st = nearestFreeStand(120); if (st) txt = 'Enter  Park at gate ' + (st.gateName || '') + ' and shut down'; }
-  if (W.taxiR && W.taxiR.pts && fdm.onGround && !W.autoTaxi && !txt && gs < 30) txt = 'Shift+Enter  Auto-taxi along the magenta route';
+  if (W.taxiR && W.taxiR.pts && fdm.onGround && !W.autoTaxi && !txt && gs < 30 && !fdm.belly && !W.evac) txt = 'Shift+Enter  Auto-taxi along the magenta route';
   if (!txt && fdm.ap.on && !fdm.onGround && (W.ptT = (W.ptT || 0) + 1) && (W.ptT % 20 === 0 ? (W.ptHand = handFlyAvailable()) : W.ptHand)) txt = 'U  Hand-fly the landing (autopilot off)';
   if (el.textContent !== txt) el.textContent = txt; el.hidden = !txt;
 }
@@ -1227,7 +1227,7 @@ function autoStartStep(dt) {
 }
 let engStartShown = null;
 function updateEngStart() {
-  const el = $('#engStart'); if (!el) return; const show = W.started && !W.menuMode && !W.onFoot && !W.paused && fdm.onGround && !(fdm.engRun[0] && fdm.engRun[1]);
+  const el = $('#engStart'); if (!el) return; const show = W.started && !W.menuMode && !W.onFoot && !W.paused && fdm.onGround && !(fdm.engRun[0] && fdm.engRun[1]) && !fdm.belly && !W.evac && !sys.engFault[0] && !sys.engFault[1];
   if (show !== engStartShown) { el.hidden = !show; engStartShown = show; } if (!show) return;
   const b = $('#engStartBtn'), A = W.autoStart; const i = A ? Math.min(A.i, AUTOSTART.length - 1) : -1;
   const t = A ? AUTOSTART[i][0] + (i >= 6 && i <= 7 ? ` · N2 ${Math.round(fdm.n2[i === 6 ? 1 : 0])}%` : i === 2 ? ` · ${Math.round(sys.apuN)}%` : '') : 'Start engines';
@@ -1397,7 +1397,7 @@ const ROUTES = [
 ];
 const KEYS = [['W S / ↑ ↓', 'Pitch (↑ nose down)'], ['A D / ← →', 'Roll'], ['Q E', 'Rudder / nose-wheel steering'], ['Shift / PgUp / =', 'Thrust up'], ['X / PgDn / −', 'Thrust down'], ['Shift T', 'TOGA thrust'],
   ['Start engines', 'Button at the top while parked (automatic start); or do it yourself on the overhead and pedestal'],
-  ['T', 'Radio (ATC): while open, 1–6 pick a call, Esc closes'], ['Y', 'Cabin PA: while open, 1–9 announce, 0 seat belt sign, Esc closes'], ['K / Enter', 'Pushback / park at gate'], ['E', 'Next step: checklists, ECAM actions after a failure, ATC calls (same as A on a controller)'], ['Shift Enter', 'Auto-taxi along the magenta route'],
+  ['T', 'Radio (ATC): while open, 1–6 pick a call, Esc closes'], ['Y', 'Cabin PA: while open, 1–9 announce, 0 seat belt sign, Esc closes'], ['K / Enter', 'Pushback / park at gate'], ['J', 'Next step: checklists, ECAM actions after a failure, ATC calls (same as A on a controller)'], ['Shift Enter', 'Auto-taxi along the magenta route'],
   ['F / V', 'Flaps extend / retract'], ['G', 'Landing gear'], ['B', 'Wheel brakes (hold)'], ['Space', 'Parking brake'], ['R', 'Reversers (on ground)'], ['/', 'Speed brake'], ['[ ]', 'Pitch trim (direct law)'],
   ['Z', 'Autopilot on / off'], ['Shift Z', 'Autothrust on / off'], ['O', 'Arm ILS approach (LOC + G/S)'], ['U', 'Hand-fly the landing (autopilot off, flight director on)'], ['L', 'Landing lights'], ['C / 1–7', 'Camera: deck, chase, orbit, tower, runway, fly-by, cabin'], ['8 / 9 / 0', 'Flight deck only: look at pedestal / overhead / side window (again: ahead)'], ['Mouse on the deck', 'Hover a switch for its name, click to operate, scroll on knobs'],
   ['Mouse drag', 'Look / orbit camera'], ['Wheel', 'Zoom'], ['M', 'Mouse yoke'], ['N', 'Navigation display overlay'], ['H', 'Outside views: clean HUD ↔ full HUD + PFD'], ['. ,', 'Time acceleration'], ['P / Esc', 'Pause / menu'], ['?', 'This help'],

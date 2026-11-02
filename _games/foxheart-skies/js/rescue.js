@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
+const merge = list => mergeGeometries(list.map(g => g.index ? g.toNonIndexed() : g)); // RoundedBox (non-indexed) + indexed primitives
 const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _q = new THREE.Quaternion(), _m = new THREE.Matrix4(), _s = new THREE.Vector3(1, 1, 1), _e = new THREE.Euler();
 // a pooled particle system (sparks, smoke, foam): fixed-size buffers, soft round sprites
 class Particles {
@@ -32,13 +33,13 @@ class Particles {
 }
 function truckGeometries() { // ~10.5 m six-wheel ARFF truck: forward-control cab, water/foam tank body, roof + bumper turrets, light bar
   const B = (w, h, d, r, x, y, z) => new RoundedBoxGeometry(w, h, d, 3, r).translate(x, y, z);
-  const paint = mergeGeometries([B(2.9, 2.0, 7.4, 0.18, 0, 2.05, 1.5), B(2.9, 1.6, 2.9, 0.22, 0, 2.15, -3.5), B(2.95, 0.5, 10.4, 0.12, 0, 0.95, 0.2), B(2.7, 0.35, 0.5, 0.1, 0, 1.0, -5.3)]);
-  const dark = mergeGeometries([B(2.92, 0.95, 1.6, 0.16, 0, 2.55, -4.15), B(0.06, 0.8, 1.9, 0.03, 1.47, 2.45, -3.4), B(0.06, 0.8, 1.9, 0.03, -1.47, 2.45, -3.4), B(2.4, 0.5, 0.2, 0.06, 0, 1.2, -5.5)]); // windows + grille
-  const stripe = mergeGeometries([B(2.98, 0.22, 10.3, 0.06, 0, 1.35, 0.2)]);
-  const metal = mergeGeometries([new THREE.CylinderGeometry(0.28, 0.32, 0.35, 16).translate(0, 3.25, -1.6), new THREE.CylinderGeometry(0.09, 0.12, 1.9, 12).rotateX(Math.PI / 2).translate(0, 3.45, -2.6), new THREE.CylinderGeometry(0.07, 0.09, 1.0, 12).rotateX(Math.PI / 2).translate(0.6, 0.95, -5.8), B(2.6, 0.12, 6.6, 0.04, 0, 3.1, 1.6)]);
+  const paint = merge([B(2.9, 2.0, 7.4, 0.18, 0, 2.05, 1.5), B(2.9, 1.6, 2.9, 0.22, 0, 2.15, -3.5), B(2.95, 0.5, 10.4, 0.12, 0, 0.95, 0.2), B(2.7, 0.35, 0.5, 0.1, 0, 1.0, -5.3)]);
+  const dark = merge([B(2.92, 0.95, 1.6, 0.16, 0, 2.55, -4.15), B(0.06, 0.8, 1.9, 0.03, 1.47, 2.45, -3.4), B(0.06, 0.8, 1.9, 0.03, -1.47, 2.45, -3.4), B(2.4, 0.5, 0.2, 0.06, 0, 1.2, -5.5)]); // windows + grille
+  const stripe = merge([B(2.98, 0.22, 10.3, 0.06, 0, 1.35, 0.2)]);
+  const metal = merge([new THREE.CylinderGeometry(0.28, 0.32, 0.35, 16).translate(0, 3.25, -1.6), new THREE.CylinderGeometry(0.09, 0.12, 1.9, 12).rotateX(Math.PI / 2).translate(0, 3.45, -2.6), new THREE.CylinderGeometry(0.07, 0.09, 1.0, 12).rotateX(Math.PI / 2).translate(0.6, 0.95, -5.8), B(2.6, 0.12, 6.6, 0.04, 0, 3.1, 1.6)]);
   const tyre = new THREE.CylinderGeometry(0.62, 0.62, 0.48, 20).rotateZ(Math.PI / 2), wheels = [];
   for (const z of [-3.2, 1.6, 3.4]) for (const x of [-1.25, 1.25]) wheels.push(tyre.clone().translate(x, 0.62, z));
-  const lightR = mergeGeometries([B(0.7, 0.18, 0.34, 0.06, -0.55, 3.08, -4.4), new THREE.SphereGeometry(0.1, 10, 8).translate(-1.3, 2.9, 4.95)]), lightB = mergeGeometries([B(0.7, 0.18, 0.34, 0.06, 0.55, 3.08, -4.4), new THREE.SphereGeometry(0.1, 10, 8).translate(1.3, 2.9, 4.95)]);
+  const lightR = merge([B(0.7, 0.18, 0.34, 0.06, -0.55, 3.08, -4.4), new THREE.SphereGeometry(0.1, 10, 8).translate(-1.3, 2.9, 4.95)]), lightB = merge([B(0.7, 0.18, 0.34, 0.06, 0.55, 3.08, -4.4), new THREE.SphereGeometry(0.1, 10, 8).translate(1.3, 2.9, 4.95)]);
   return { paint, dark, stripe, metal, tyres: mergeGeometries(wheels), lightR, lightB };
 }
 export class Rescue {
@@ -85,10 +86,10 @@ export class Rescue {
   evacuate(ac, belly) {
     if (this.evac) return; const doorY = belly ? 0.6 : 1.0, groundY = belly ? -2.4 : -4.6; const slideM = new THREE.MeshStandardMaterial({ color: 0xf2bf1f, roughness: 0.55 }); const doors = [[-1.95, -12.6], [1.95, -12.6], [-1.95, 13.4], [1.95, 13.4]];
     const grp = new THREE.Group(); const slides = [];
-    for (const [x, z] of doors) { const len = belly ? 4.5 : 8.2, out = Math.sign(x), drop = doorY - groundY, run = Math.sqrt(Math.max(1, len * len - drop * drop)); const g = mergeGeometries([new RoundedBoxGeometry(1.9, 0.28, len, 2, 0.12), new THREE.CapsuleGeometry(0.2, len - 0.4, 4, 10).rotateX(Math.PI / 2).translate(0.95, 0.2, 0), new THREE.CapsuleGeometry(0.2, len - 0.4, 4, 10).rotateX(Math.PI / 2).translate(-0.95, 0.2, 0)]);
+    for (const [x, z] of doors) { const len = belly ? 4.5 : 8.2, out = Math.sign(x), drop = doorY - groundY, run = Math.sqrt(Math.max(1, len * len - drop * drop)); const g = merge([new RoundedBoxGeometry(1.9, 0.28, len, 2, 0.12), new THREE.CapsuleGeometry(0.2, len - 0.4, 4, 10).rotateX(Math.PI / 2).translate(0.95, 0.2, 0), new THREE.CapsuleGeometry(0.2, len - 0.4, 4, 10).rotateX(Math.PI / 2).translate(-0.95, 0.2, 0)]);
       const m = new THREE.Mesh(g, slideM); m.rotation.order = 'YXZ'; m.rotation.y = out > 0 ? -Math.PI / 2 : Math.PI / 2; m.rotation.x = -Math.atan2(drop, run); m.position.set(x + out * (run / 2 + 0.2), (doorY + groundY) / 2, z); m.scale.set(1, 1, 0.02); grp.add(m); slides.push({ m, foot: new THREE.Vector3(x + out * (run + 1.2), groundY, z), top: new THREE.Vector3(x, doorY, z) }); }
     ac.add(grp); // slides belong to the aircraft frame
-    const body = mergeGeometries([new THREE.CapsuleGeometry(0.21, 0.95, 4, 10).translate(0, 0.72, 0), new THREE.SphereGeometry(0.13, 12, 10).translate(0, 1.55, 0)]); const N = 72;
+    const body = merge([new THREE.CapsuleGeometry(0.21, 0.95, 4, 10).translate(0, 0.72, 0), new THREE.SphereGeometry(0.13, 12, 10).translate(0, 1.55, 0)]); const N = 72;
     const mesh = new THREE.InstancedMesh(body, new THREE.MeshStandardMaterial({ roughness: 0.75 }), N); mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); mesh.frustumCulled = false; const col = new THREE.Color(); const pal = [0x2f4a6e, 0x8c2f2f, 0x2e2e2e, 0xd9d2c3, 0x3f6b45, 0x6b4f8c, 0xb5793a, 0x1f5f7a, 0x9a9a9a];
     for (let i = 0; i < N; i++) { mesh.setColorAt(i, col.setHex(pal[i % pal.length]).offsetHSL(0, 0, (Math.random() - 0.5) * 0.1)); mesh.setMatrixAt(i, _m.makeScale(0, 0, 0)); } this.scene.add(mesh);
     _v.set(0, 0, 1).applyQuaternion(ac.quaternion); const ap = ac.position.clone().addScaledVector(_v.set(_v.x, 0, _v.z).normalize(), 55); // assembly point behind the aircraft, clear of the engines
