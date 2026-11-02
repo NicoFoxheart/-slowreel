@@ -19,7 +19,7 @@ export class Displays {
   }
   draw(S, which) { // S: snapshot of sim state
     const list = which || ['pfd', 'nd', 'ewd', 'sd'];
-    for (const k of list) { this['draw_' + k](this[k].getContext('2d'), S); this.tex[k].needsUpdate = true; }
+    for (const k of list) { const c = this[k].getContext('2d'); if (S.elecEmer && (k === 'nd' || k === 'sd')) { c.fillStyle = '#000'; c.fillRect(0, 0, this[k].width, this[k].height); } else this['draw_' + k](c, S); this.tex[k].needsUpdate = true; } // ND / SD unpowered in the electrical emergency configuration
   }
   // ------------------------------------------------ PFD
   draw_pfd(c, S) {
@@ -202,7 +202,7 @@ export class Displays {
     // memo / warnings
     c.strokeStyle = WHT; c.lineWidth = 1.5; c.beginPath(); c.moveTo(10, 362); c.lineTo(502, 362); c.stroke();
     const msgs = S.warnings; let y = 392; c.textAlign = 'left'; c.font = `bold 18px ${MONO}`;
-    for (const m of msgs.slice(0, 5)) { c.fillStyle = m.c === 'r' ? RED : m.c === 'a' ? AMB : GRN; c.fillText(m.t, 22, y); y += 26; }
+    for (const m of msgs.slice(0, 5)) { c.fillStyle = m.c === 'r' ? RED : m.c === 'a' ? AMB : m.c === 'b' ? CYAN : GRN; c.fillText(m.t, 22, y); y += 26; }
   }
   // ------------------------------------------------ System display: gear, brakes, spoilers, trim
   draw_sd(c, S) {

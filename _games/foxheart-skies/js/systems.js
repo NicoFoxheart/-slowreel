@@ -54,7 +54,8 @@ export class Systems {
     this.memo = [];
     for (let i = 0; i < 2; i++) {
       const e = this.eng[i], master = i ? s.master2 : s.master1;
-      if (!master) { if (e.st !== 'off') { e.st = 'off'; fdm.engRun[i] = false; } }
+      if (this.engFault && this.engFault[i]) { e.st = master ? 'fail' : 'off'; e.msg = 'FAIL'; fdm.engRun[i] = false; } // failed / shut down after a failure: no relight
+      else if (!master) { if (e.st !== 'off') { e.st = 'off'; fdm.engRun[i] = false; } }
       else if (e.st === 'off' || e.st === 'wait') {
         if (fdm.engRun[i]) e.st = 'run';
         else if (s.engMode !== 'IGN') { e.st = 'wait'; this.memo.push(`ENG ${i + 1}: SET ENG MODE TO IGN/START`); }

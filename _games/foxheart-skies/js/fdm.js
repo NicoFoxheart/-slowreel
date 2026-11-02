@@ -46,6 +46,7 @@ export class FDM {
     this.events = []; this.td = null; this.crashed = null; this.stall = 0; this.tailStrike = false; this.alpha = 0; this.beta = 0; this.nz = 1;
     this.windV = V3(); this.gust = V3(); this.time = 0; this.ra = this.onGround ? 0 : 1e4; this.lastVs = 0; this.maxG = 1; this.calls = {};
     this._iasPrev = 0; this.accel = 0;
+    this.fail = { thr: [1, 1], flapJam: null, flapMax: 4, gearJam: 0, gravity: false, hyd: false, noAP: false, vappAdd: 0 }; this.rudTrim = 0; this.autoTrim = true; this.belly = null; this.scrape = 0; // failures (failures.js)
     if (!this.onGround && o.speed) { this.ap.spd = Math.round(o.speed / KT); }
   }
   // ---------------- helpers ----------------
@@ -54,7 +55,7 @@ export class FDM {
   speeds() {
     const W = this.mass * G, rho0 = 1.225;
     const vs = (cfg) => { const f = FLAPS[cfg]; const clmax = 0.22 + f.dCL + 5.2 * f.aS * D2R; return Math.sqrt(2 * W / (rho0 * S * clmax)) / KT; };
-    const vsNow = vs(this.flapIdx); const vref = 1.23 * vs(4);
+    const vsNow = vs(this.flapIdx); const fl = this.fail || {}; const ldg = fl.flapJam != null ? FLAPS.reduce((b, f, i) => Math.abs(f.flap - fl.flapJam) < Math.abs(FLAPS[b].flap - fl.flapJam) ? i : b, 0) : Math.min(4, fl.flapMax ?? 4); const vref = 1.23 * vs(ldg) + (fl.vappAdd || 0);
     return { vs1g: vsNow, vls: 1.23 * vsNow, vref, vapp: vref + 5, v1: 1.06 * vs(1), vr: 1.09 * vs(1), v2: 1.13 * vs(1) + 2, vfe: FLAPS[this.flapIdx].vfe, vmo: 350, green: 1.28 * vs(0) + 0, f: 1.22 * vs(2), s: 1.23 * vs(1) };
   }
   setFlaps(i) { const n = clamp(i, 0, 4); if (n !== this.flapIdx) { this.flapIdx = n; this.events.push({ t: 'flaps', v: n }); } }
@@ -81,13 +82,14 @@ export class FDM {
     this._ias = Math.sqrt(atm.rho / 1.225) * V / KT; this.tas = V / KT; this.mach = mach;
     // configuration transitions
     const F = FLAPS[this.flapIdx];
-    this.flapPos += clamp(F.flap - this.flapPos, -dt / 7, dt / 7); this.slatPos += clamp(F.slat - this.slatPos, -dt / 5, dt / 5);
-    this.gearPos = clamp(this.gearPos + (this.gearDown ? 1 : -1) * dt / 9, 0, 1);
+    const fl = this.fail, fT = fl.flapJam != null ? fl.flapJam : Math.min(F.flap, FLAPS[fl.flapMax].flap), fr = fl.hyd ? 14 : 7;
+    this.flapPos += clamp(fT - this.flapPos, -dt / fr, dt / fr); this.slatPos += clamp((fl.flapJam != null ? this.slatPos : F.slat) - this.slatPos, -dt / 5, dt / 5);
+    if (!(this.gearDown && fl.gearJam && !(fl.gravity && fl.gearJam < 2))) this.gearPos = clamp(this.gearPos + (this.gearDown ? 1 : -1) * dt / (fl.gravity && this.gearDown ? 22 : 9), 0, 1);
     const ff = this.flapPos; // interpolate config
     const fi = FLAPS.reduce((b, f, i) => Math.abs(f.flap - ff) < Math.abs(FLAPS[b].flap - ff) ? i : b, 0);
     const dCL = this.interp('dCL', ff), dCD = this.interp('dCD', ff), aS = this.interp('aS', ff) * D2R;
     // aerodynamics
-    const spoil = Math.max(this.speedbrake * 0.5, this.groundSpoilers);
+    const spoil = Math.max(this.speedbrake * 0.5, this.groundSpoilers) * (this.fail.hyd ? 0.55 : 1);
     let CL0 = 0.22 + dCL - 0.45 * spoil, CLa = 5.2;
     let CL;
     if (alpha < aS) CL = CL0 + CLa * alpha; else { const clmax = CL0 + CLa * aS; CL = Math.max(0.55, clmax - (alpha - aS) * 3.2); }
@@ -102,15 +104,15 @@ export class FDM {
     const F_ = new THREE.Vector3().addScaledVector(liftDir, lift).addScaledVector(vhat, -drag);
     F_.addScaledVector(right, qbar * S * (-0.85 * beta + 0.12 * this.dr));
     // engines
-    let T = 0;
+    let T = 0, Tasym = 0;
     for (let i = 0; i < 2; i++) {
       const rev = this.reverser > 0.5;
-      const cmd = rev ? 20 + 50 * this.tl : 20 + 76 * this.tl;
+      const cmd = rev ? 20 + 50 * this.tl : 20 + 76 * Math.min(this.tl, this.fail.thr[i] < 1 ? this.fail.thr[i] : 1);
       const run = this.engRun[i]; // a shut-down engine is driven by the systems model (start sequence / spool-down)
       if (run) { const k = cmd > this.n1[i] ? 0.16 + 0.0105 * this.n1[i] : 0.55; this.n1[i] += (cmd - this.n1[i]) * Math.min(1, k * dt); this.n2[i] += ((58.6 + Math.max(0, this.n1[i] - 20) * 0.5) - this.n2[i]) * Math.min(1, dt * 1.5); }
       const f = run ? 0.04 + 0.96 * Math.pow(clamp((this.n1[i] - 20) / 80, 0, 1.1), 1.85) : 0;
       const ti = 120000 * f * Math.pow(atm.rho / 1.225, 0.75) * (1 - 0.45 * mach + 0.25 * mach * mach);
-      T += this.reverser > 0.1 ? -ti * 0.42 * this.reverser : ti;
+      const tie = this.reverser > 0.1 ? -ti * 0.42 * this.reverser : ti; T += tie; Tasym += i ? -tie : tie;
       if (run) this.egt[i] += ((380 + this.n1[i] * 5.6) - this.egt[i]) * Math.min(1, dt * 0.8);
     }
     this.fuel = Math.max(0, this.fuel - ((this.engRun[0] ? this.n1[0] : 0) + (this.engRun[1] ? this.n1[1] : 0)) * 0.0095 * dt);
@@ -127,7 +129,9 @@ export class FDM {
     let Cn = 0.11 * beta + 0.07 * this.dr - 0.2 * (r * B / (2 * Vm)) - 0.006 * this.da;
     if (this.stall > 0.3 && !this.onGround) { Cl += (Math.random() - 0.5) * 0.02 * this.stall; Cm += (Math.random() - 0.5) * 0.03 * this.stall; }
     let Mx = qbar * S * CBAR * Cm + T * 1.6 * 0.5 * (this.reverser > 0.1 ? 0 : 1) / 1;
-    let Lr = qbar * S * B * Cl, Nn = qbar * S * B * Cn;
+    const Nasym = Tasym * 5.75; // engine thrust off the centreline (yaw-right positive when the left engine pulls harder)
+    if (this.autoTrim) { const tgt = clamp(-Nasym / (Math.max(qbar, 400) * S * B * 0.07), -25 * D2R, 25 * D2R); this.rudTrim += clamp(tgt - this.rudTrim, -dt * 5 * D2R, dt * 5 * D2R); } else this.rudTrim += clamp(-this.rudTrim, -dt * D2R, dt * D2R);
+    let Lr = qbar * S * B * Cl, Nn = qbar * S * B * Cn + Nasym;
     // body-frame torque accumulator
     const tq = new THREE.Vector3(Mx, -Nn, -Lr);
     // ground contact
@@ -171,7 +175,7 @@ export class FDM {
       let wf = hFwd.clone(), wr = hRight.clone();
       if (i === 0) { const s = this.steer; wf = hFwd.clone().multiplyScalar(Math.cos(s)).addScaledVector(hRight, Math.sin(s)).normalize(); wr = new THREE.Vector3(-wf.z, 0, wf.x); }
       const vl = vw.dot(wf), vlat = vw.dot(wr);
-      const brakeMu = i ? (this.parkBrake ? 0.6 : this.brake * (wet ? 0.28 : 0.48)) : 0;
+      const brakeMu = i ? (this.parkBrake ? 0.6 : this.brake * (wet ? 0.28 : 0.48) * (this.fail.hyd ? 0.6 : 1)) : 0;
       const mu = 0.016 + brakeMu;
       const Fl = -clamp(vl * 3e5, -mu * Fn, mu * Fn);
       const latMu = (wet ? 0.38 : 0.65);
@@ -184,6 +188,15 @@ export class FDM {
         this.events.push({ t: 'touchdown', v: this.vel.y });
       }
     }
+    if (!gearOk) { // gear up: nacelles + belly are the contact points
+      const e0 = this.euler(); if (!this.belly) { const near = [[5.75, -3.0, -5], [-5.75, -3.0, -5], [0, -2.1, 0]].some(pr => { const pw = new THREE.Vector3(...pr).applyQuaternion(this.q).add(this.pos); return pw.y < env.ground(pw.x, pw.z).h + 0.05; });
+        if (near && this.vel.y > -3.2 && Math.abs(e0.bank) < 9 && !env.ground(this.pos.x, this.pos.z).water) { this.belly = { vs: this.vel.y, t: this.time }; if (!this.td) { this.td = { vs: this.vel.y, ias: this._ias, t: this.time, x: this.pos.x, z: this.pos.z, pitch: e0.pitch, bank: e0.bank, ils: this.ap.ils, gs: Math.hypot(this.vel.x, this.vel.z), belly: true }; } this.events.push({ t: 'belly', v: this.vel.y }); } }
+      if (this.belly) { this.scrape = 0;
+        for (const pr of [[5.75, -3.0, -5], [-5.75, -3.0, -5], [0, -2.1, 0], [0, -2.0, -14]]) { const rw = new THREE.Vector3(...pr).applyQuaternion(this.q), pw = rw.clone().add(this.pos), g = env.ground(pw.x, pw.z), c = g.h - pw.y + 0.03; if (c <= 0) continue;
+          const vw = this.vel.clone().add(new THREE.Vector3().crossVectors(this.w.clone().applyQuaternion(this.q), rw)); const Fn = Math.max(0, 2.2e6 * c - 3e5 * vw.y); const vh = new THREE.Vector3(vw.x, 0, vw.z); const sp = vh.length();
+          const Ff = sp > 0.05 ? vh.multiplyScalar(-Math.min(0.42 * Fn, sp * 4e5) / sp) : vh.set(0, 0, 0); const Fw = new THREE.Vector3(0, Fn, 0).add(Ff); F.add(Fw); tq.add(new THREE.Vector3().crossVectors(rw, Fw).applyQuaternion(qinv)); anyMain = any = true; this.scrape = Math.max(this.scrape, sp); }
+        this.w.multiplyScalar(1 - Math.min(1, dt * 2)); }
+    } else this.scrape = 0;
     this.onGround = anyMain || (any && this.onGround);
     if (this.onGround) { this.airTime = 0; this.gndTime += dt; } else { this.airTime += dt; this.gndTime = 0; }
     if (wasGround && !this.onGround) this.events.push({ t: 'liftoff' });
@@ -192,6 +205,7 @@ export class FDM {
     for (let j = 0; j < probes.length; j++) {
       const pr = probes[j]; const pw = new THREE.Vector3(...pr).applyQuaternion(this.q).add(this.pos); const g = env.ground(pw.x, pw.z);
       if (pw.y < g.h + 0.02) {
+        if (this.belly && (j === 2 || j === 3 || j === 6 || j === 0)) continue; // sliding on the belly / nacelles
         if (j === 1 && this.vel.y > -3 && !g.water) { if (!this.tailStrike) { this.tailStrike = true; this.events.push({ t: 'tailstrike' }); } const push = g.h + 0.02 - pw.y; this.pos.y += push; if (this.vel.y < 0) this.vel.y = 0; continue; }
         if (j === 6 && !gearOk && this.vel.y > -4 && !g.water) { this.crash('Gear-up landing'); return; }
         this.crash(g.water ? 'Crashed into the water' : j >= 4 ? 'Wingtip struck the ground' : j >= 2 ? 'Engine struck the ground' : 'Crashed'); return;
@@ -271,8 +285,8 @@ export class FDM {
     }
     // ----- yaw: rudder + yaw damper / turn coordination, nose-wheel steering -----
     const rCoord = (G / Math.max(V, 40)) * Math.tan(phi);
-    if (!this.onGround) this.dr = clamp(yIn * 25 * D2R + (air ? 1.2 * beta - 0.9 * (yawRate - rCoord) : 0), -30 * D2R, 30 * D2R);
-    else this.dr = clamp(yIn * 25 * D2R, -30 * D2R, 30 * D2R);
+    if (!this.onGround) this.dr = clamp(yIn * 25 * D2R + this.rudTrim + (air ? 1.2 * beta - 0.9 * (yawRate - rCoord) : 0), -30 * D2R, 30 * D2R);
+    else this.dr = clamp(yIn * 25 * D2R + this.rudTrim, -30 * D2R, 30 * D2R);
     const gsKt = Math.hypot(this.vel.x, this.vel.z) / KT;
     const steerMax = (gsKt < 20 ? 65 : gsKt < 80 ? 65 - (gsKt - 20) * 0.95 : 8) * D2R;
     this.steer += (yIn * steerMax - this.steer) * Math.min(1, dt * 3);
@@ -280,6 +294,7 @@ export class FDM {
     if (this.onGround && this.spoilersArmed && this.tl < 0.08 && gsKt > 40 && this.gndTime > 0.3) this.groundSpoilers = Math.min(1, this.groundSpoilers + dt * 2);
     else if (!this.onGround || this.tl > 0.3) this.groundSpoilers = Math.max(0, this.groundSpoilers - dt);
     // autobrake
+    if (this.fail.hyd) this.autobrake = 0;
     if (this.autobrake && this.onGround && this.gndTime > 1 && this.groundSpoilers > 0.5) {
       const tgt = this.autobrake === 1 ? 1.7 : 3.0; const a = -this.accel * KT;
       this.brake = clamp(this.brake + (tgt - a) * dt * 0.4, 0, 1);

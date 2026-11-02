@@ -38,6 +38,19 @@ export const PA_LINES = [
     es: c => `Señoras y señores, bienvenidos a ${c.dEs}. La hora local es ${c.timeEs} y la temperatura es de ${c.temp} grados con ${c.wxEs}. Gracias por volar con Nicofoxheart Air.`,
     ko: c => `손님 여러분, ${c.dKo}에 오신 것을 환영합니다. 현지 시각은 ${c.timeKo}이며 기온은 섭씨 ${c.temp}도, ${c.wxKo}입니다. 니코폭스하트 항공을 이용해 주셔서 감사합니다.` },
 ];
+// emergency lines (not in the numbered menu): the captain's briefing, brace, evacuate, oxygen masks
+export const PA_EMERG = [
+  { id: 'emerg', who: 'captain', label: 'Emergency: prepare the cabin', boost: 0, sign: true,
+    en: c => `Ladies and gentlemen, this is the captain. We have a technical problem and we are diverting to ${c.d || 'the nearest airport'}. The crew is trained for this. Please listen carefully to the cabin crew, keep your seat belt fastened and follow their instructions. Cabin crew, prepare the cabin for an emergency landing.`,
+    es: c => `Señoras y señores, les habla el capitán. Tenemos un problema técnico y nos desviamos a ${c.dEs || 'el aeropuerto más cercano'}. Escuchen a la tripulación, mantengan el cinturón abrochado y sigan sus instrucciones.`,
+    ko: c => `손님 여러분, 기장입니다. 기술적인 문제로 ${c.dKo || '가까운 공항'}으로 회항합니다. 승무원의 안내에 따라 좌석벨트를 매고 지시를 따라 주십시오.` },
+  { id: 'brace', who: 'captain', label: 'Brace for impact', boost: 0, sign: true,
+    en: () => 'Brace! Brace! Brace! Heads down, stay down!', es: () => '¡Cabeza abajo! ¡Agáchense! ¡Agáchense!', ko: () => '충격 대비! 충격 대비! 머리 숙여!' },
+  { id: 'evac', who: 'captain', label: 'Evacuate', boost: 0,
+    en: () => 'Evacuate! Evacuate! Unfasten your seat belts and get out! Leave everything behind!', es: () => '¡Evacuar! ¡Evacuar! ¡Desabróchense los cinturones y salgan! ¡Dejen todo!', ko: () => '탈출하십시오! 탈출하십시오! 좌석벨트를 풀고 짐은 두고 나가십시오!' },
+  { id: 'masks', who: 'crew', label: 'Oxygen masks', boost: 0,
+    en: () => 'Put on your oxygen mask! Pull the mask toward you, place it over your nose and mouth and breathe normally. Secure your own mask before helping others.', es: () => '¡Pónganse la máscara de oxígeno! Colóquenla sobre la nariz y la boca y respiren normalmente.', ko: () => '산소마스크를 착용하십시오! 마스크를 당겨 코와 입에 대고 정상적으로 호흡하십시오.' },
+];
 export class PA {
   constructor(audio) { this.audio = audio; this.lang = 'en'; this.last = {}; this.log = []; }
   context(c) { // c: { origin, dest (apt objects), distNm, cruiseFt, destLocalMin, temp, wx, localMin }
@@ -53,7 +66,7 @@ export class PA {
   voiceFor(lang) { let vs = []; try { vs = speechSynthesis.getVoices(); } catch (e) { } const rank = v => (/natural|neural/i.test(v.name) ? 3 : 0) + (/online|google/i.test(v.name) ? 2 : 0); return vs.filter(v => v.lang.toLowerCase().startsWith(lang)).sort((a, b) => rank(b) - rank(a))[0] || null; }
   // returns { text, lang actually used, note }
   announce(id, custom) {
-    const L = PA_LINES.find(l => l.id === id); let lang = this.lang, text, note = '';
+    const L = PA_LINES.find(l => l.id === id) || PA_EMERG.find(l => l.id === id); let lang = this.lang, text, note = '';
     if (custom != null) text = custom; else { const f = L[lang] || L.en; text = f(this.c || {}); if (!L[lang]) { lang = 'en'; note = 'No ' + this.lang.toUpperCase() + ' version of this line; spoken in English.'; } }
     if (custom != null) lang = /[\uac00-\ud7af]/.test(custom) ? 'ko' : /[ñáéíóú¿¡]/i.test(custom) ? 'es' : lang === 'ko' ? 'en' : lang; // typed text: pick the voice from the script
     let voice = this.voiceFor(lang === 'ko' ? 'ko' : lang === 'es' ? 'es' : 'en');

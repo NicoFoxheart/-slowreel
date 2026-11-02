@@ -220,7 +220,7 @@ export class ATC {
   chatter(dt) {
     if (this.chatterOn === false || !this.tuned || ['ATIS', 'DEL'].includes(this.tuned.kind)) return;
     this.chatT = (this.chatT ?? 12) - dt; if (this.chatT > 0 || this.queue.length || this.tx) return;
-    if (this.rb || this.ho || this.t - (this.lastMeT ?? -99) < 10 || ['twr_hold', 'lineup', 'takeoff_clr', 'go_around'].includes(this.phase)) { this.chatT = 6; return; } // never step on your calls
+    if (this.flags.emer || this.rb || this.ho || this.t - (this.lastMeT ?? -99) < 10 || ['twr_hold', 'lineup', 'takeoff_clr', 'go_around'].includes(this.phase)) { this.chatT = 6; return; } // never step on your calls
     const s = this.ctxS(); if (ARR_TWR.has(this.phase) && !s.onGround && s.aglFt < 1500) { this.chatT = 8; return; }
     this.chatT = 26 + Math.random() * 30;
     const k = this.tuned.kind, A = this.tuned.apt, F = this.tuned.name, c = this.o.ctx; const w = this.windM(); const ta = this.ta(A);
@@ -263,6 +263,9 @@ export class ATC {
       case 'ctr': if (!this.flags.desc && s.distArrNm < this.todNm(s) + 40) add('descent', 'CTR', 'Request descent', s.distArrNm < this.todNm(s) + 5); break;
       case 'app': if (!this.flags.appClr && s.distArrNm < 40) add('ils', 'APP', `Request the ILS runway ${c.arrEnd().ident}`, false, false); break;
     }
+    const em = c.emergency && c.emergency();
+    if (!this.flags.emer && (!s.onGround || s.gsKt > 30 || em)) { const k = this.curK(); add('mayday', k, em ? `MAYDAY: ${em.nature}` : 'MAYDAY (declare an emergency)', false, !!em && em.kind === 'mayday'); add('pan', k, em ? `PAN-PAN: ${em.nature}` : 'PAN-PAN (urgency)', false, !!em && em.kind === 'pan'); }
+    if (this.flags.emer && !this.waiting() && (!em || (s.onGround && s.gsKt < 5))) add('cancel', this.curK(), s.onGround ? `Cancel ${this.flags.emer === 'mayday' ? 'MAYDAY' : 'PAN-PAN'}, vacate the runway` : `Cancel ${this.flags.emer === 'mayday' ? 'MAYDAY' : 'PAN-PAN'}`, false, true);
     if (this.atisWanted(s)) { const A = this.apt(); add('atis', 'ATIS', `Listen to ATIS (${this.city(A)})`, false, false); }
     if (this.flags.tfc) { const k = this.tuned?.kind || 'APP'; add('tfc_sight', k, 'Traffic in sight', false, false); add('tfc_look', k, 'Looking for the traffic', true, false); }
     if (this.lastInstr && this.t - this.lastInstr.t < 150 && !this.waiting()) add('sayagain', this.lastInstr.kind, 'Say again', false, false);
@@ -285,6 +288,8 @@ export class ATC {
       case 'taxi': return this.reqTaxi();
       case 'ready': return this.reqDeparture();
       case 'descent': return this.reqDescent();
+      case 'mayday': case 'pan': return this.declare(id);
+      case 'cancel': return this.cancelEmer();
       case 'ils': { const re = c.arrEnd(); this.me('APP', M(this.fac('APP').name, ', ', CS, ', request the I L S runway ', this.rwyM(re.ident), '.')); this.atc('APP', M(CS, ', roger, expect vectors for the I L S runway ', this.rwyM(re.ident), '.'), 1.6, null, { reply: true }); this.flags.ilsReq = true; return; }
     }
   }
@@ -343,7 +348,7 @@ export class ATC {
   }
   clearLanding(delay, pre) {
     const re = this.o.ctx.arrEnd(), CS = this.CSm(), R = this.rwyM(re.ident);
-    this.atc('TWR', M(CS, ', ', this.idM('TWR'), pre || '', this.windM(), ', runway ', R, ', cleared to land.'), delay, () => { this.setPhase('land_clr'); this.ho = null; }, { reply: true, rb: { label: `cleared to land ${re.ident}`, m: M('Cleared to land runway ', R, ', ', CS, '.') } });
+    this.atc('TWR', M(CS, ', ', this.idM('TWR'), pre || '', this.windM(), ', runway ', R, ', cleared to land', this.flags.emer ? ', fire and rescue are standing by' : '', '.'), delay, () => { this.setPhase('land_clr'); this.ho = null; }, { reply: true, rb: { label: `cleared to land ${re.ident}`, m: M('Cleared to land runway ', R, ', ', CS, '.') } });
   }
   // direct to a real navaid near the destination when there is one, else a vector toward it
   routeInstr(s) {
@@ -469,6 +474,8 @@ export class ATC {
         if (!this.flags.gaCmd && s.aglFt < 600 && ((busy && s.aglFt < 500) || (gearBad && s.aglFt < 450) || (far > (easy ? 2.3 : 1.8)))) { this.goAround(true, busy ? 'traffic on the runway' : gearBad ? 'your gear appears up' : 'you are not established on the approach'); return; }
       }
     }
+    if (this.flags.emer && s.onGround && s.gsKt < 40 && !this.flags.emerGnd && this.t - (this.flags.emerT || 0) > 5) { this.flags.emerGnd = this.flags.vacate = true; this.rb = this.ho = null; c.rescue && c.rescue(); this.setPhase('emer_gnd');
+      this.atc('TWR', M(CS, ', ', this.idM('TWR'), 'fire and rescue are on their way to you. Hold position and advise intentions.'), 1.2, null, { instr: true }); return; }
     if ((ARR_TWR.has(p) || p === 'app') && s.onGround && s.gsKt < 60 && !this.flags.vacate && s.distArrNm < 8) {
       this.flags.vacate = true; this.rb = null; this.ho = null; const ex = c.exitInfo(); this.exitName = ex.name;
       const vac = this.usA(this.arr) ? M('turn ', ex.side, ex.name ? M(' at ', [ex.name, twyS(ex.name)]) : ' next available taxiway', ', ') : M('vacate ', ex.side, ex.name ? M(' via ', [ex.name, twyS(ex.name)]) : '', ', ');
@@ -516,5 +523,32 @@ export class ATC {
     const S = this.spdA; if (S && live && this.t - S.t > 60 && Math.abs(s.ias - S.kt) > 25 && this.t - S.warnT > 90) { S.warnT = this.t; this.atc(this.curK(), M(CS, ', maintain ', [S.kt + ' kt', digits(S.kt) + ' knots'], '.'), 0.2); }
   }
   setAssigned(ft) { this.assignAlt(ft); }
+  // ---------------------------------------------------------------- emergencies: MAYDAY / PAN-PAN, priority handling and the nearest suitable runway
+  declare(kind) {
+    const c = this.o.ctx, s = this.ctxS(), CS = this.CSm(), k = this.curK(), F = this.fac(k), em = c.emergency && c.emergency(); const may = kind === 'mayday';
+    const nat = em ? em.nature : may ? 'emergency' : 'technical problem'; const div = c.divert ? c.divert().apt : this.arr; const back = div === this.dep;
+    const fm = c.fuelMin ? c.fuelMin() : 120, fh = Math.floor(fm / 60), fmm = Math.round((fm % 60) / 5) * 5; const souls = c.souls ? c.souls() : 156;
+    this.flags.emer = kind; this.flags.emerT = this.t; this.rb = null; this.ho = null; this.queue = this.queue.filter(x => !x.chatter); this.dropChatter();
+    const word = may ? ['MAYDAY, MAYDAY, MAYDAY', 'Mayday, Mayday, Mayday'] : ['PAN-PAN, PAN-PAN, PAN-PAN', 'Pan pan, pan pan, pan pan'];
+    this.me(k, M(word, ', ', F.name, ', ', CS, ', ', nat, ', ', s.onGround ? 'stopping on the runway' : back ? 'request immediate return to ' + this.city(div) : 'request diversion to ' + this.city(div), s.onGround ? '' : M(', ', this.altRep(s, this.alt?.ft ?? null)), ', ', [souls + ' souls on board', souls + ' souls on board'], ', fuel ', [`${fh} h ${String(fmm).padStart(2, '0')} min`, `${fh ? fh + (fh > 1 ? ' hours ' : ' hour ') : ''}${fmm ? fmm + ' minutes' : ''}`], '.'));
+    this.atc(k, M(CS, ', ', this.idM(k), 'roger ', may ? 'MAYDAY' : ['PAN-PAN', 'pan pan'], '.'), 1.4, null, { reply: true });
+    if (may) this.atc(k, M('All stations, ', F.name, ', stop transmitting, MAYDAY in progress.'), 0.5, null, { reply: true });
+    if (s.onGround) { this.atc(k, M(CS, ', fire and rescue are on their way. Hold position.'), 0.6, () => { c.rescue && c.rescue(); }, { reply: true }); return; }
+    // vectors to the nearest suitable runway (longest nearby), "runway of your choice"
+    if (div !== this.arr) { c.setArr && c.setArr(div); this.arr = div; } this.appAlt = Math.max(2000, r100(div.elevFt + 3000));
+    const g = c.approachGeo(), re = c.arrEnd(), hd = Math.round(g.ipHdg / 5) * 5, tgt = s.altFt > 10300 ? Math.max(this.appAlt, 10000) : s.altFt < this.appAlt ? this.appAlt : Math.max(this.appAlt, r100(s.altFt));
+    const altIns = Math.abs(tgt - s.altFt) < 300 ? M('maintain ', this.Am(tgt, div)) : this.cmdAlt(tgt, s.altFt, div);
+    const ins = M(this.hdgM(hd, s.trk), ', ', altIns, ', vectors I L S runway ', this.rwyM(re.ident), ' at ', this.city(div));
+    this.atc(k, M(CS, ', ', ins, ', runway of your choice, fire and rescue will be standing by.'), 0.8, () => { this.setPhase('app'); Object.assign(this.flags, { appClr: false, vecT: this.t, advise: false, gaCmd: false, twrCall: false, vacate: false }); this.contacted.add(this.fac('APP').name); this.ctrApt = div; this.emit(); },
+      { reply: true, rb: { label: `heading ${hdgD(hd)}, ${altD(tgt, this.ta(div))}, ILS ${re.ident} ${this.city(div)}`, m: M(cap(ins), ', ', CS, '.'), fcu: { alt: tgt, hdg: hd }, then: () => { this.assignAlt(tgt); this.assignHdg(hd); } } });
+  }
+  cancelEmer() {
+    const c = this.o.ctx, s = this.ctxS(), CS = this.CSm(), k = this.curK(), F = this.fac(k), may = this.flags.emer === 'mayday';
+    this.me(k, M(CS, ', cancel ', may ? 'MAYDAY' : ['PAN-PAN', 'pan pan'], s.onGround ? ', we can vacate the runway.' : ', the situation is under control.'));
+    this.atc(k, M(CS, ', roger, ', may ? 'MAYDAY' : ['PAN-PAN', 'pan pan'], ' cancelled.'), 1.4, null, { reply: true });
+    if (may) this.atc(k, M('All stations, ', F.name, ', distress traffic ended.'), 0.5, null, { reply: true });
+    this.flags.emer = null;
+    if (s.onGround) { const ex = c.exitInfo(); this.exitName = ex.name; this.atc('TWR', M(CS, ', vacate ', ex.side, ex.name ? M(' via ', [ex.name, twyS(ex.name)]) : ' when able', ', ', this.contactM('GND', this.arr), '.'), 0.8, () => this.setPhase('to_gnd'), { ho: { to: 'GND', from: 'TWR' } }); }
+  }
   curK() { const k = this.tuned?.kind; return k && k !== 'ATIS' ? k : this.phase === 'dep' ? 'DEP' : this.phase === 'ctr' ? 'CTR' : 'APP'; }
 }

@@ -347,6 +347,10 @@ kbd{font:11px var(--f-mono);padding:2px 6px;border-radius:4px;border:1px solid v
           <label for="vPilot">Your pilot voice</label><div style="display:flex;gap:6px"><select id="vPilot" style="flex:1;min-width:0"></select><button class="go ghost" id="vPilotTest" style="padding:6px 10px;font-size:13px">Test</button></div>
           <small style="color:var(--mute)">For the most natural ATC voices, play in Microsoft Edge: its “Online (Natural)” voices are picked automatically. Chrome uses its Google voices.</small></div>
         <label class="toggle"><input type="checkbox" id="chatterOn" checked> Background radio chatter from other aircraft</label>
+        <div class="field"><span class="lab">Failures and emergencies</span><span class="lab" style="font-weight:400;color:var(--mute)">Random failure during a flight</span>
+          <div class="seg" id="failRandSeg"><button data-v="off">Off</button><button data-v="rare">Rare</button><button data-v="sometimes">Sometimes</button></div>
+          <div style="display:flex;gap:6px;margin-top:6px"><select id="failPick" style="flex:1;min-width:0" aria-label="Failure"></select><button class="go ghost" id="failNow" style="padding:6px 10px;font-size:13px">Trigger now</button></div>
+          <small style="color:var(--mute)">“Trigger now” works in flight (pause, then Settings). Engine failure at V1 arms for the next takeoff. The first officer calls the checklist; press E (or A on a controller) for the next action, and declare MAYDAY or PAN-PAN from the radio (T / X).</small></div>
         <label class="toggle"><input type="checkbox" id="hudOn" checked> Clean HUD in external views</label>
         <div class="field padset"><span class="lab">Controller (Xbox / gamepad)</span><div class="padhint">Using an Xbox controller? Press any button on it to connect it.</div>
           <span class="lab">Assist</span><div class="seg" id="padAssistSeg"><button data-v="easy">Easy</button><button data-v="normal">Normal</button><button data-v="realistic">Realistic</button></div>

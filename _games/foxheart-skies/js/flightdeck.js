@@ -584,7 +584,8 @@ export function buildCockpit(displays, opts = {}) {
   function legendLights(c, ctx, test) {
     const s = ctx.sys, sw = s.sw, f = ctx.fdm, ap = f.ap, id = c.id, o = c.o; let top = OFFC, bot = OFFC;
     if (test && (o.top || o.bot)) return [o.top ? (o.top === 'FIRE' ? RED : o.top === 'BAR' ? GRN : o.top === 'AVAIL' ? GRN : o.top === 'ON' ? BLU : AMB) : OFFC, o.bot ? (o.bot === 'ON' ? BLU : o.bot === 'AVAIL' ? GRN : WHT) : OFFC];
-    if (['bat1', 'bat2', 'gen1', 'gen2', 'apuGen', 'pack1', 'pack2', 'bleed1', 'bleed2', 'fuelL1', 'fuelL2', 'fuelC1', 'fuelC2', 'fuelR1', 'fuelR2', 'hyd1', 'hyd2', 'ptu', 'crewOxy', 'busTie'].includes(id)) bot = sw[id] ? OFFC : WHT;
+    if (/^(fire[12]|eng[12]fault)$/.test(id)) { const i = id.includes('1') ? 0 : 1, F = (s.fire || [])[i] || {}; top = F.on ? RED : OFFC; bot = id.startsWith('fire') ? (F.pushed ? WHT : OFFC) : (s.engFault && s.engFault[i] ? AMB : OFFC); }
+    else if (['bat1', 'bat2', 'gen1', 'gen2', 'apuGen', 'pack1', 'pack2', 'bleed1', 'bleed2', 'fuelL1', 'fuelL2', 'fuelC1', 'fuelC2', 'fuelR1', 'fuelR2', 'hyd1', 'hyd2', 'ptu', 'crewOxy', 'busTie'].includes(id)) bot = sw[id] ? OFFC : WHT;
     else if (id === 'fuelMode') bot = sw.fuelMode ? OFFC : WHT;
     else if (id === 'apuMaster' || id === 'apuBleed' || id === 'hydElec' || id === 'rainRpl') bot = sw[id] ? BLU : OFFC;
     else if (id === 'extPwr') { top = s.extAvail && !sw.extPwr ? GRN : OFFC; bot = sw.extPwr ? BLU : OFFC; }
@@ -727,7 +728,7 @@ export function buildCockpit(displays, opts = {}) {
       if (c.id in sw && typeof sw[c.id] === 'boolean') { if (c.id === 'apuStart') { if (sw.apuMaster) sw.apuStart = true; return; } if (c.id === 'extPwr' && !ctx.sys.extAvail) return A.toast && A.toast('No ground power connected'); sw[c.id] = !sw[c.id]; return; }
       if (c.id === 'fcuAp1' || c.id === 'fcuAp2') return A.ap && A.ap(); if (c.id === 'fcuAthr') return A.athr && A.athr(); if (c.id === 'fcuAppr' || c.id === 'fcuLoc') return A.appr && A.appr();
       if (c.id.startsWith('abrk')) return A.autobrake && A.autobrake({ abrkLO: 1, abrkMED: 2, abrkMAX: 3 }[c.id]);
-      if (c.id === 'callAll') return A.callCabin && A.callCabin(); if (c.id.startsWith('fire')) return A.toast && A.toast('Fire pushbuttons are guarded. No fire today.');
+      if (c.id === 'callAll') return A.callCabin && A.callCabin(); if (c.id.startsWith('fire')) return A.firePb ? A.firePb(c.id) : A.toast && A.toast('Fire pushbuttons are guarded. No fire today.');
       if (c.id.startsWith('mw') || c.id.startsWith('mc')) return A.silence && A.silence();
       if (c.id.startsWith('xfr') && c.id.length === 4) { const a = ctx.freq, b = st.stby || 121.9; st.stby = a; return A.swapFreq && A.swapFreq(b); }
       if (c.id.startsWith('efis') || c.id.startsWith('ecp')) st.last['p_' + c.id] = !st.last['p_' + c.id];

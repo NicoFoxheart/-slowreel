@@ -23,7 +23,7 @@ export function pchip(pts) {
 }
 
 // ---------------------------------------------------------------- canvases & textures
-export function canvas(w, h = w) { const cv = document.createElement('canvas'); cv.width = w; cv.height = h; return { cv, c: cv.getContext('2d', { willReadFrequently: false }) }; }
+export function canvas(w, h = w) { const cv = document.createElement('canvas'); cv.width = w; cv.height = h; return { cv, c: cv.getContext('2d', { willReadFrequently: true }) }; }
 export function tex(cv, o = {}) {
   const t = new THREE.CanvasTexture(cv); if (o.srgb !== false) t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = o.aniso ?? 8; if (o.repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; } if (o.wrapS) t.wrapS = o.wrapS; if (o.wrapT) t.wrapT = o.wrapT;

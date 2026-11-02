@@ -87,6 +87,8 @@ export class Audio {
     if (!this.paBus) { this.paBus = c.createGain(); this.paBus.gain.value = 1; const d = c.createDelay(0.5); d.delayTime.value = 0.085; const fb = c.createGain(); fb.gain.value = 0.32; const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2600; this.paBus.connect(this.master); this.paBus.connect(d); d.connect(lp); lp.connect(fb); fb.connect(d); lp.connect(this.master); }
     for (const [m, a] of [[1, 1], [2.01, 0.28], [3.0, 0.08]]) { const o = c.createOscillator(), g = c.createGain(); o.type = 'sine'; o.frequency.value = freq * m; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain * a, t + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t + decay / m); o.connect(g); g.connect(this.paBus); o.start(t); o.stop(t + decay + 0.1); }
   }
+  masterChime() { this.bell(1046, 0, 0.1, 0.45); } // one stroke of the continuous repetitive chime (master warning)
+  cautionChime() { this.bell(880, 0, 0.11, 1.1); } // single chime (master caution)
   paChime() { this.bell(830, 0, 0.11, 1.5); this.bell(660, 0.55, 0.11, 1.9); } // high-low "ding-dong"
   signDing() { this.bell(1046, 0, 0.09, 1.2); } // single cabin-sign ding
   callDing() { this.bell(880, 0, 0.08, 1.0); this.bell(880, 0.32, 0.06, 1.0); }

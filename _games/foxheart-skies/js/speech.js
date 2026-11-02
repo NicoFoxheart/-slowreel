@@ -3,7 +3,7 @@
 // item never kills another. Priorities: GPWS 5 (never over a PA) > PA 4 > ATC 3 > ATIS 2 > chatter 1.
 // Text is split into short chunks (sentences, then commas, max ~180 chars) to dodge Chrome's ~15 s cut-off.
 // Subtitles are shown for everything; if speech is missing or silent the subtitles carry on by themselves.
-export const PRIO = { gpws: 5, pa: 4, atc: 3, atis: 2, chatter: 1 };
+export const PRIO = { gpws: 5, pa: 4, crew: 3.5, atc: 3, atis: 2, chatter: 1 }; // crew: the first officer's checklist callouts on the flight deck
 export function chunkText(t, max = 180) {
   const out = []; const sentences = String(t).replace(/\s+/g, ' ').trim().split(/(?<=[.!?。])\s+/);
   for (let s of sentences) {
