@@ -23,13 +23,14 @@ import { PA, PA_LINES } from './pa.js';
 import { Speech } from './speech.js';
 import { GroundCrew } from './groundcrew.js';
 import { LandingAids, fdGuide, coachLine } from './landing.js';
+import { Music, moodFor } from './music.js';
 import { buildCabin } from './interiors.js';
 import { rng } from './terrain.js';
 
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const errors = []; window.addEventListener('error', e => errors.push(String(e.message))); window.addEventListener('unhandledrejection', e => errors.push(String(e.reason)));
 const store = { get(k, d) { try { const v = localStorage.getItem('foxheart.' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('foxheart.' + k, JSON.stringify(v)); } catch (e) { } } };
-const settings = Object.assign({ quality: 'high', res: 'auto', units: 'aviation', law: 'fbw', invert: '0', mouseSens: 1, vol: 0.7, voice: true, hud: true, padAssist: 'easy', padSens: 1, padDz: 0.15, padInvert: '0', padRumble: true, landBoxes: true, landAutoSpd: true, extHud: 'min' }, store.get('settings', {}));
+const settings = Object.assign({ quality: 'high', res: 'auto', units: 'aviation', law: 'fbw', invert: '0', mouseSens: 1, vol: 0.7, voice: true, hud: true, padAssist: 'easy', padSens: 1, padDz: 0.15, padInvert: '0', padRumble: true, landBoxes: true, landAutoSpd: true, extHud: 'min', music: true, musicVol: 0.5, termMusic: true }, store.get('settings', {}));
 const TODAY = new Date(Date.UTC(2026, 9, 27));
 
 // ---------------------------------------------------------------- renderer
@@ -72,6 +73,7 @@ pad.onDisconnect = () => { toast('Controller disconnected'); padStatus(); };
 function padStatus() { const t = pad.gp ? ((/xbox|xinput|045e/i.test(pad.id) ? 'Xbox controller' : 'Controller') + ' connected' + (pad.standard ? '' : ' (non-standard layout)')) : 'Using an Xbox controller? Press any button on it to connect it.'; for (const el of document.querySelectorAll('.padhint')) { el.textContent = t; el.classList.toggle('on', !!pad.gp); } }
 const fdm = new FDM(); fdm.law = settings.law;
 const audio = new Audio(); audio.vol = settings.vol; audio.voice = settings.voice;
+const music = new Music(audio); music.on = settings.music !== false; music.vol = settings.musicVol ?? 0.5; music.term = settings.termMusic !== false;
 const traffic = new Traffic(scene);
 const atc = new ATC(audio);
 const foot = new OnFoot(scene, camera, aircraft, audio);
@@ -82,6 +84,7 @@ const pa = new PA(audio);
 const speech = new Speech(); atc.speech = speech; pa.speech = speech; audio.speech = speech;
 let subT = null;
 speech.on((ev, it) => {
+  if (it && it.channel === 'pa') { if (ev === 'start') music.duck(true); else if (ev === 'end' || ev === 'silent') music.duck(false); } // music dips under cabin announcements
   const el = $('#subs'); if (!el) return;
   if (ev === 'start' && it.channel !== 'gpws') { el.className = it.channel === 'pa' ? 'pa' : (it.channel === 'chatter' || it.channel === 'atis') ? 'oth' : ''; el.innerHTML = `<b>${esc(it.o.who || '')}</b>${esc(it.o.display || it.o.text || '')}`; el.style.opacity = 1; clearTimeout(subT);
     if (!speech.canSpeak() && !W.speechNote && it.o.mute !== true) { W.speechNote = true; toast('No speech voice is available in this browser, so announcements and ATC are shown as subtitles.', 7000); } }
@@ -979,7 +982,17 @@ function renderFrame(dt) {
   const hc = $('#hudc'); const hx = hc.getContext('2d');
   if (!W.menuMode && !W.onFoot && settings.hud && W.view !== 'cockpit' && W.view !== 'cabin' && W.S) drawHUD(hx, hc.width, hc.height, W.S, camera, settings.units, settings.extHud); else hx.clearRect(0, 0, hc.width, hc.height);
   audio.update({ fdm, apuN: sys.apuN, paused: W.paused || W.menuMode, ground: fdm.onGround, camDist: camera.position.distanceTo(aircraft.position), rain: W.wx === 'rain', nearAirport: true, groundH: gh, flapTarget: FLAPS[fdm.flapIdx].flap }, dt, W.view);
+  music.update(dt, musicWant());
   if (!W.menuMode && !W.onFoot) { updateUI(); updateParkPrompt(); updateCoach(); } else if (!$('#coach').hidden) $('#coach').hidden = true;
+}
+// boarding / deplaning music in the cabin while parked with power on; ambient music in the terminal halls
+const MOOD_NAME = { bossa: 'bossa nova', pentatonic: 'pentatonic', lounge: 'lounge jazz' };
+function musicWant() {
+  if (W.menuMode || !W.started || W.paused || W.crashShown) return null;
+  const mood = moodFor((W.primary?.apt || W.apt)?.icao);
+  if (W.onFoot) { const tag = foot.zoneTag(); if (tag === 'hall' || !tag) return { kind: 'terminal', mood, level: 0.9 }; if (tag === 'bridge' || tag === 'gatedoor') return { kind: 'cabin', mood, level: 0.3 }; return { kind: 'cabin', mood, level: tag === 'cockpit' || tag === 'ckdoor' ? 0.5 : 1 }; }
+  const parked = fdm.onGround && Math.hypot(fdm.vel.x, fdm.vel.z) < 0.5 && sys.ac && ((W.stand && !W.push && !fdm.engRun[0] && !fdm.engRun[1]) || W.parkedAt);
+  const lv = !parked ? 0 : W.view === 'cabin' ? 1 : W.view === 'cockpit' ? 0.3 : 0; return lv ? { kind: 'cabin', mood, level: lv } : null;
 }
 // approach coach for hand-flown landings: glide path, centreline and speed in plain words, then the flare cue
 let coachN = 0;
@@ -1230,8 +1243,8 @@ function buildMenu() {
   const setSeg = (id, key) => { $$(`#${id} button`).forEach(b => { b.setAttribute('aria-pressed', String(settings[key]) === b.dataset.v); b.onclick = () => { $$(`#${id} button`).forEach(x => x.setAttribute('aria-pressed', x === b)); settings[key] = b.dataset.v; store.set('settings', settings); applySettings(key); }; }); };
   setSeg('qSeg', 'quality'); setSeg('resSeg', 'res'); setSeg('unitSeg', 'units'); setSeg('lawSeg', 'law'); setSeg('invSeg', 'invert'); setSeg('padAssistSeg', 'padAssist'); setSeg('padInvSeg', 'padInvert');
   renderPadMap(); $('#padRumble').checked = settings.padRumble !== false; $('#padRumble').onchange = () => { settings.padRumble = $('#padRumble').checked; pad.cfg.rumble = settings.padRumble; store.set('settings', settings); if (pad.cfg.rumble) pad.rumble(0.4, 0.4, 200); };
-  for (const [id, key] of [['mouseSens', 'mouseSens'], ['vol', 'vol'], ['padSens', 'padSens'], ['padDz', 'padDz']]) { const el = $('#' + id); el.value = settings[key]; el.oninput = () => { settings[key] = +el.value; store.set('settings', settings); applySettings(key); }; }
-  for (const [id, key] of [['voice', 'voice'], ['hudOn', 'hud']]) { const el = $('#' + id); el.checked = settings[key]; el.onchange = () => { settings[key] = el.checked; store.set('settings', settings); applySettings(key); }; }
+  for (const [id, key] of [['mouseSens', 'mouseSens'], ['vol', 'vol'], ['musicVol', 'musicVol'], ['padSens', 'padSens'], ['padDz', 'padDz']]) { const el = $('#' + id); el.value = settings[key]; el.oninput = () => { settings[key] = +el.value; store.set('settings', settings); applySettings(key); }; }
+  for (const [id, key] of [['voice', 'voice'], ['hudOn', 'hud'], ['music', 'music'], ['termMusic', 'termMusic']]) { const el = $('#' + id); el.checked = settings[key]; el.onchange = () => { settings[key] = el.checked; store.set('settings', settings); applySettings(key); }; }
   const fillVoices = () => { const vs = (atc.allVoices || []).filter(v => /^(en|es|ko)/i.test(v.lang)); for (const [id, key] of [['vCtl', 'controller'], ['vPilot', 'pilot']]) { const el = $('#' + id); const cur = settings['voice_' + key] || 'auto'; el.innerHTML = `<option value="auto">Auto (most natural available)</option>` + vs.map(v => `<option value="${v.name.replace(/"/g, '&quot;')}">${v.name} · ${v.lang}</option>`).join(''); el.value = vs.some(v => v.name === cur) ? cur : 'auto'; atc.voicePref[key] = el.value; el.onchange = () => { settings['voice_' + key] = el.value; atc.voicePref[key] = el.value; store.set('settings', settings); }; } };
   fillVoices(); atc.on((a, why) => { if (why === 'voices') fillVoices(); });
   $('#vCtlTest').onclick = () => { audio.start(); atc.o = atc.o || { ctx: atcCtx, dep: World.byIcao.get('KTPA'), arr: World.byIcao.get('KMIA'), depEnd: airportGeometry(World.byIcao.get('KTPA')).ends[0] }; atc.say('TWR', { d: 'Foxheart 412, Tampa Tower, wind 210 at 8, runway 19 right, cleared for takeoff.', s: 'Foxheart four one two, Tampa Tower, wind two one zero at eight, runway one niner right, cleared for takeoff.' }); };
@@ -1248,12 +1261,16 @@ function buildMenu() {
   $('#radioBtn').onclick = () => { toggleRadio(); canvas.focus(); }; $('#paBtn').onclick = () => { togglePA(); canvas.focus(); }; $('#rClose').onclick = () => toggleRadio(false);
   $('#rAuto').onchange = () => { atc.auto = $('#rAuto').checked; settings.atcAuto = atc.auto; store.set('settings', settings); };
   $('#rSpeak').onchange = () => { atc.speakMe = $('#rSpeak').checked; };
+  $('#pMusic').onclick = () => { settings.music = settings.music === false; store.set('settings', settings); applySettings('music'); toast('Boarding music ' + (settings.music ? 'on' : 'off')); };
+  $('#pMusicVol').oninput = () => { settings.musicVol = +$('#pMusicVol').value; store.set('settings', settings); applySettings('musicVol'); }; syncMusicUI();
   selectAirport(World.byIcao.get('KTPA'), true);
 }
+function syncMusicUI() { const b = $('#pMusic'), r = $('#pMusicVol'); if (b) b.setAttribute('aria-pressed', String(settings.music !== false)); if (r) r.value = settings.musicVol; for (const [id, k] of [['music', 'music'], ['termMusic', 'termMusic']]) { const el = $('#' + id); if (el) el.checked = settings[k] !== false; } const mv = $('#musicVol'); if (mv) mv.value = settings.musicVol; }
 function applySettings(key) {
   if (key === 'padSens') pad.cfg.sens = settings.padSens; if (key === 'padDz') pad.cfg.dz = settings.padDz;
   if (key === 'vol') audio.setVolume(settings.vol); if (key === 'voice') audio.voice = settings.voice; if (key === 'law') fdm.law = settings.law;
   if (key === 'res') applyRes();
+  if (key === 'music' || key === 'musicVol' || key === 'termMusic') { music.on = settings.music !== false; music.vol = +settings.musicVol; music.term = settings.termMusic !== false; syncMusicUI(); }
   if (key === 'quality') { toast('Graphics quality applies on reload'); location.hash = ''; setTimeout(() => location.reload(), 600); }
 }
 function selectAirport(A, quiet) {

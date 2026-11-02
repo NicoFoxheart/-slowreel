@@ -4,6 +4,22 @@ Live link: https://claude.ai/artifact/Fnfn6Njxh3cxXeq2zZLB3s
 Backup: private repo NicoFoxheart/-slowreel, folder `_games/foxheart-skies/`
 Progress log: PROGRESS.md (one line per finished step; the last line is where to pick up)
 
+## STATUS at handoff (2 Nov 2026)
+- **Live (v7):** new flight deck, easy Xbox mode, PA fix (speech.js), engines silent at start, arrival, pushback + ground crew (groundcrew.js), Land it yourself (landing.js), detailed other planes (ac-traffic.js).
+- **Unfinished, in this backup, NOT live:**
+  - js/music.js: cabin and boarding music, by the lead;
+  - js/ac-livery.js, ac-shape.js, ac-util.js: the player aircraft exterior, by the aircraft artist.
+  - The main.js edits for these may be partial. Smoke test before publishing.
+- **Next, in order:**
+  1. finish the cabin music, then much better ATC;
+  2. player aircraft exterior + cabin;
+  3. crew and passengers;
+  4. airport + terminal (env-kit.js started);
+  5. sky, ground and road cars.
+- **The previous agents are gone in a new chat.** Spawn fresh ones per TEAM.md, at most two at a time, in lean mode. They have to read the code again.
+- **Publishing:** publish to https://claude.ai/artifact/Fnfn6Njxh3cxXeq2zZLB3s with `url` set to that link, the full `files` list (index.html, data/world.json and every js/*.js imported by main.js), and `root` = the folder. Read the artifact first (action read) so the publish is allowed.
+- **Working with Nico:** very usage-conscious, so keep updates short and only message when something is ready. If anything would cost money, stop. Review every agent's work before it goes live, and send sloppy work back.
+
 ## Queue (in order)
 1. Flight deck rebuild: flightdeck.js, fdart.js, systems.js; overhead panel; cold-and-dark start
 2. Easy Xbox controls
