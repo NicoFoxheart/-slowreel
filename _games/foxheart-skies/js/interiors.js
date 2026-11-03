@@ -334,11 +334,17 @@ export function buildBridge(pts, matSrc) {
 }
 
 // ---------------------------------------------------------------- cabin (aircraft body frame)
+import { buildCabinShell } from './ac-cabin.js';
 export const CABIN = { floor: -0.55, door: new THREE.Vector3(-1.98, -0.55, -13.0), seatRows: 29, pitch: 0.79, z0: -10.6, ckFloor: -0.15 };
 export function buildCabin(icao, rnd) {
-  const at = buildAtlas(icao, 7, ''); const mat = atlasMaterial(at.tex);
   const group = new THREE.Group(); group.name = 'cabin';
-  const fl = CABIN.floor; const B = new Builder((p, n) => 0.86 + Math.max(0, n.y) * 0.12 - (Math.abs(n.y) < 0.5 ? 0.1 * Math.exp(-(p.y - fl) / 0.4) : 0));
+  const fl = CABIN.floor;
+  const seats = []; for (let r = 0; r < CABIN.seatRows; r++) for (const x of [-1.38, -0.88, -0.38, 0.38, 0.88, 1.38]) seats.push([x, CABIN.z0 + r * CABIN.pitch]);
+  // detailed shell + seats (ac-cabin.js); the simple box cabin below is only a fallback if that build throws
+  let shell = null; try { shell = buildCabinShell({ seats, rnd, floor: fl, rows: CABIN.seatRows, pitch: CABIN.pitch, z0: CABIN.z0 }); group.add(shell.group); } catch (e) { console.error('cabin: detailed interior failed, using the simple one', e); shell = null; }
+  let at = null, mat = shell ? shell.mat : null;
+  if (!shell) { at = buildAtlas(icao, 7, ''); mat = atlasMaterial(at.tex);
+  const B = new Builder((p, n) => 0.86 + Math.max(0, n.y) * 0.12 - (Math.abs(n.y) < 0.5 ? 0.1 * Math.exp(-(p.y - fl) / 0.4) : 0));
   const z0 = -14.2, z1 = 12.4, L = z1 - z0, zc = (z0 + z1) / 2;
   B.box(0, fl - 0.05, zc, 3.7, 0.1, L, 'cabcarpet', { faces: 'py', rep: 1.2 });
   B.box(0, 1.55, zc, 2.4, 0.08, L, 'white', { faces: 'ny', rep: 2 });
@@ -359,8 +365,8 @@ export function buildCabin(icao, rnd) {
   // seats (instanced): 3+3 rows
   const sb = new Builder(() => 0.95); sb.box(0, 0.4, 0, 0.47, 0.1, 0.46, 'leather', { tiles: { py: 'leather' } }); sb.box(0, 0.85, 0.24, 0.47, 0.8, 0.09, 'leather'); sb.box(0, 0.2, 0, 0.36, 0.4, 0.06, 'metal'); sb.box(-0.24, 0.6, 0.02, 0.04, 0.06, 0.4, 'metal'); sb.box(0, 1.15, 0.29, 0.3, 0.1, 0.02, 'white');
   const seatGeo = sb.geometry(); seatGeo.translate(0, fl, 0);
-  const seats = []; for (let r = 0; r < CABIN.seatRows; r++) for (const x of [-1.38, -0.88, -0.38, 0.38, 0.88, 1.38]) seats.push([x, CABIN.z0 + r * CABIN.pitch]);
   const im = new THREE.InstancedMesh(seatGeo, mat, seats.length); const M = new THREE.Matrix4(); seats.forEach(([x, z], i) => { M.makeTranslation(x, 0, z); im.setMatrixAt(i, M); }); im.frustumCulled = false; group.add(im);
+  }
   // passengers
   const N = 124; const crowd = new People(group, N, rnd); const free = seats.map((s, i) => i).sort(() => rnd() - 0.5);
   const boarders = []; let k = 0; const ACTS = ['idle', 'window', 'read', 'phone', 'sleep', 'talk', 'idle', 'window'];
@@ -383,7 +389,7 @@ export function buildCabin(icao, rnd) {
   const signMat = { belt: new THREE.MeshBasicMaterial({ map: signTexture('belt') }), smoke: new THREE.MeshBasicMaterial({ map: signTexture('smoke') }) };
   const houseMat = new THREE.MeshBasicMaterial({ color: 0x7d838b }); const sgeo = new THREE.PlaneGeometry(0.2, 0.1), hgeo = new THREE.BoxGeometry(0.46, 0.13, 0.055);
   for (let r = 2; r < CABIN.seatRows; r += 6) { const z = CABIN.z0 + r * CABIN.pitch - 0.38;
-    const hb = new THREE.Mesh(hgeo, houseMat); hb.position.set(0, 1.43, z); group.add(hb); const rod = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.06, 0.02), houseMat); rod.position.set(0, 1.5, z); group.add(rod);
+    const hb = new THREE.Mesh(hgeo, houseMat); hb.position.set(0, 1.43, z); group.add(hb); const rod = new THREE.Mesh(new THREE.BoxGeometry(0.02, shell ? 0.24 : 0.06, 0.02), houseMat); rod.position.set(0, shell ? 1.58 : 1.5, z); group.add(rod);
     for (const f of [-1, 1]) for (const [k, dx] of [['belt', -0.11], ['smoke', 0.11]]) { const pl = new THREE.Mesh(sgeo, signMat[k]); pl.position.set(dx * f, 1.43, z + f * 0.029); pl.rotation.y = f > 0 ? 0 : Math.PI; group.add(pl); } }
   const psuGeo = new THREE.PlaneGeometry(0.075, 0.038); const psu = {}; const Mp = new THREE.Matrix4(), Qp = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.93, 0, 0)), Sp = new THREE.Vector3(1, 1, 1);
   for (const [k, dx] of [['belt', -0.045], ['smoke', 0.045]]) { const m = new THREE.InstancedMesh(psuGeo, signMat[k], CABIN.seatRows * 2); let i = 0; for (let r = 0; r < CABIN.seatRows; r++) for (const sd of [-1, 1]) { Mp.compose(new THREE.Vector3(sd * 1.17 + dx, 1.035, CABIN.z0 + r * CABIN.pitch - 0.12), Qp, Sp); m.setMatrixAt(i++, Mp); } m.frustumCulled = false; group.add(m); psu[k] = m; }
@@ -392,6 +398,7 @@ export function buildCabin(icao, rnd) {
   paintSigns();
   let boarded = 0, demoT = 0;
   const update = (dt, t, cam) => {
+    shell?.mood(false, dt); shell?.setFlight(false);
     for (const p of boarders) {
       if (p.state === 'wait') { p.delay -= dt; if (p.delay < 0) { p.state = 'in'; p.hidden = false; p.y = fl; p.mode = 'walk'; } else { p.y = -100; continue; } }
       if (p.state === 'in') { const tx = 0, tz = -12.4; const d = Math.hypot(tx - p.x, tz - p.z); if (d < 0.15) p.state = 'aisle'; else { p.x += (tx - p.x) / d * 1.0 * dt; p.z += (tz - p.z) / d * 1.0 * dt; p.yaw = Math.atan2(tx - p.x, tz - p.z); } }
@@ -421,6 +428,7 @@ export function buildCabin(icao, rnd) {
   const pickWalkers = () => { if (LV.walkers.length) return; const cand = pax.filter(p => p.act !== 'baby' && p.act !== 'sleep' && Math.abs(p.x) < 1.0); for (let i = 0; i < 4 && cand.length; i++) { const p = cand.splice((rnd() * cand.length) | 0, 1)[0]; LV.walkers.push({ p, st: 'sit', t: 6 + i * 9 + rnd() * 10, hx: p.x, hz: p.z, gx: (rnd() - 0.5) * 0.9, gz: 11.2 + rnd() * 0.6 }); } };
   const walkTo = (p, x, z, sp, dt) => { const dx = x - p.x, dz = z - p.z, d = Math.hypot(dx, dz); if (d < 0.04) return true; const st = Math.min(d, sp * dt); p.x += dx / d * st; p.z += dz / d * st; p.yaw = Math.atan2(dx, dz); return false; };
   const live = (dt, t, cam, st) => { // st: { belt, airborne, comfort, nervous }
+    shell?.mood(st.airborne, dt); shell?.setFlight(true);
     if (!pax[0].baseAct) for (const p of pax) p.baseAct = p.act;
     LV.reactT -= dt; if (LV.reactT <= 0) LV.react = null;
     for (const p of pax) { if (p.walking) continue; let a = p.baseAct;
@@ -447,9 +455,9 @@ export function buildCabin(icao, rnd) {
     if (st.visible !== false) crowd.commit(t, cam ? group.worldToLocal(cam.clone()) : null);
   };
   const setSigns = (belt, smoke) => { if (belt && !sign.belt) { react('buckle', 4); LV.crewT = 60; LV.crewDir = 1; } sign.belt = belt; sign.smoke = smoke; paintSigns(); };
-  const light = k => { sign.k = k; paintSigns(); };
+  const light = k => { sign.k = k; paintSigns(); shell?.setK(k); };
   crowd.commit(0);
-  return { group, zones, update, updateOut, deplane, crowd, mat, boarders, seatsTotal: seats.length, seatAll, live, react, setSigns, light, sign, dispose() { group.traverse(o => { if (o.geometry && true) o.geometry.dispose(); }); at.tex.dispose(); } };
+  return { group, zones, update, updateOut, deplane, crowd, mat, boarders, seatsTotal: seats.length, seatAll, live, react, setSigns, light, sign, dispose() { group.traverse(o => { if (o.geometry && true) o.geometry.dispose(); }); at?.tex.dispose(); shell?.dispose(); } };
 }
 function signTexture(kind) {
   const c = document.createElement('canvas'); c.width = 128; c.height = 64; const x = c.getContext('2d');

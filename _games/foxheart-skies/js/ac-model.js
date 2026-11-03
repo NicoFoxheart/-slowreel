@@ -104,7 +104,7 @@ function windowsGeo(hi) {
     for (let k = 0; k < n; k++) { const k1 = (k + 1) % n; const quad = (A, B) => { triO(seal, A[k], B[k], B[k1], 0, 0); triO(seal, A[k], B[k1], A[k1], 0, 0); }; quad(ringO, ringI); quad(ringI, ring); }
   }
   // flight-deck panes: corners (d from the nose, theta deg) [bottom-inner, top-inner, top-outer, bottom-outer]
-  const panes = [[[1.36, 2.6], [2.16, 2.6], [2.46, 32.5], [1.74, 38.5]], [[1.92, 41.5], [2.52, 36.5], [2.98, 51], [2.34, 58.5]], [[2.48, 61.5], [3.07, 55], [3.56, 59.5], [3.0, 69]]];
+  const panes = [[[1.24, 2.6], [2.24, 2.6], [2.56, 31.5], [1.62, 40]], [[1.8, 43.5], [2.62, 35.5], [3.12, 50.5], [2.3, 62]], [[2.44, 65], [3.2, 54], [3.66, 58.5], [3.0, 72.5]]];
   const nP = hi ? 5 : 2;
   for (const sd of [1, -1]) for (const pc of panes) {
     const cor = pc.map(([d, t]) => [NOSE_Z + d, (sd > 0 ? t : 360 - t) * D]); const cz = cor.reduce((s, c) => s + c[0], 0) / 4, ct = cor.reduce((s, c) => s + c[1], 0) / 4;
@@ -263,9 +263,9 @@ function mainGear(sd, hi) {
   const ay = -L, paint = [], metal = [];
   const cyl = (r0, r1, y0, y1, n = hi ? 14 : 8, x = 0, z = 0) => new THREE.CylinderGeometry(r1, r0, y1 - y0, n).translate(x, (y0 + y1) / 2, z);
   paint.push(pv(new THREE.CylinderGeometry(0.13, 0.13, 0.75, hi ? 12 : 6).rotateX(PI / 2), [0.8, 0.81, 0.83])); // trunnion
-  paint.push(pv(cyl(0.135, 0.125, -1.3, 0.05), [0.8, 0.81, 0.83]));            // main fitting / outer cylinder
-  paint.push(pv(cyl(0.16, 0.16, -1.36, -1.22), [0.78, 0.79, 0.81]));            // gland nut
-  metal.push(colorise(cyl(0.098, 0.098, ay + 0.15, -1.2), [0.92, 0.93, 0.95])); // chrome slider
+  paint.push(pv(cyl(0.16, 0.15, -1.3, 0.05), [0.8, 0.81, 0.83]));            // main fitting / outer cylinder
+  paint.push(pv(cyl(0.18, 0.18, -1.36, -1.22), [0.78, 0.79, 0.81]));            // gland nut
+  metal.push(colorise(cyl(0.115, 0.115, ay + 0.15, -1.2), [0.92, 0.93, 0.95])); // chrome slider
   paint.push(pv(cyl(0.12, 0.12, ay - 0.1, ay + 0.2), [0.78, 0.79, 0.81]));       // axle yoke
   metal.push(colorise(new THREE.CylinderGeometry(0.07, 0.07, 2 * GEAR.track + W * 0.9, 10).rotateZ(PI / 2).translate(0, ay, 0), [0.7, 0.72, 0.74]));
   // torque links (scissor) ahead of the leg
@@ -309,10 +309,10 @@ function contrails() { // two world-space ribbons, newest sample first; billboar
   const mat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms: { uTime: { value: 0 }, uCol: { value: new THREE.Color(1, 1, 1) }, uLife: { value: 14 } },
     vertexShader: `#include <common>\n#include <logdepthbuf_pars_vertex>\nattribute vec3 aPrev; attribute vec2 aInfo; uniform float uTime; uniform float uLife; varying float vA; varying float vS;
       void main(){ float age = uTime - aInfo.x; vec3 p = position; vec3 d = p - aPrev; d = length(d) > 1e-3 ? normalize(d) : vec3(0.0,0.0,1.0); vec3 v = normalize(cameraPosition - p); vec3 s = cross(d, v); s = length(s) > 1e-4 ? normalize(s) : vec3(0.0,1.0,0.0);
-        float w = 0.9 + age * 1.6 + age * age * 0.05; p += s * aInfo.y * w; p.y -= age * age * 0.04; vS = aInfo.y;
-        vA = smoothstep(0.12, 0.6, age) * pow(clamp(1.0 - age / uLife, 0.0, 1.0), 1.4) * (age < 0.0 ? 0.0 : 1.0); vA *= clamp(1.6 / (1.0 + w * 0.08), 0.25, 1.0);
+        float w = 0.7 + age * 0.95 + age * age * 0.03; p += s * aInfo.y * w; p.y -= age * age * 0.04; vS = aInfo.y; float puff = 0.78 + 0.22 * sin(age * 9.0 + position.x * 0.05 + position.z * 0.05);
+        vA = smoothstep(0.12, 0.6, age) * pow(clamp(1.0 - age / uLife, 0.0, 1.0), 1.4) * (age < 0.0 ? 0.0 : 1.0); vA *= clamp(1.4 / (1.0 + w * 0.1), 0.2, 1.0) * puff;
         gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);\n#include <logdepthbuf_vertex>\n}`,
-    fragmentShader: `#include <common>\n#include <logdepthbuf_pars_fragment>\nuniform vec3 uCol; varying float vA; varying float vS; void main(){ float e = 1.0 - vS * vS; gl_FragColor = vec4(uCol, vA * e * 0.85);\n#include <logdepthbuf_fragment>\n}` });
+    fragmentShader: `#include <common>\n#include <logdepthbuf_pars_fragment>\nuniform vec3 uCol; varying float vA; varying float vS; void main(){ float e = 1.0 - vS * vS; gl_FragColor = vec4(uCol, vA * e * e * 0.6);\n#include <logdepthbuf_fragment>\n}` });
   const mesh = new THREE.Mesh(g, mat); mesh.frustumCulled = false; mesh.renderOrder = 6; mesh.name = 'contrails';
   return { mesh, mat, g, last: -1e9, lastPos: [V3(1e9, 0, 0), V3(1e9, 0, 0)], on: 0 };
 }
@@ -327,7 +327,7 @@ export function buildPlayerAircraft(quality = 'high') {
   const F = fuselageMaps(big ? 4096 : 2048), Wm = wingMaps(big ? 2048 : 1024), Fm = finMaps(big ? 1024 : 512), Lm = wingletMaps(big ? 512 : 256), PT = panelTile(512, 2);
   const Nm = nacelleMaps(nacBandsOf(), big ? 1024 : 512);
   const orm = (o, m) => Object.assign(o, { map: m.map, normalMap: m.normalMap, aoMap: m.orm, roughnessMap: m.orm, metalnessMap: m.orm, roughness: 1, metalness: 1 });
-  const hullMat = atmos(new THREE.MeshPhysicalMaterial(orm({ clearcoat: 1, clearcoatRoughness: 0.07, clearcoatNormalMap: F.normalMap, clearcoatNormalScale: new THREE.Vector2(0.35, 0.35), aoMapIntensity: 0.8, envMapIntensity: 1.0 }, F)));
+  const hullMat = atmos(new THREE.MeshPhysicalMaterial(orm({ clearcoat: 0.85, clearcoatRoughness: 0.07, clearcoatNormalMap: F.normalMap, clearcoatNormalScale: new THREE.Vector2(0.35, 0.35), aoMapIntensity: 0.8, envMapIntensity: 0.8 }, F)));
   const finMat = atmos(new THREE.MeshPhysicalMaterial(orm({ clearcoat: 1, clearcoatRoughness: 0.08, emissiveMap: Fm.map, emissive: 0xffffff, emissiveIntensity: 0 }, Fm)));
   const wingMat = atmos(new THREE.MeshPhysicalMaterial(orm({ clearcoat: 0.45, clearcoatRoughness: 0.2, normalScale: new THREE.Vector2(0.8, 0.8) }, Wm)));
   const wletMat = atmos(new THREE.MeshPhysicalMaterial(orm({ clearcoat: 1, clearcoatRoughness: 0.08 }, Lm)));
@@ -374,9 +374,9 @@ export function buildPlayerAircraft(quality = 'high') {
     const ail = pivotOf(mergeAll([foil({ sec: S, ss: ailB, c0: 0.74, c1: 1, nc: ncD, uv: wUV, sOf, caps: [true, true] }), ...wk]), S, 12.2, 15.6, 0.74, wingMat, sd);
     // canoes: lathe, narrowed, hung under the lower surface; aft part follows its flap
     const canoe = (b, flap) => { const Sb = S(b), zh = fpt(Sb, 0.74, -1).z, zf = fpt(Sb, 0.5, -1).z, zt = fpt(Sb, 1, 0).z + 1.0, len = zt - zf, yb = fpt(Sb, 0.62, -1).y - 0.03;
-      const prof = []; for (let k = 0; k <= 12; k++) { const f = k / 12; prof.push([0.3 * Math.pow(Math.sin(PI * Math.pow(f, 0.62)), 0.75) + 0.002, zf + f * len]); }
-      const front = prof.filter(p => p[1] <= zh + 0.001), back = prof.filter(p => p[1] >= zh - 0.001); if (front[front.length - 1][1] < zh) { const r = 0.3 * Math.pow(Math.sin(PI * Math.pow((zh - zf) / len, 0.62)), 0.75); front.push([r, zh]); back.unshift([r, zh]); }
-      const mk = pr => { const g = latheZ(pr.map(([r, z]) => [r, z]), hi ? 14 : 8); g.scale(0.45, 1, 1); g.translate(sd * b, yb, 0); return pv(g, [0.88, 0.89, 0.9]); };
+      const prof = []; for (let k = 0; k <= 12; k++) { const f = k / 12; prof.push([0.27 * Math.pow(Math.sin(PI * Math.pow(f, 0.62)), 0.75) + 0.002, zf + f * len]); }
+      const front = prof.filter(p => p[1] <= zh + 0.001), back = prof.filter(p => p[1] >= zh - 0.001); if (front[front.length - 1][1] < zh) { const r = 0.27 * Math.pow(Math.sin(PI * Math.pow((zh - zf) / len, 0.62)), 0.75); front.push([r, zh]); back.unshift([r, zh]); }
+      const mk = pr => { const g = latheZ(pr.map(([r, z]) => [r, z]), hi ? 14 : 8); g.scale(0.45, 1, 1); { const p = g.attributes.position; for (let i = 0; i < p.count; i++) if (p.getY(i) > 0) p.setY(i, p.getY(i) * 0.3); g.computeVertexNormals(); } g.translate(sd * b, yb, 0); return pv(g, [0.88, 0.89, 0.9]); };
       statPaint.push(mk(front)); return mk(back); };
     attachTo(flapIn, mergeAll([canoe(3.9, flapIn)], ['position', 'normal', 'uv', 'color']), paintMat);
     attachTo(flapOut, mergeAll([canoe(7.3, flapOut), canoe(9.4, flapOut), canoe(11.6, flapOut)], ['position', 'normal', 'uv', 'color']), paintMat);
