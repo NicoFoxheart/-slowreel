@@ -279,9 +279,13 @@ function stopPreview() {
   preview = null;
 }
 function addSongClip(songId) {
-  let t = track(); if (!isSongTrack(t)) t = S.project.tracks.find(isSongTrack) || addTrack('song', { name: 'Songs' });
-  if (!t) return;
   const s = SONGS.find(x => x.id === songId);
+  let t = track();
+  if (s.user) {   // music from Nico's computer gets its own track (named after it), unless that track is the one selected
+    if (!(isSongTrack(t) && t.clips.some(c => c.song?.songId === songId))) t = S.project.tracks.find(x => isSongTrack(x) && x.clips.some(c => c.song?.songId === songId)) || addTrack('song', { name: s.title }) || t;
+  }
+  if (!isSongTrack(t)) t = S.project.tracks.find(isSongTrack) || addTrack('song', { name: 'Songs' });
+  if (!t) return;
   const c = createClipAt(t, S.engine.position().beat, { songId });
   edit(p => { const tr = p.tracks.find(x => x.id === t.id); if (tr.clips.length === 1 && /^(Song|Songs)$/.test(tr.name)) tr.name = s.title; }, { type: 'track', trackId: t.id });
   toast(`${s.title} is on "${track(t.id).name}" at bar ${Math.floor(c.startBeat / bpb()) + 1}.`);
