@@ -214,7 +214,28 @@ function accessories() {
   const suitcase = (() => { const c = rbox(0.38, 0.54, 0.22, 0.03, 2).translate(0, 0.32, 0); const rods = [-1, 1].map(s => new THREE.CylinderGeometry(0.008, 0.008, 0.42, 6).translate(s * 0.07, 0.79, -0.08)); const grip = rbox(0.17, 0.025, 0.03, 0.01, 1).translate(0, 1.0, -0.08);
     const wheels = [-1, 1].map(s => new THREE.CylinderGeometry(0.03, 0.03, 0.025, 10).rotateZ(Math.PI / 2).translate(s * 0.15, 0.03, -0.08));
     return merge([threeMesh(c, B.prop2, 8, 13), ...rods.map(g => threeMesh(g, B.prop2, 7, 10)), threeMesh(grip, B.prop2, 7, 10), ...wheels.map(g => threeMesh(g, B.prop2, 7, 10))]); })();
-  return { tie, scarf, hat, phone, book, backpack, suitcase }; }
+  // flight deck: headset (head) and shirt epaulettes (clavicles), sitting on the shoulder top of a shirt
+  const headset = (() => { const band = new THREE.TorusGeometry(0.094, 0.0065, 6, 28, Math.PI).scale(1, 1.48, 1.15); const cup = new THREE.CylinderGeometry(0.033, 0.035, 0.026, 18).rotateZ(Math.PI / 2); const pad = new THREE.TorusGeometry(0.026, 0.009, 6, 16).rotateY(Math.PI / 2);
+    const boom = new THREE.CylinderGeometry(0.003, 0.003, 0.125, 6), mic = new THREE.SphereGeometry(0.011, 10, 8);
+    const parts = [threeMesh(band, B.head, 7, 18, p => { p[1] += 1.636; p[2] += -0.012; })];
+    for (const s of [-1, 1]) { parts.push(threeMesh(cup, B.head, 7, 18, p => { p[0] += s * 0.094; p[1] += 1.633; p[2] += -0.012; })); parts.push(threeMesh(pad, B.head, 7, 18, p => { p[0] += s * 0.081; p[1] += 1.633; p[2] += -0.012; })); }
+    const a0 = new THREE.Vector3(-0.1, 1.615, 0.004), a1 = new THREE.Vector3(-0.034, 1.574, 0.096), mid = a0.clone().add(a1).multiplyScalar(0.5), dir = a1.clone().sub(a0).normalize(); const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+    parts.push(threeMesh(boom.applyQuaternion(q), B.head, 7, 18, p => { p[0] += mid.x; p[1] += mid.y; p[2] += mid.z; })); parts.push(threeMesh(mic, B.head, 7, 18, p => { p[0] += a1.x; p[1] += a1.y; p[2] += a1.z; })); return merge(parts); })();
+  const epaulettes = (() => { const S = shapes(); const parts = []; for (const s of [-1, 1]) { const g = rbox(0.12, 0.007, 0.05, 0.003, 1); const x = s * 0.135, z = -0.034; let y = 1.6; for (let i = 0; i < 200 && S.sBody.eval(x, y, z) > 0; i++) y -= 0.002; y += 0.0115;
+      parts.push(threeMesh(g, B['clav' + (s < 0 ? 'L' : 'R')], 4, 14, p => { const px = p[0], py = p[1]; const a = -s * 0.2; p[0] = px * Math.cos(a) - py * Math.sin(a) + x; p[1] = px * Math.sin(a) + py * Math.cos(a) + y; p[2] += z; })); } return merge(parts); })();
+  // cabin service: tray in hand (prop1), cup in hand (prop1), meal on a tray table (prop2), trolley (prop2), jump seat (prop2)
+  const tray = merge([threeMesh(rbox(0.36, 0.018, 0.25, 0.006, 1), B.prop1, 7, 15), threeMesh(rbox(0.15, 0.03, 0.1, 0.008, 1).translate(0.06, 0.022, 0.02), B.prop1, 7, 16), threeMesh(new THREE.CylinderGeometry(0.03, 0.026, 0.08, 12).translate(-0.12, 0.05, 0.06), B.prop1, 7, 19), threeMesh(new THREE.SphereGeometry(0.03, 10, 8).scale(1, 0.7, 1).translate(-0.06, 0.03, -0.06), B.prop1, 7, 16)]);
+  const cup = merge([threeMesh(new THREE.CylinderGeometry(0.034, 0.028, 0.092, 14), B.prop1, 7, 19)]);
+  const meal = merge([threeMesh(rbox(0.42, 0.016, 0.27, 0.006, 1).translate(0, 0, 0), B.prop2, 7, 15), threeMesh(rbox(0.36, 0.016, 0.24, 0.006, 1).translate(0, 0.016, 0), B.prop2, 7, 18),
+    threeMesh(rbox(0.15, 0.032, 0.11, 0.009, 1).translate(0.05, 0.04, 0.02), B.prop2, 7, 16), threeMesh(rbox(0.08, 0.025, 0.07, 0.008, 1).translate(-0.1, 0.035, -0.06), B.prop2, 7, 16), threeMesh(new THREE.SphereGeometry(0.03, 10, 8).scale(1, 0.75, 1).translate(-0.1, 0.045, 0.06), B.prop2, 7, 16),
+    threeMesh(new THREE.CylinderGeometry(0.032, 0.027, 0.09, 12).translate(0.14, 0.07, -0.07), B.prop2, 7, 19), threeMesh(rbox(0.012, 0.004, 0.15, 0.002, 1).translate(0.15, 0.027, 0.04), B.prop2, 7, 17)]);
+  const trolley = (() => { const parts = [threeMesh(rbox(0.3, 0.92, 0.76, 0.02, 2).translate(0, 0.52, 0), B.prop2, 7, 17), threeMesh(rbox(0.32, 0.03, 0.04, 0.012, 1).translate(0, 1.0, -0.4), B.prop2, 7, 18), threeMesh(rbox(0.31, 0.03, 0.78, 0.01, 1).translate(0, 0.995, 0), B.prop2, 7, 18)];
+    for (const [x, z] of [[-0.1, -0.25], [0.1, -0.25], [-0.1, 0.25], [0.1, 0.25]]) parts.push(threeMesh(new THREE.CylinderGeometry(0.03, 0.03, 0.03, 10).rotateZ(Math.PI / 2).translate(x, 0.03, z), B.prop2, 7, 18));
+    for (let k = 0; k < 6; k++) parts.push(threeMesh(new THREE.CylinderGeometry(0.028, 0.028, k < 3 ? 0.12 : 0.25, 10).translate(-0.08 + (k % 3) * 0.08, 1.07 + (k < 3 ? 0 : 0.065), k < 3 ? 0.18 : 0.3), B.prop2, 7, k < 3 ? 19 : 16));
+    return merge(parts); })();
+  const jumpseat = merge([threeMesh(rbox(0.42, 0.07, 0.36, 0.02, 1).translate(0, 0.44, 0.05), B.prop2, 7, 18), threeMesh(rbox(0.44, 0.62, 0.07, 0.025, 1).translate(0, 0.86, -0.14), B.prop2, 7, 18), threeMesh(rbox(0.44, 0.12, 0.08, 0.02, 1).translate(0, 1.27, -0.12), B.prop2, 7, 18),
+    ...[-1, 1].map(s => threeMesh(rbox(0.045, 0.5, 0.008, 0.002, 1).translate(s * 0.09, 0.94, -0.09), B.prop2, 7, 14))]);
+  return { tie, scarf, hat, phone, book, backpack, suitcase, headset, epaulettes, tray, cup, meal, trolley, jumpseat }; }
 
 // ---------------------------------------------------------------- build all layers
 // layer: { geo, kind: 'skin'|'cloth'|'hair'|'eye', part }

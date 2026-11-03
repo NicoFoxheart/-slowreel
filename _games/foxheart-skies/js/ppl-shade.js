@@ -153,7 +153,7 @@ void main() {
     }
   }
   // V of a jacket: shirt and tie area painted on the body
-  if (uPart < 0.5) { vec4 g6 = dataT(6); if (g6.w > 0.5 && vReg.w > 0.0 && vB.y < 1.47) { alb = dataT(8).rgb * (0.92 + 0.08 * n2); hb = (vn(vB * 1400.) - 0.5) * 0.4; ao *= 0.9 + 0.1 * smoothstep(0.0, 0.02, vReg.w); } }
+  if (uPart < 0.5 || uPart > 2.5) { vec4 g6 = dataT(6); if (g6.w > 0.5 && vReg.w > 0.0 && vB.y < 1.47 && vB.y > 1.0) { alb = dataT(8).rgb * (0.92 + 0.08 * n2); hb = (vn(vB * 1400.) - 0.5) * 0.4; ao *= 0.9 + 0.1 * smoothstep(0.0, 0.02, vReg.w); } }
   N = bump(N, vW, hb * 0.00025, 1.0);
   Lit l = lightSetup(N);
   float wrap = 0.5, dif = max(0.0, (l.nl + wrap) / (1.0 + wrap));
@@ -174,6 +174,14 @@ void main() {
   if (slot < 0.5) { alb = d2.rgb; fab = d2.w; } else if (slot < 1.5) { alb = d3.rgb; fab = d3.w + 10.0; } else if (slot < 2.5) { alb = d4.rgb; fab = 20.0; } else if (slot < 3.5) { alb = vec3(d4.w); fab = 21.0; }
   else if (slot < 4.5) { alb = d7.rgb; fab = 30.0; } else if (slot < 5.5) { alb = d8.rgb; fab = 0.0; } else if (slot < 6.5) { alb = d2.rgb; fab = 1.0; } else if (slot < 7.5) { alb = vec3(0.035, 0.037, 0.04); fab = 40.0; } else if (slot < 8.5) { alb = d7.rgb; fab = 41.0; } else { alb = vec3(0.85, 0.95, 0.05); fab = 4.0; }
   if (kind > 10.5 && kind < 11.5) { alb = mix(vec3(0.5, 0.12, 0.1), vec3(0.1, 0.22, 0.45), step(0.5, fract(d7.w * 3.7))); fab = 42.0; }
+  if (kind > 13.5) { // service items and deck gear
+    if (kind < 14.5) { alb = vec3(0.03, 0.04, 0.08); float st = dataT(8).w; float u = (abs(vB.x) - 0.075) / 0.011; if (st > 0.5 && u > 0.0 && u < st && fract(u) > 0.35) { alb = vec3(0.78, 0.58, 0.2); specK = 0.6; rough = 0.25; } fab = 40.0; }
+    else if (kind < 15.5) { alb = vec3(0.55, 0.56, 0.58); fab = 40.0; specK = 0.1; }
+    else if (kind < 16.5) { float f = h13(floor(vB * 9.0 + 0.5) + float(vPid)); alb = alb; if (vN.y < 0.0) f = 0.4; alb = f < 0.25 ? vec3(0.55, 0.3, 0.12) : f < 0.5 ? vec3(0.85, 0.8, 0.7) : f < 0.75 ? vec3(0.35, 0.5, 0.18) : vec3(0.7, 0.22, 0.12); fab = 40.0; specK = 0.15; }
+    else if (kind < 17.5) { alb = vec3(0.62, 0.64, 0.67); fab = 40.0; specK = 0.35; rough = 0.35; }
+    else if (kind < 18.5) { alb = vec3(0.07, 0.075, 0.08); fab = 40.0; specK = 0.15; }
+    else { alb = vec3(0.86, 0.85, 0.82); fab = 40.0; specK = 0.1; }
+  }
   float n1 = vn(vB * 1700.), n2 = fbm(vB * 45.), n3 = vn(vB * 420.);
   float h = 0.0;
   // weave / material
