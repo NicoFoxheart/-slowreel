@@ -142,4 +142,4 @@ export const ARM = p => limbT(p, Math.sign(p[0]) || 1, LM.SH, LM.EL, LM.WR, 0.29
 export const LEG = p => limbT(p, Math.sign(p[0]) || 1, LM.HIP, LM.KNEE, LM.ANK, 0.425, 0.4215);
 export { nrm, sub, add, mul, dot, cross, lerp, mx };
 // body / head seam: >0 on the head side (neck region only, so shoulders stay with the body under clothes)
-export function headSide(x, y, z) { return Math.max(y - 1.53, Math.min(y - 1.483, (1 - Math.hypot(x / 0.079, (z + 0.014) / 0.07)) * 0.075)); }
+export function headSide(x, y, z) { return Math.max(y - 1.53, Math.min(y - 1.483, (1 - Math.hypot(x / 0.071, (z + 0.016) / 0.064)) * 0.07)); }

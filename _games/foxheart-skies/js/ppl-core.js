@@ -19,7 +19,7 @@ const lin = (hex, out) => { const c = new THREE.Color(hex); out[0] = c.r; out[1]
 const hash = (a, b) => { let x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
 let QUALITY = null;
 function quality() { if (QUALITY) return QUALITY; try { const o = JSON.parse(localStorage.getItem('foxheart.settings') || '{}'); return o.quality || 'high'; } catch (e) { return 'high'; } }
-const LOD_R = { low: [1.7, 6.5], medium: [2.4, 8.5], high: [3.0, 10], ultra: [3.6, 12] };
+const LOD_R = { low: [1.5, 5], medium: [2.2, 7], high: [2.8, 8.5], ultra: [3.4, 10] };
 
 // ---------------------------------------------------------------- 3x4 affine helpers (row-major)
 const M12 = () => new Float64Array(12);
@@ -120,7 +120,7 @@ export class PeopleHD {
       const dressShoe = !kid && (T.top === 'jacket' || h(15) < 0.2); const sh = dressShoe ? DSHOES[(h(16) * DSHOES.length) | 0] : SHOES[(h(16) * SHOES.length) | 0]; T.shoe = dressShoe ? 'dress' : 'sneaker'; T.shoeHex = sh[0]; T.sole = dressShoe ? sh[1] : T.shoeHex === '#f1f1ef' ? 0.95 : h(17) < 0.6 ? 0.92 : 0.1;
       T.acc = null; T.accHex = ['#2b3442', '#c0392b', '#3f7d63', '#d6c7a1', '#5a3a22'][p.i % 5]; T.stripes = 0; T.hat = false;
     }
-    T.sleeve = { tee: 0.175, long: 0.5, jacket: 0.505, hoodie: 0.495 }[T.top]; T.hem = { tee: 0.855, long: 0.85, jacket: 0.775, hoodie: 0.83 }[T.top]; T.leg = { trousers: 0.822, jeans: 0.82, shorts: 0.31, skirt: -1 }[T.bot];
+    T.sleeve = { tee: 0.175, long: 0.5, jacket: 0.505, hoodie: 0.495 }[T.top]; T.hem = { tee: 0.885, long: 0.88, jacket: 0.775, hoodie: 0.86 }[T.top]; T.leg = { trousers: 0.822, jeans: 0.82, shorts: 0.31, skirt: -1 }[T.bot];
     T.headK = 1 + 0.5 * (1 - Math.min(1, p.scale / (p.female ? 0.95 : 1.02))) + Math.pow(1 - Math.min(1, p.scale / (p.female ? 0.95 : 1.02)), 2);
     if (!kid) T.headK = 1 + (p.female ? -0.02 : 0); T.shoulderK = p.female ? 0.9 : kid ? 0.96 : 1; T.hipK = p.female ? 1.05 : 1;
     return T; }
@@ -186,7 +186,7 @@ export class PeopleHD {
       A.lean = 0.2; A.arm.L.sp = A.arm.R.sp = -0.42; A.arm.L.el = A.arm.R.el = -0.95; A.arm.L.sr = A.arm.R.sr = 0.05; A.arm.L.wx = A.arm.R.wx = 0.25; A.arm.L.curl = A.arm.R.curl = 0.55;
       const act = p.act;
       if (act === 'read') { A.arm.L.sp = A.arm.R.sp = -0.55; A.arm.L.el = A.arm.R.el = -1.5; A.arm.L.sr = A.arm.R.sr = -0.12; A.arm.L.wy = 0.6; A.arm.R.wy = 0.6; A.arm.L.curl = A.arm.R.curl = 0.6; A.headPitch = 0.5; gazeP = 0.3; p.prop = 'book'; }
-      else if (act === 'phone') { A.arm.R.sp = -0.42; A.arm.R.el = -1.85; A.arm.R.sr = -0.18; A.arm.R.wy = 1.0; A.arm.R.wx = -0.2; A.arm.R.curl = 0.75; A.arm.L.sp = -0.3; A.arm.L.el = -1.2; A.headPitch = 0.48 + slow * 0.04; gazeP = 0.32; p.prop = 'phone'; }
+      else if (act === 'phone') { A.arm.R.sp = -0.42; A.arm.R.el = -1.75; A.arm.R.sr = -0.22; A.arm.R.wy = -1.3; A.arm.R.wx = 0.25; A.arm.R.curl = 0.75; A.arm.L.sp = -0.3; A.arm.L.el = -1.2; A.headPitch = 0.48 + slow * 0.04; gazeP = 0.32; p.prop = 'phone'; }
       else if (act === 'sleep') { A.headRoll = 0.4 * (p.i % 2 ? 1 : -1); A.headPitch = 0.28; A.lean = 0.1; A.eyes = 1; p.prop = null; }
       else if (act === 'window') { A.headYaw = p.windowSide * (0.9 + slow * 0.2); A.headPitch = 0.05; gazeY = p.windowSide * 0.2; p.prop = null; }
       else if (act === 'talk') { A.headYaw = p.talkSide * (0.7 + slow2 * 0.15); A.headPitch = Math.sin(t * 3 + s) * 0.06; gazeY = p.talkSide * 0.25; A.arm.R.sp = -0.6 + Math.sin(t * 2.3 + s) * 0.15; A.arm.R.el = -1.2; A.arm.R.wy = 0.5 + Math.sin(t * 1.7 + s) * 0.4; A.arm.R.curl = 0.25; p.prop = null; }
@@ -201,7 +201,7 @@ export class PeopleHD {
       A.arm.L.sp = Math.sin(t * 0.5 + s) * 0.04; A.arm.L.el = A.arm.R.el = -0.25;
       if (p.suitcase) { A.arm.R.sp = -0.05; A.arm.R.sr = 0.28; A.arm.R.el = -0.15; A.arm.R.curl = 1.1; }
       if (p.act === 'board') { A.headPitch = -0.35; A.headYaw = slow * 0.15; }
-      else if (p.act === 'phone') { A.arm.R.sp = -0.55; A.arm.R.el = -1.75; A.arm.R.sr = -0.15; A.arm.R.wy = 1.0; A.arm.R.wx = -0.2; A.arm.R.curl = 0.75; A.headPitch = 0.5; gazeP = 0.3; }
+      else if (p.act === 'phone') { A.arm.R.sp = -0.55; A.arm.R.el = -1.7; A.arm.R.sr = -0.2; A.arm.R.wy = -1.3; A.arm.R.wx = 0.25; A.arm.R.curl = 0.75; A.headPitch = 0.5; gazeP = 0.3; }
       else if (p.act === 'lift') { const k = Math.min(1, (p.actT || 0) / 1.2); A.arm.L.sp = A.arm.R.sp = -2.85 * k; A.arm.L.el = A.arm.R.el = -0.35; A.arm.L.clav = A.arm.R.clav = 0.25 * k; A.arm.L.curl = A.arm.R.curl = 0.9; A.headPitch = -0.4 * k; gazeP = -0.2 * k; A.lean = -0.05 * k; }
       else if (p.act === 'demo') { const ph = Math.floor(t / 2.5) % 4; if (ph === 0) { A.arm.L.sp = A.arm.R.sp = -1.4; A.arm.L.sr = A.arm.R.sr = 1.1; A.arm.L.curl = A.arm.R.curl = 0.1; } else if (ph === 1) { A.arm.L.sp = A.arm.R.sp = -0.9; A.arm.L.el = A.arm.R.el = -1.2; A.arm.L.sr = A.arm.R.sr = -0.4; } else if (ph === 2) { A.arm.R.sp = -1.6; A.arm.R.sr = 0.2; A.arm.R.curl = 0.1; A.arm.L.sp = 0.1; } else { A.arm.L.sp = -1.6; A.arm.L.sr = 0.2; A.arm.L.curl = 0.1; A.arm.R.sp = 0.1; } }
       else if (p.act === 'board-look') { A.headPitch = -0.4; gazeP = -0.15; }

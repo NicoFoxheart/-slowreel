@@ -83,7 +83,7 @@ function fromThree(g, tf, reg = [0, 0, 0, 0], ext) { const gi = g.index ? g : g;
 // slot ids for the cloth shader: 0 top, 1 bottom, 2 shoe upper, 3 sole, 4 accent (tie/scarf), 5 shirt, 6 hat, 7 prop A, 8 prop B, 9 hi-vis
 function shell(bm, o) { const R = bm.A.aReg.data;
   let m = offset(bm, (x, y, z, i) => o.off(x, y, z, R[i * 4], R[i * 4 + 1]));
-  if (o.top) { const SI = m.A.skinIndex.data; for (let i = 0; i < SI.length; i++) if (SI[i] === B.thighL || SI[i] === B.thighR) SI[i] = B.pelvis; } // tops hang from the hips, not the thighs
+  { const SI = m.A.skinIndex.data; for (let i = 0; i < SI.length; i++) if ((SI[i] === B.thighL || SI[i] === B.thighR) && (o.top || m.P[(i >> 2) * 3 + 1] > 0.905)) SI[i] = B.pelvis; } // tops / waistbands hang from the hips, not the thighs
   const keep = field(m, (x, y, z, i) => o.keep(x, y, z, R[i * 4], R[i * 4 + 1], R[i * 4 + 2], R[i * 4 + 3]));
   ensure(m, 'hem', 1, 0); setAttr(m, 'edge', 1, (x, y, z, i, out) => { out[0] = keep[i]; });
   m = clip(m, keep); m = hem(m, o.hemDepth || 0.01, { round: 0.3, attr: (k, c, v, inner) => k === 'hem' ? (inner ? 1 : 0.6) : k === 'edge' ? 0 : v });
@@ -92,10 +92,10 @@ function shell(bm, o) { const R = bm.A.aReg.data;
   setAttr(m, 'aReg', 4, (x, y, z, i, out) => { out[0] = R2[i * 4]; out[1] = R2[i * 4 + 1]; out[2] = R2[i * 4 + 2]; out[3] = R2[i * 4 + 3]; });
   bakeAO(m, shapes().fAll, { steps: [[0.025, 1], [0.06, 0.6], [0.12, 0.3]], k: 0.9 }); return m; }
 const TOPS = {
-  tee: { off: (x, y, z, a) => 0.0085 + (a > 0 ? 0.004 * sstep(0, 0.15, a) : 0), keep: (x, y, z, a, l, c) => Math.min(0.175 - a, y - 0.855, -c), hemDepth: 0.008 },
-  long: { off: (x, y, z, a) => 0.009 + (a > 0 ? 0.004 : 0), keep: (x, y, z, a, l, c) => Math.min(0.5 - a, y - 0.85, -c), hemDepth: 0.008 },
+  tee: { off: (x, y, z, a) => 0.0085 + (a > 0 ? 0.004 * sstep(0, 0.15, a) : 0) + sstep(1.0, 0.86, y) * 0.007, keep: (x, y, z, a, l, c) => Math.min(0.175 - a, y - 0.885, -c), hemDepth: 0.008 },
+  long: { off: (x, y, z, a) => 0.009 + (a > 0 ? 0.004 : 0) + sstep(1.0, 0.86, y) * 0.007, keep: (x, y, z, a, l, c) => Math.min(0.5 - a, y - 0.88, -c), hemDepth: 0.008 },
   jacket: { off: (x, y, z, a) => 0.011 + (a > 0 ? 0.002 : 0) + sstep(1.0, 0.8, y) * 0.006, keep: (x, y, z, a, l, c, v) => Math.min(0.505 - a, y - 0.775, -v), hemDepth: 0.012 },
-  hoodie: { off: (x, y, z, a) => 0.016 + (a > 0 ? 0.006 * sstep(0.1, 0.45, a) : 0), keep: (x, y, z, a, l, c) => Math.min(0.495 - a, y - 0.83, -crewHole(x, y, z, -0.006)), hemDepth: 0.014 },
+  hoodie: { off: (x, y, z, a) => 0.016 + (a > 0 ? 0.006 * sstep(0.1, 0.45, a) : 0), keep: (x, y, z, a, l, c) => Math.min(0.495 - a, y - 0.86, -crewHole(x, y, z, -0.006)), hemDepth: 0.014 },
   vest: { off: () => 0.024, keep: (x, y, z, a, l, c, v) => Math.min(-0.01 - a, y - 0.86, -v), hemDepth: 0.006 },
 };
 const BOTTOMS = {
@@ -222,18 +222,18 @@ let CACHE = {};
 export function buildLayers(q = 'high') {
   if (CACHE[q]) return CACHE[q]; const t0 = performance.now(); const lowQ = q === 'low';
   const L = {}; let tl = performance.now(); const put = (name, m, kind, part = 0, extra = {}) => { const t = performance.now(); L[name] = { geo: toGeo(m), kind, part, tris: m.I.length / 3, ms: Math.round(t - tl), ...extra }; tl = performance.now(); };
-  const b0 = bodyMesh(lowQ ? 0.027 : 0.022), b1 = bodyMesh(0.032);
-  put('body0', b0, 'skin', 0); put('body1', b1, 'skin', 0); put('fig2', figureMesh(0.045), 'skin', 3);
-  put('head0', headMesh(lowQ ? 0.0065 : 0.0055, 0.011), 'skin', 1); put('head1', headMesh(0.0115, 0.017), 'skin', 1);
-  put('hands0', handsMesh(lowQ ? 0.0085 : 0.0068), 'skin', 2); put('hands1', handsMesh(0.012), 'skin', 2);
-  put('eyes0', eyesMesh(lowQ ? 12 : 16), 'eye'); put('eyes1', eyesMesh(8), 'eye');
+  const b0 = bodyMesh(lowQ ? 0.027 : 0.022), b1 = bodyMesh(0.042);
+  put('body0', b0, 'skin', 0); put('body1', b1, 'skin', 0); put('fig2', figureMesh(0.052), 'skin', 3);
+  put('head0', headMesh(lowQ ? 0.0065 : 0.0055, 0.011), 'skin', 1); put('head1', headMesh(0.015, 0.022), 'skin', 1);
+  put('hands0', handsMesh(lowQ ? 0.0085 : 0.0068), 'skin', 2); put('hands1', handsMesh(0.017), 'skin', 2);
+  put('eyes0', eyesMesh(lowQ ? 12 : 16), 'eye'); put('eyes1', eyesMesh(6), 'eye');
   for (const [k, o] of Object.entries(TOPS)) { put(k + '0', shell(b0, { ...o, top: true, slot: k === 'vest' ? 9 : 0, kind: { tee: 0, long: 0, jacket: 1, hoodie: 2, vest: 9 }[k] }), 'cloth'); put(k + '1', shell(b1, { ...o, top: true, slot: k === 'vest' ? 9 : 0, kind: { tee: 0, long: 0, jacket: 1, hoodie: 2, vest: 9 }[k] }), 'cloth'); }
   for (const [k, o] of Object.entries(BOTTOMS)) { put(k + '0', shell(b0, { ...o, slot: 1, kind: 3 }), 'cloth'); put(k + '1', shell(b1, { ...o, slot: 1, kind: 3 }), 'cloth'); }
-  put('skirt0', skirtMesh(0.016, 0.5), 'cloth'); put('skirt1', skirtMesh(0.035, 0.5), 'cloth');
+  put('skirt0', skirtMesh(0.016, 0.5), 'cloth'); put('skirt1', skirtMesh(0.05, 0.5), 'cloth');
   put('hood0', hoodMesh(0.012), 'cloth'); put('hood1', hoodMesh(0.024), 'cloth');
-  for (const k of ['sneaker', 'dress']) { put(k + '0', shoeMesh(lowQ ? 0.011 : 0.0092, k), 'cloth'); put(k + '1', shoeMesh(0.016, k), 'cloth'); }
-  for (const k of HAIR_STYLES) { put('hair_' + k + '0', hairMesh(k, lowQ ? 0.009 : 0.0072, 0.012), 'hair', 0, { shells: lowQ ? 1 : 2 }); put('hair_' + k + '1', hairMesh(k, 0.013, 0.018), 'hair'); }
-  put('beard0', beardMesh('beard', 0.005), 'hair'); put('beard1', beardMesh('beard', 0.01), 'hair'); put('moustache0', beardMesh('moustache', 0.0042), 'hair');
+  for (const k of ['sneaker', 'dress']) { put(k + '0', shoeMesh(lowQ ? 0.011 : 0.0092, k), 'cloth'); put(k + '1', shoeMesh(0.024, k), 'cloth'); }
+  for (const k of HAIR_STYLES) { put('hair_' + k + '0', hairMesh(k, lowQ ? 0.009 : 0.0072, 0.012), 'hair', 0, { shells: lowQ ? 1 : 2 }); put('hair_' + k + '1', hairMesh(k, 0.018, 0.025), 'hair'); }
+  put('beard0', beardMesh('beard', 0.005), 'hair'); put('beard1', beardMesh('beard', 0.013), 'hair'); put('moustache0', beardMesh('moustache', 0.0042), 'hair');
   const A = accessories(); for (const [k, m] of Object.entries(A)) put(k, m, 'cloth');
   // hair fur shells: duplicate LOD0 hair with a layer index in aExt? (layer in skinWeight slot unused) → separate attribute
   for (const k of Object.keys(L)) if (L[k].shells > 1) { const g = L[k].geo, n = g.attributes.position.count, sh = L[k].shells; const ng = new THREE.BufferGeometry();
