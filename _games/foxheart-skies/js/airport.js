@@ -8,6 +8,7 @@ import { airportGeometry, FT, D2R, ilsFreq } from './data.js';
 import { TERMINAL_HINTS } from './surroundings.js';
 import { trafficAirliner } from './ac-traffic.js';
 import { facadeMaterial, rng } from './terrain.js';
+import { Site, obb, overlap, runwayBox } from './env-site.js';
 
 const GLYPHS = '0123456789LRC';
 let glyphTex = null;
@@ -307,13 +308,20 @@ export function buildAirport(apt, opts) {
   else { ax = g.cx * 0.3; az = g.cz * 0.3; adx = main.dir.x; adz = main.dir.z; }
   const nRw = g.runways.length;
   const len = apt.large ? Math.min(1500, 520 + nRw * 230) : 380, dep = apt.large ? 250 : 160;
-  const segDist = (px, pz, r) => { const vx = px - r.a.x, vz = pz - r.a.z; const s = Math.max(0, Math.min(r.L, vx * r.dir.x + vz * r.dir.z)); return Math.hypot(vx - r.dir.x * s, vz - r.dir.z * s); };
-  const clear = (cx, cz, l) => { const nx = -adz, nz = adx; for (let i = -1; i <= 1; i += 0.5) for (let j = -1; j <= 1; j += 0.5) { const px = cx + adx * l / 2 * i + nx * (dep / 2 + 120) * j, pz = cz + adz * l / 2 * i + nz * (dep / 2 + 120) * j; for (const r of g.runways) if (segDist(px, pz, r) < r.W / 2 + 190) return false; } return true; };
+  // the whole site (apron in front, terminal, curb and car park behind) must clear every runway strip + safety area
+  // (exact oriented-box test against the real runway rectangles; 190 m each side keeps the parallel taxiway clear too)
+  const rwPlace = g.runways.map(r => runwayBox(r, 190, 300)), back = apt.large ? 175 : 140;
+  const clear = (cx, cz, l) => { let qx = -adz, qz = adx; if ((main.cx - cx) * qx + (main.cz - cz) * qz < 0) { qx = -qx; qz = -qz; } const o = obb(cx - qx * back / 2, cz - qz * back / 2, adx, adz, l / 2 + 40, (dep + back) / 2); return !rwPlace.some(r => overlap(o, r)); };
   let L2 = len, placed = false;
   const side0 = Math.sign((ax - main.cx) * -main.dir.z + (az - main.cz) * main.dir.x) || 1;
-  for (let shrink = 0; shrink < 4 && !placed; shrink++, L2 *= 0.75) for (let k = 0; k < 40 && !placed; k++) for (const sd of [side0, -side0]) {
+  for (let shrink = 0; shrink < 4 && !placed; shrink++) { if (shrink) L2 *= 0.75; for (let k = 0; k < 40 && !placed; k++) for (const sd of [side0, -side0]) {
     const off = k * 90 * sd; const cx = ax + -main.dir.z * off, cz = az + main.dir.x * off;
     if (clear(cx, cz, L2)) { ax = cx; az = cz; placed = true; break; }
+  } }
+  // fallback: spiral out around the airfield, both orientations
+  for (let rad = 300; rad < 9000 && !placed; rad += 250) for (let a = 0; a < 32 && !placed; a++) for (const rot of [0, 1]) {
+    const cx = g.cx + Math.cos(a / 32 * Math.PI * 2) * rad, cz = g.cz + Math.sin(a / 32 * Math.PI * 2) * rad; if (rot) { const t = adx; adx = -adz; adz = t; }
+    if (clear(cx, cz, L2)) { ax = cx; az = cz; placed = true; break; } if (rot) { const t = adx; adx = adz; adz = -t; }
   }
   // normal pointing from apron toward the main runway = "front"
   let nx = -adz, nz = adx; if ((main.cx - ax) * nx + (main.cz - az) * nz < 0) { nx = -nx; nz = -nz; }
@@ -341,13 +349,22 @@ export function buildAirport(apt, opts) {
     // link to apron
     const vs = Math.max(0, Math.min(r.L, (ax - r.a.x) * r.dir.x + (az - r.a.z) * r.dir.z));
     const p0 = P(vs), dA = Math.hypot(p0.x - ax, p0.z - az);
-    if (dA < 4000) {
+    if (dA < 4000 && (p0.x - ax) * nx + (p0.z - az) * nz < dep / 2) { // runway behind the terminal: links run round the apron ends, never through the building
+      [-1, 1].forEach((sg, j) => { const q = { x: ax + adx * sg * (L2 / 2 + 35), z: az + adz * sg * (L2 / 2 + 35) }; const se = Math.max(0, Math.min(r.L, (q.x - r.a.x) * r.dir.x + (q.z - r.a.z) * r.dir.z)), pe = P(se); taxis.push([pe, q]); net.links.push({ name: LINKS[k * 2 + j] || 'L', s: se, a: pe, b: q }); });
+    } else if (dA < 4000) {
       const fx = ax + nx * dep / 2, fz = az + nz * dep / 2;
       const q0 = { x: fx + (p0.x - ax) * 0.1, z: fz + (p0.z - az) * 0.1 }; taxis.push([p0, q0]);
       const s2 = Math.max(0, Math.min(r.L, vs + (vs > r.L / 2 ? -600 : 600))); const p1 = P(s2);
       const q1 = { x: fx + adx * Math.sign(s2 - vs) * L2 * 0.35, z: fz + adz * Math.sign(s2 - vs) * L2 * 0.35 }; taxis.push([p1, q1]);
       net.links.push({ name: LINKS[k * 2] || 'L', s: vs, a: p0, b: q0 }, { name: LINKS[k * 2 + 1] || 'M', s: s2, a: p1, b: q1 });
     }
+  }
+  { // no approximate taxiway may run through the terminal building (drop the strip and its routing link)
+    const TD = apt.large ? 70 : 40, dd = dep / 2 + 6 + TD / 2, tcx = ax - nx * dd, tcz = az - nz * dd;
+    const inT = (x, z) => { const dx = x - tcx, dz = z - tcz; return Math.abs(dx * adx + dz * adz) < L2 * 0.42 + 12 && Math.abs(-dx * adz + dz * adx) < TD / 2 + 12; };
+    const cut = ([a, b]) => { const L = Math.hypot(b.x - a.x, b.z - a.z) || 1; for (let u = 0; u <= L; u += 4) if (inT(a.x + (b.x - a.x) * u / L, a.z + (b.z - a.z) * u / L)) return true; return false; };
+    for (let i = taxis.length - 1; i >= 0; i--) if (cut(taxis[i])) taxis.splice(i, 1);
+    for (const net of taxiNet) net.links = net.links.filter(l => !cut([l.a, l.b]));
   }
   const taxiMat = sharedMats?.taxi || taxiMaterial(wet, false);
   for (const t of taxis) {
@@ -359,6 +376,10 @@ export function buildAirport(apt, opts) {
   }
   // ---- buildings ----
   const along = (s, d) => ({ x: ax + adx * s - nx * d, z: az + adz * s - nz * d }); // d>0 = behind apron (terminal side)
+  // exclusion mask: runway strips + safety areas, every taxiway strip, the apron; buildings are shifted to a clear spot or culled
+  const site = new Site(g); for (const t of taxis) site.addTaxi(t[0], t[1], tw / 2); site.addApron(obb(ax, az, adx, adz, L2 / 2 + 10, dep / 2));
+  // try candidate (s, d) spots in order for a w (along) x dd (across) footprint; returns the world centre or null
+  const spot = (cands, w, dd, sets) => { for (const [s0, d0] of cands) { const p = along(s0, d0); if (site.place(p.x, p.z, adx, adz, w / 2, dd / 2, [[0, 0]], sets)) return p; } return null; };
   const yaw = Math.atan2(-adz, adx);
   const facade = sharedMats?.facade || facadeMaterial({ glass: true });
   const plain = sharedMats?.plain || atmos(new THREE.MeshStandardMaterial({ color: 0xc8c4bc, roughness: 0.8 }));
@@ -393,33 +414,34 @@ export function buildAirport(apt, opts) {
     ib.castShadow = iF.castShadow = quality === 'ultra'; ib.frustumCulled = iF.frustumCulled = false; group.add(ib, iF);
   }
   // tower
-  const tp = along(L2 * 0.5 + 120, dep / 2 + 40), th = apt.large ? 72 : 32;
+  const th = apt.large ? 72 : 32;
+  const tp = spot([[L2 * 0.5 + 120, dep / 2 + 40], [L2 * 0.5 + 60, dep / 2 + 110], [-L2 * 0.5 - 120, dep / 2 + 40], [-L2 * 0.5 - 60, dep / 2 + 110], [L2 * 0.5 + 40, dep / 2 + 220]], 24, 24) || along(L2 * 0.3, dep / 2 + 6 + termDepth * 0.6); // fallback: on the terminal roof
+  const tBase = site.placed.length && Math.hypot(site.placed[site.placed.length - 1].cx - tp.x, site.placed[site.placed.length - 1].cz - tp.z) < 1 ? 0 : termH;
   const tmat = plain;
-  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 4.2, th, 12), tmat); shaft.position.set(tp.x, th / 2, tp.z); group.add(shaft);
-  const cab = new THREE.Mesh(new THREE.CylinderGeometry(9, 7, 7, 8), facade); cab.position.set(tp.x, th + 3.5, tp.z); group.add(cab);
-  const cap = new THREE.Mesh(new THREE.CylinderGeometry(9.5, 9.5, 1.2, 8), roofM); cap.position.set(tp.x, th + 7.6, tp.z); group.add(cap);
-  lights.add(tp.x, th + 10, tp.z, R_, 0, [0, 0, 0], R_, 0, 1.4);
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 4.2, th, 12), tmat); shaft.position.set(tp.x, tBase + th / 2, tp.z); group.add(shaft);
+  const cab = new THREE.Mesh(new THREE.CylinderGeometry(9, 7, 7, 8), facade); cab.position.set(tp.x, tBase + th + 3.5, tp.z); group.add(cab);
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(9.5, 9.5, 1.2, 8), roofM); cap.position.set(tp.x, tBase + th + 7.6, tp.z); group.add(cap);
+  lights.add(tp.x, tBase + th + 10, tp.z, R_, 0, [0, 0, 0], R_, 0, 1.4);
   // hangars and cargo sheds
   if (full) {
     const nh = apt.large ? 4 : 2;
     for (let i = 0; i < nh; i++) {
-      const hp = along(-L2 / 2 - 140 - i * 110, dep / 2 - 20);
+      const s0 = -L2 / 2 - 140 - i * 110, hp = spot([[s0, dep / 2 - 20], [s0, dep / 2 + 90], [s0, dep / 2 + 200], [L2 / 2 + 220 + i * 110, dep / 2 + 60], [L2 / 2 + 220 + i * 110, dep / 2 + 170]], 82, 76); if (!hp) continue;
       const hg = new THREE.Group(); hg.position.set(hp.x, 0, hp.z); hg.rotation.y = yaw + Math.PI / 2;
       const roof = new THREE.Mesh(new THREE.CylinderGeometry(40, 40, 72, 20, 1, false, -Math.PI / 2, Math.PI), roofM); roof.rotation.z = Math.PI / 2; roof.scale.set(0.45, 1, 1); roof.position.y = 12; hg.add(roof);
       const walls = new THREE.Mesh(new THREE.BoxGeometry(72, 12, 80), plain); walls.position.y = 6; hg.add(walls);
       group.add(hg);
     }
     // landside: car park + low buildings behind terminal
-    const cp = along(0, dep / 2 + termDepth + 70);
-    box(L2 * 0.5, 14, 60, cp.x, cp.z, plain);
-    for (let i = 0; i < 8; i++) { const p = along((R() - 0.5) * L2 * 1.4, dep / 2 + termDepth + 160 + R() * 250); box(30 + R() * 50, 8 + R() * 18, 30 + R() * 40, p.x, p.z, R() < 0.5 ? plain : facade); }
+    const cp = spot([[0, dep / 2 + termDepth + 70]], L2 * 0.5, 60, ['rw', 'tw']); if (cp) box(L2 * 0.5, 14, 60, cp.x, cp.z, plain);
+    for (let i = 0; i < 8; i++) { const w = 30 + R() * 50, hh = 8 + R() * 18, d = 30 + R() * 40, s0 = (R() - 0.5) * L2 * 1.4, d0 = dep / 2 + termDepth + 160 + R() * 250, m = R() < 0.5 ? plain : facade; const p = spot([[s0, d0]], w, d); if (p) box(w, hh, d, p.x, p.z, m); }
     // apron floodlight masts
     for (let s = -L2 / 2; s <= L2 / 2; s += 160) { const p = along(s, -dep / 2 + 8); const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 30, 6), roofM); mast.position.set(p.x, 15, p.z); group.add(mast); lights.add(p.x, 30.5, p.z, [1, 0.85, 0.6], 0, [0, 0, 0], [1, 0.85, 0.6], 0, 2.4); }
   }
   const pts = lights.build(); group.add(pts);
-  const towerPos = new THREE.Vector3(tp.x, th + 4, tp.z);
+  const towerPos = new THREE.Vector3(tp.x, tBase + th + 4, tp.z);
   const frame = { ax, az, adx, adz, nx, nz, dep, L2, termDepth, termH, facadeD: dep / 2 + 6 };
-  return { group, stands, towerPos, ilsEnds, geom: g, lightsCount: lights.p.length / 3, taxis, taxiNet, frame };
+  return { group, stands, towerPos, ilsEnds, geom: g, lightsCount: lights.p.length / 3, taxis, taxiNet, frame, site, placed };
 }
 
 // ILS geometry for a runway end in the world frame

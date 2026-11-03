@@ -262,7 +262,7 @@ export class Terrain {
   }
   // airports: [{x, z, r, elev}] in local frame (max 4)
   setup(geo, cx, cz, aptZones, aptObjs, opts) {
-    this.geo = geo; this.apts = aptZones.slice(0, 4); this.base = opts.base; this.noiseAmp = opts.noiseAmp;
+    this.geo = geo; this.apts = aptZones.slice(0, 4); this.aptObjs = aptObjs || []; this.base = opts.base; this.noiseAmp = opts.noiseAmp;
     const cl = CLIMATES[opts.climate] || CLIMATES.temperate; const u = this.uniforms;
     u.cGrass.value.setRGB(...cl.grass); u.cDry.value.setRGB(...cl.dry); u.cDark.value.setRGB(...cl.dark); u.cSoil.value.setRGB(...cl.soil); u.cShallow.value.setRGB(...cl.shallow); u.uFields.value = cl.fields;
     this.masks.build(geo, cx, cz, aptObjs, opts.extraCities || []);
@@ -327,11 +327,17 @@ export class City {
     const cities = near.cities.map(c => ({ x: geo.x(c.lon), z: geo.z(c.lat), r: c.r * 1000, h: c.h, d: c.d }));
     const R = rng(1234), out = [];
     const range = q === 'ultra' ? 17000 : 13000, step0 = 85;
+    // [env] keep city blocks off EVERY built airport: runway strip + safety area (150 m each side, 300 m past the ends)
+    // and the terminal/apron site, padded by the largest block footprint (not only the 4 nearest airport discs)
+    const keepOut = []; for (const a of terrain.aptObjs || []) { const g = a.geom; if (!g) continue; const ox = geo.x(a.lon), oz = geo.z(a.lat); if (Math.hypot(ox - cx, oz - cz) > range + 8000) continue;
+      for (const r of g.runways) keepOut.push([ox + r.cx, oz + r.cz, r.dir.x, r.dir.z, r.L / 2 + 300 + 40, r.W / 2 + 150 + 40]);
+      if (g.apron) { const ap = g.apron; keepOut.push([ox + ap.x, oz + ap.z, ap.dx, ap.dz, ap.len / 2 + 450, ap.dep / 2 + 650]); } }
+    const kept = (x, z) => { for (const k of keepOut) { const dx = x - k[0], dz = z - k[1]; if (Math.abs(dx * k[2] + dz * k[3]) < k[4] && Math.abs(-dx * k[3] + dz * k[2]) < k[5]) return false; } return true; };
     for (let z = cz - range; z < cz + range && out.length < max * 1.4; z += step0) for (let x = cx - range; x < cx + range; x += step0) {
       const jx = x + (R() - 0.5) * step0 * 0.7, jz = z + (R() - 0.5) * step0 * 0.7;
       const m = terrain.masks.sample(jx, jz); if (m[0] > 0.3 || m[1] < 0.18) continue;
       if (R() > m[1] * 1.15) continue;
-      if (airportsLocal.some(a => Math.hypot(jx - a.x, jz - a.z) < a.r + 500)) continue;
+      if (airportsLocal.some(a => Math.hypot(jx - a.x, jz - a.z) < a.r + 500) || !kept(jx, jz)) continue;
       let hmax = 8, core = 0;
       for (const c of cities) { const d = Math.hypot(jx - c.x, jz - c.z) / c.r; if (d < 1) { const inf = (1 - d) * (1 - d); hmax = Math.max(hmax, c.h * inf); if (c.h > 60) core = Math.max(core, 1 - d); } }
       const tall = core > 0.25 && R() < 0.75;
