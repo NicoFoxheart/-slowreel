@@ -192,7 +192,7 @@ class LegacyPeople {
       else if (act === 'phone') { A.arm.R.sp = -1.0; A.arm.R.el = -1.6; A.headPitch = 0.5 + slow * 0.05; p.prop = 'phone'; }
       else if (act === 'sleep') { A.headRoll = 0.45 * (p.i % 2 ? 1 : -1); A.headPitch = 0.25; A.lean = -0.22; p.prop = null; }
       else if (act === 'window') { A.headYaw = p.windowSide * (0.9 + slow * 0.2); A.headPitch = 0.05; p.prop = null; }
-      else if (act === 'talk') { A.headYaw = p.talkSide * (0.7 + slow2 * 0.15); A.headPitch = Math.sin(t * 3 + s) * 0.06; A.arm.R.sp = -0.7 + Math.sin(t * 2.3 + s) * 0.15; A.arm.R.el = -1.0; p.prop = null; }
+      else if (act === 'talk') { A.headYaw = (p.talkSide ?? 1) * (0.7 + slow2 * 0.15); A.headPitch = Math.sin(t * 3 + s) * 0.06; A.arm.R.sp = -0.7 + Math.sin(t * 2.3 + s) * 0.15; A.arm.R.el = -1.0; p.prop = null; }
       else if (act === 'buckle') { A.arm.L.sp = A.arm.R.sp = -0.35; A.arm.L.el = A.arm.R.el = -1.1; A.arm.L.sr = A.arm.R.sr = -0.3; A.headPitch = 0.55; p.prop = null; }
       else if (act === 'baby') { A.arm.L.sp = A.arm.R.sp = -0.8; A.arm.L.el = A.arm.R.el = -1.5; A.arm.L.sr = A.arm.R.sr = -0.5; A.headPitch = 0.35; A.headYaw = slow * 0.2; }
       else if (act === 'listen') { A.headPitch = -0.16; A.headYaw = slow * 0.08; A.headRoll = 0.06 * (p.i % 2 ? 1 : -1); p.prop = null; }

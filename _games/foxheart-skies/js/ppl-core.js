@@ -6,7 +6,6 @@ import { buildLayers } from './ppl-build.js';
 import { makeMaterials, DATA_W, BONE_W, DYN } from './ppl-shade.js';
 import { B, NB, J, QB, LM, HF } from './ppl-body.js';
 import { atmos } from './sky.js';
-import { CabinDirector } from './ppl-service.js';
 
 const SKIN_OLD = ['#f3d2b8', '#e7b48f', '#c98c62', '#9a6440', '#6b4126'];
 const SKIN = [['#f2cdb3', '#ecc1a2', '#e6b896'], ['#dfab86', '#d49f78', '#cf9a6e'], ['#b97f58', '#c28a62', '#a87050'], ['#8f5d3e', '#7f5236', '#94603e'], ['#5e3b27', '#4e301f', '#6a4129']];
@@ -109,8 +108,7 @@ export class PeopleHD {
     if (p.crew) { T.beard = null; T.stubble = p.female ? 0 : 0.06; }
     // outfit
     if (p.crew) { const role = p.role || 'cabin';
-      if (role === 'captain-deck' || role === 'fo-deck') { Object.assign(T, { top: 'tee', topHex: '#f3f4f2', topFab: 0, bot: 'trousers', botHex: '#1b2238', botFab: 0, shoe: 'dress', shoeHex: '#121212', sole: 0.04, shirt: '#f3f4f2', acc: 'tie', accHex: '#1b2238', stripes: role === 'captain-deck' ? 4 : 3, hat: false, headset: true, epaulettes: true }); }
-      else if (role === 'ground') { Object.assign(T, { top: 'long', vest: true, topHex: '#2a2f38', topFab: 3, bot: 'trousers', botHex: '#23272e', botFab: 0, shoe: 'sneaker', shoeHex: '#1e1e1e', sole: 0.12, acc: null }); }
+      if (role === 'ground') { Object.assign(T, { top: 'long', vest: true, topHex: '#2a2f38', topFab: 3, bot: 'trousers', botHex: '#23272e', botFab: 0, shoe: 'sneaker', shoeHex: '#1e1e1e', sole: 0.12, acc: null }); }
       else { const navy = role === 'agent' ? '#26324f' : '#1b2747'; Object.assign(T, { top: 'jacket', topHex: navy, topFab: 1, bot: p.female && role !== 'captain' && role !== 'fo' ? 'skirt' : 'trousers', botHex: navy, botFab: 0, shoe: 'dress', shoeHex: '#121212', sole: 0.04, shirt: '#f2f2ee', acc: p.female && role !== 'captain' && role !== 'fo' ? 'scarf' : 'tie', accHex: p.female ? '#f29a4c' : role === 'agent' ? '#c0392b' : '#1b2747', stripes: role === 'captain' ? 4 : role === 'fo' ? 3 : 0, hat: role === 'captain' }); if (T.acc === 'tie' && role !== 'captain' && role !== 'fo') T.accHex = '#f29a4c'; }
       if (p.female && (T.hair === 'long' || T.hair === 'curly')) T.hair = 'bun'; if (!p.female && !['short', 'side', 'bald'].includes(T.hair)) T.hair = 'short';
     } else {
@@ -137,16 +135,11 @@ export class PeopleHD {
   }
   setCrew(i, role) { const p = this.p[i]; Object.assign(p, { crew: true, role: role || p.role || 'cabin', top: '#1b2747', bottom: '#1b2747', dress: p.female, longSleeve: true, shorts: false, backpack: false, age: 'adult', scale: Math.max(0.95, p.scale), stoop: 0 }); if (p.hairStyle === 'none') p.hairStyle = 'short'; this.paint(p); }
   setExposure(k) { this.U.uK.value = k; }
-  // cabin crew hooks (cabin People set): phase 'boarding'|'taxi'|'takeoff'|'cruise'|'descent'|'landing'|'arrived'; service('start'|'stop')
-  cabinPhase(ph) { (this.dir || (this.dir = new CabinDirector(this))).setPhase(ph); return this.crewState(); }
-  service(on = 'start') { return (this.dir || (this.dir = new CabinDirector(this))).service(on); }
-  crewState() { return (this.dir || (this.dir = new CabinDirector(this))).state(); }
-  tickCrew(t) { if (this.dir) this.dir.step(t); } // advance the crew director while the cabin is not being drawn
   static setQuality(q) { QUALITY = q; }
   stats() { let tris = 0, calls = 0; for (const L of Object.values(this.layers)) if (L.mesh.visible && L.mesh.geometry.instanceCount) { calls++; tris += L.tris * L.mesh.geometry.instanceCount; } return { tris: Math.round(tris), calls }; }
   // ---------------------------------------------------------------- per frame
   commit(t, camPos) {
-    this.frame++; if (camPos) { this.camPos.copy(camPos); this.hasCam = true; } if (this.dir) this.dir.step(t);
+    this.frame++; if (camPos) { this.camPos.copy(camPos); this.hasCam = true; }
     this.parent.updateMatrixWorld(); const e = this.parent.matrixWorld.elements; this.U.uObj.value.set(e[0], e[4], e[8], e[1], e[5], e[9], e[2], e[6], e[10]);
     const R = LOD_R[this.q] || LOD_R.high, r0 = R[0] * R[0], r1 = R[1] * R[1];
     for (const k in this.layers) this.layers[k].list.length = 0;
@@ -162,11 +155,9 @@ export class PeopleHD {
       else { const s = String(lod); add('body' + s, i); add('head' + s, i); add('hands' + s, i); add('eyes' + s, i); add(T.top + s, i); if (T.vest) add('vest' + s, i); if (T.top === 'hoodie') add('hood' + s, i);
         add(T.bot + s, i); add(T.shoe + s, i); if (T.hair !== 'none') add('hair_' + T.hair + s, i); if (T.beard === 'beard') add('beard' + s, i); else if (T.beard === 'moustache' && lod === 0) add('moustache0', i);
         if (T.acc) add(T.acc, i); if (T.hat) add('hat', i);
-        if (T.headset) add('headset', i); if (T.epaulettes) add('epaulettes', i);
-        if (p.prop && this.layers[p.prop]) add(p.prop, i); }
-      if (p.prop2 && this.layers[p.prop2]) add(p.prop2, i);
-      if (p.backpack && p.mode !== 'sit' && p.mode !== 'pilot') add('backpack', i); if (p.suitcase && p.mode !== 'sit' && !p.prop2) add('suitcase', i);
-      if (p.mode !== 'sit' && p.mode !== 'pilot' && !p.baby) add('_shadow', i);
+        if (p.prop === 'phone') add('phone', i); else if (p.prop === 'book') add('book', i); }
+      if (p.backpack && p.mode !== 'sit') add('backpack', i); if (p.suitcase && p.mode !== 'sit') add('suitcase', i);
+      if (p.mode !== 'sit' && !p.baby) add('_shadow', i);
     }
     for (const L of Object.values(this.layers)) { const n = L.list.length, g = L.mesh.geometry; g.instanceCount = n; L.mesh.visible = n > 0; if (!n) continue; const sig = L.list.join(','); if (sig !== L.last) { L.pid.array.set(L.list); L.pid.needsUpdate = true; L.last = sig; } }
     this.boneTex.needsUpdate = true;
@@ -190,22 +181,17 @@ export class PeopleHD {
       if (p.suitcase) { A.arm.R.sp = 0.42; A.arm.R.el = -0.08; A.arm.R.sr = 0.22; A.arm.R.curl = 1.1; A.arm.R.wy = -0.3; }
       if (p.act === 'carry') { A.arm.R.sp = 0.2; A.arm.R.el = -1.3; A.arm.R.curl = 0.8; }
       A.headYaw = slow * 0.25; gazeY = slow * 0.12;
-    } else if (p.mode === 'sit' || p.mode === 'pilot') {
+    } else if (p.mode === 'sit') {
       A.hipY = 0.535 + (p.baby ? 0.38 : 0); A.hipZ = 0.025; const sp = (s * 7.3) % 1; const kn = 1.38 + sp * 0.25;
       A.hipPitch = -0.3; A.leg.L.hp = A.leg.R.hp = -1.12; A.leg.L.kn = kn; A.leg.R.kn = kn + (sp - 0.5) * 0.3; A.leg.L.ab = 0.06 + sp * 0.06; A.leg.R.ab = 0.06 + ((s * 3.1) % 1) * 0.06;
       if (p.baby) { A.leg.L.kn = A.leg.R.kn = 0.5; A.hipY = 0.54 + 0.36; }
       A.lean = 0.2; A.arm.L.sp = A.arm.R.sp = -0.42; A.arm.L.el = A.arm.R.el = -0.95; A.arm.L.sr = A.arm.R.sr = 0.05; A.arm.L.wx = A.arm.R.wx = 0.25; A.arm.L.curl = A.arm.R.curl = 0.55;
-      const act = p.mode === 'pilot' ? 'pilot' : p.act;
-      if (act === 'pilot') this._pilot(p, A, t);
-      else if (act === 'eat' || act === 'drink') { const ph = ((t + s * 3) * (act === 'eat' ? 0.21 : 0.12)) % 1, w = ph < 0.25 ? Math.sin(ph / 0.25 * Math.PI) : 0;
-        A.arm.L.sp = -0.48; A.arm.L.el = -1.32; A.arm.L.sr = -0.08; A.arm.L.curl = 0.6; A.arm.R.sp = -0.48 - w * 0.05; A.arm.R.el = -1.3 - w * 0.95; A.arm.R.sr = -0.1 - w * 0.08; A.arm.R.wy = -w * 0.5; A.arm.R.curl = 0.8;
-        A.headPitch = act === 'eat' ? 0.4 - w * 0.25 : 0.3 - w * 0.45; gazeP = 0.25 - w * 0.2; A.lean = 0.28; p.prop = act === 'drink' ? 'cup' : null; }
-      else if (act === 'take' || act === 'give') { A.arm.L.sp = A.arm.R.sp = -0.85; A.arm.L.el = A.arm.R.el = -0.8; A.arm.L.sr = A.arm.R.sr = -0.08; A.arm.L.curl = A.arm.R.curl = 0.5; A.headYaw = 0.55 * (Math.sign(p.x) || 1); A.headPitch = 0.12; gazeY = 0.2 * (Math.sign(p.x) || 1); A.lean = 0.3; p.prop = null; }
-      else if (act === 'read') { A.arm.L.sp = A.arm.R.sp = -0.55; A.arm.L.el = A.arm.R.el = -1.5; A.arm.L.sr = A.arm.R.sr = -0.12; A.arm.L.wy = 0.6; A.arm.R.wy = 0.6; A.arm.L.curl = A.arm.R.curl = 0.6; A.headPitch = 0.5; gazeP = 0.3; p.prop = 'book'; }
+      const act = p.act;
+      if (act === 'read') { A.arm.L.sp = A.arm.R.sp = -0.55; A.arm.L.el = A.arm.R.el = -1.5; A.arm.L.sr = A.arm.R.sr = -0.12; A.arm.L.wy = 0.6; A.arm.R.wy = 0.6; A.arm.L.curl = A.arm.R.curl = 0.6; A.headPitch = 0.5; gazeP = 0.3; p.prop = 'book'; }
       else if (act === 'phone') { A.arm.R.sp = -0.42; A.arm.R.el = -1.75; A.arm.R.sr = -0.22; A.arm.R.wy = -1.3; A.arm.R.wx = 0.25; A.arm.R.curl = 0.75; A.arm.L.sp = -0.3; A.arm.L.el = -1.2; A.headPitch = 0.48 + slow * 0.04; gazeP = 0.32; p.prop = 'phone'; }
       else if (act === 'sleep') { A.headRoll = 0.4 * (p.i % 2 ? 1 : -1); A.headPitch = 0.28; A.lean = 0.1; A.eyes = 1; p.prop = null; }
       else if (act === 'window') { A.headYaw = p.windowSide * (0.9 + slow * 0.2); A.headPitch = 0.05; gazeY = p.windowSide * 0.2; p.prop = null; }
-      else if (act === 'talk') { A.headYaw = p.talkSide * (0.7 + slow2 * 0.15); A.headPitch = Math.sin(t * 3 + s) * 0.06; gazeY = p.talkSide * 0.25; A.arm.R.sp = -0.6 + Math.sin(t * 2.3 + s) * 0.15; A.arm.R.el = -1.2; A.arm.R.wy = 0.5 + Math.sin(t * 1.7 + s) * 0.4; A.arm.R.curl = 0.25; p.prop = null; }
+      else if (act === 'talk') { A.headYaw = (p.talkSide ?? 1) * (0.7 + slow2 * 0.15); A.headPitch = Math.sin(t * 3 + s) * 0.06; gazeY = (p.talkSide ?? 1) * 0.25; A.arm.R.sp = -0.6 + Math.sin(t * 2.3 + s) * 0.15; A.arm.R.el = -1.2; A.arm.R.wy = 0.5 + Math.sin(t * 1.7 + s) * 0.4; A.arm.R.curl = 0.25; p.prop = null; }
       else if (act === 'buckle') { A.arm.L.sp = A.arm.R.sp = -0.32; A.arm.L.el = A.arm.R.el = -1.15; A.arm.L.sr = A.arm.R.sr = -0.32; A.arm.L.curl = A.arm.R.curl = 0.8; A.headPitch = 0.55; gazeP = 0.35; p.prop = null; }
       else if (act === 'baby') { p.prop = null; A.arm.L.sp = A.arm.R.sp = -0.75; A.arm.L.el = A.arm.R.el = -1.55; A.arm.L.sr = A.arm.R.sr = -0.5; A.arm.L.curl = A.arm.R.curl = 0.4; A.headPitch = 0.35; A.headYaw = slow * 0.2; gazeP = 0.3; }
       else if (act === 'listen') { A.headPitch = -0.16; A.headYaw = slow * 0.08; A.headRoll = 0.06 * (p.i % 2 ? 1 : -1); gazeP = -0.1; p.prop = null; }
@@ -221,9 +207,7 @@ export class PeopleHD {
       else if (p.act === 'lift') { const k = Math.min(1, (p.actT || 0) / 1.2); A.arm.L.sp = A.arm.R.sp = -2.85 * k; A.arm.L.el = A.arm.R.el = -0.35; A.arm.L.clav = A.arm.R.clav = 0.25 * k; A.arm.L.curl = A.arm.R.curl = 0.9; A.headPitch = -0.4 * k; gazeP = -0.2 * k; A.lean = -0.05 * k; }
       else if (p.act === 'demo') { const ph = Math.floor(t / 2.5) % 4; if (ph === 0) { A.arm.L.sp = A.arm.R.sp = -1.4; A.arm.L.sr = A.arm.R.sr = 1.1; A.arm.L.curl = A.arm.R.curl = 0.1; } else if (ph === 1) { A.arm.L.sp = A.arm.R.sp = -0.9; A.arm.L.el = A.arm.R.el = -1.2; A.arm.L.sr = A.arm.R.sr = -0.4; } else if (ph === 2) { A.arm.R.sp = -1.6; A.arm.R.sr = 0.2; A.arm.R.curl = 0.1; A.arm.L.sp = 0.1; } else { A.arm.L.sp = -1.6; A.arm.L.sr = 0.2; A.arm.L.curl = 0.1; A.arm.R.sp = 0.1; } }
       else if (p.act === 'board-look') { A.headPitch = -0.4; gazeP = -0.15; }
-      else if (p.act === 'push') { A.arm.L.sp = A.arm.R.sp = -0.6; A.arm.L.el = A.arm.R.el = -0.85; A.arm.L.sr = A.arm.R.sr = -0.05; A.arm.L.curl = A.arm.R.curl = 1.1; A.lean = 0.12; A.headPitch = 0.1; }
-      else if (p.act === 'serve') { A.arm.R.sp = -1.15; A.arm.R.el = -0.4; A.arm.R.sr = -0.05; A.arm.R.wx = 0.35; A.arm.R.curl = 0.65; A.lean = 0.12; A.headPitch = 0.25; gazeP = 0.2; A.headYaw = slow * 0.1; }
-      p.prop = p.act === 'phone' ? 'phone' : p.act === 'serve' ? p.prop : null;
+      p.prop = p.act === 'phone' ? 'phone' : null;
     }
     if (A.headPitch < 0) A.headPitch = Math.max(A.headPitch, -0.5);
     // blink & saccades
@@ -233,22 +217,6 @@ export class PeopleHD {
     const sac = Math.floor(t * 0.7 + s); const sy = (hash(s, sac) - 0.5) * 0.22, sp2 = (hash(s + 3, sac) - 0.5) * 0.1;
     this._fk(p, A, T, blink, Math.max(-0.45, Math.min(0.45, gazeY + sy - A.headYaw * 0.15)), Math.max(-0.3, Math.min(0.4, gazeP + sp2)));
     return A;
-  }
-  _pilot(p, A, t) { // flight deck seat: feet to the pedals, outboard hand on the sidestick, idle looks and reach gestures
-    const side = p.pilotSide || 1, ob = side > 0 ? 'L' : 'R', ib = side > 0 ? 'R' : 'L', s = p.seed;
-    A.leg.L.hp = A.leg.R.hp = -1.2; A.leg.L.kn = 0.95; A.leg.R.kn = 1.02; A.leg.L.ab = A.leg.R.ab = 0.07; A.lean = 0.24;
-    const o = A.arm[ob], n = A.arm[ib]; Object.assign(o, { sp: -0.42, sr: 0.62, el: -0.95, wx: 0.25, wy: 0.4, curl: 1.1 }); Object.assign(n, { sp: -0.12, sr: 0.04, el: -0.62, wx: 0.35, wy: 0.5, curl: 0.55 });
-    // look targets: instruments, outside, the other pilot / camera, side window
-    const L = p._look || (p._look = { y: 0, p: 0.2, until: 0, cy: 0, cp: 0.2 });
-    if (t > L.until || t < L.until - 20) { const r = hash(s, Math.floor(t * 0.37)); const k = r < 0.4 ? 0 : r < 0.62 ? 1 : r < 0.85 ? 2 : 3;
-      if (k === 0) { L.y = (hash(s + 1, t) - 0.5) * 0.35; L.p = 0.3; } else if (k === 1) { L.y = (hash(s + 2, t) - 0.5) * 0.3; L.p = 0.02; } else if (k === 2) { if (p.lookAt) { const dx = p.lookAt[0] - p.x, dz = p.lookAt[2] - p.z, dy = p.lookAt[1] - (p.y + 1.2); L.y = Math.atan2(-dx, -dz) * 1; L.y = Math.max(-1.1, Math.min(1.1, L.y)); L.p = -Math.atan2(dy, Math.hypot(dx, dz)) * 0.7; } else { L.y = 0.8 * side; L.p = 0.05; } } else { L.y = -0.65 * side; L.p = 0.0; }
-      L.until = t + 1.8 + hash(s + 3, t) * 4; }
-    L.cy += (L.y - L.cy) * 0.12; L.cp += (L.p - L.cp) * 0.12; A.headYaw = L.cy * 0.85; A.headPitch = L.cp; p._gaze = [L.y * 0.15, L.p * 0.3];
-    const g = p._g; if (g) { const u = t - g.t0; if (u > 1.8 || u < 0) p._g = null; else {
-      const w = u < 0.6 ? 0.5 - 0.5 * Math.cos(u / 0.6 * Math.PI) : u < 1.05 ? 1 : 0.5 + 0.5 * Math.cos((u - 1.05) / 0.75 * Math.PI), press = u > 0.6 && u < 1.05 ? Math.sin((u - 0.6) / 0.45 * Math.PI) : 0;
-      const T = { pedestal: [-1.05, 0.55, -0.35, 0.45, 0.45, 0.12], fcu: [-1.65, 0.18, -0.2, -0.05, 0.3, 0.22], glareshield: [-1.72, -0.02, -0.15, -0.1, 0.05, 0.22], overhead: [-2.65, 0.22, -0.35, -0.6, 0.15, -0.05] }[g.name] || [-1.65, 0.18, -0.2, 0, 0.3, 0.2];
-      n.sp += (T[0] - press * 0.06 - n.sp) * w; n.sr += (T[1] - n.sr) * w; n.el += (T[2] - n.el) * w; n.curl += (0.12 - n.curl) * w; n.wx += (0.1 - n.wx) * w; n.wy *= 1 - w;
-      A.headPitch += (T[3] - A.headPitch) * w; A.headYaw += (T[4] * side - A.headYaw) * w; A.lean += (0.24 + T[5] - A.lean) * w; } }
   }
   _fk(p, A, T, blink, gy, gp) {
     const W = this.W, t1 = this.T1, t2 = this.T2, R = this.R, sc = p.scale;
@@ -285,12 +253,7 @@ export class PeopleHD {
       const nz = [-X[0], -X[1], -X[2]], ny = p.prop === 'phone' ? [-Y[0], -Y[1], -Y[2]] : [Z[0], Z[1], Z[2]], nx = [ny[1] * nz[2] - ny[2] * nz[1], ny[2] * nz[0] - ny[0] * nz[2], ny[0] * nz[1] - ny[1] * nz[0]];
       const Wh = mMul(this.T2, W[B.handR], IB[B.handR]); mMul(W[B.prop1], Wh, mSet(this.S, nx[0], ny[0], nz[0], pp[0], nx[1], ny[1], nz[1], pp[1], nx[2], ny[2], nz[2], pp[2]));
       const o = row + B.prop1 * 12; out.set(Array.from(W[B.prop1]), o); }
-    if (p.prop === 'tray' || p.prop === 'cup') { // upright item at the right hand
-      const Wh = W[B.handR]; const ax = HF.Y; const off = p.prop === 'tray' ? -0.09 : -0.07; const hx = Wh[3] + (Wh[0] * -ax[0] + Wh[1] * -ax[1] + Wh[2] * -ax[2]) * -off, hy = Wh[7] + (Wh[4] * -ax[0] + Wh[5] * -ax[1] + Wh[6] * -ax[2]) * -off, hz = Wh[11] + (Wh[8] * -ax[0] + Wh[9] * -ax[1] + Wh[10] * -ax[2]) * -off;
-      const c = Math.cos(p.yaw), sn = Math.sin(p.yaw); mSet(W[B.prop1], c, 0, sn, hx, 0, 1, 0, hy + (p.prop === 'tray' ? 0.01 : 0.03), -sn, 0, c, hz); out.set(Array.from(W[B.prop1]), row + B.prop1 * 12); }
-    if (p.prop2) { const c = Math.cos(p.yaw), sn = Math.sin(p.yaw); const o = p.prop2 === 'meal' ? [0, 0.69, 0.43] : p.prop2 === 'trolley' ? [0, 0, 0.62] : [0, 0, 0]; const oy = p.prop2 === 'meal' ? o[1] : 0;
-      mSet(W[B.prop2], c, 0, sn, p.x + sn * o[2], 0, 1, 0, p.y + oy, -sn, 0, c, p.z + c * o[2]); out.set(Array.from(W[B.prop2]), row + B.prop2 * 12); }
-    else if (p.suitcase) { if (p.mode === 'walk') mEuler(R, -0.38, 0, 0, 0.32, 0, -0.42); else mEuler(R, 0, 0.3, 0, 0.36, 0, 0.12); mMul(W[B.prop2], rootM, R); out.set(Array.from(W[B.prop2]), row + B.prop2 * 12); }
+    if (p.suitcase) { if (p.mode === 'walk') mEuler(R, -0.38, 0, 0, 0.32, 0, -0.42); else mEuler(R, 0, 0.3, 0, 0.36, 0, 0.12); mMul(W[B.prop2], rootM, R); out.set(Array.from(W[B.prop2]), row + B.prop2 * 12); }
     // eyes: blink, gaze
     const d = row + DYN * 4; out[d] = blink; out[d + 1] = gy; out[d + 2] = gp; out[d + 3] = p.mode === 'sit' ? 1 : 0;
   }
