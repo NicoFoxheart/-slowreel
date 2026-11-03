@@ -630,7 +630,7 @@ function padFlight(dt) {
   const rt = pad.val[BTN.RT], lt = pad.val[BTN.LT], gsKt = Math.hypot(fdm.vel.x, fdm.vel.z) / KT;
   if (fdm.onGround && gsKt > 40 && fdm.tl < 0.03 && lt > 0.35 && !fdm.revCmd) { fdm.revCmd = true; W.padRev = true; toast('Reverse thrust'); }
   if (W.padRev && fdm.revCmd) { if (lt < 0.08) { fdm.revCmd = false; W.padRev = false; fdm.tl = 0; } else fdm.tl = lt; }
-  else if (rt > 0.06 || lt > 0.06) { fdm.tl = THREE.MathUtils.clamp(fdm.tl + (rt * 0.5 - lt * 0.6) * dt, 0, 1); if (fdm.ap.athr) { fdm.ap.athr = false; toast('A/THR off (manual thrust)'); } }
+  else if (rt > 0.06 || lt > 0.06) { fdm.tl = THREE.MathUtils.clamp(fdm.tl + (rt * 1.1 - lt * 1.2) * dt, 0, 1); if (fdm.ap.athr) { fdm.ap.athr = false; toast('A/THR off (manual thrust)'); } }
   padLook(dt, a[2], a[3]); if (pad.down(BTN.RS)) padRecentre();
   const lb = P('flapsUp');
   if (pad.held(lb)) {
@@ -672,7 +672,6 @@ function nextStep() {
     if (f.td && gs < 4) { const st = nearestFreeStand(120); if (st) return { label: 'Park at gate ' + (st.gateName || ''), run: () => parkAtGate(st) }; }
     if (onDepRunway() && f.tl < 0.6 && !f.td) return { label: 'Take off: brakes off, takeoff thrust', run: () => { f.parkBrake = false; if (f.flapIdx === 0) f.setFlaps(1); f.tl = 1; f.ap.athr = false; f.spoilersArmed = true; toast('Takeoff thrust. At VR pull the left stick back gently.', 5000); } };
     if (atcStep) return atcStep;
-    if (W.taxiR && W.taxiR.pts && !W.autoTaxi && gs < 30) return { label: 'Auto-taxi along the route', run: () => { W.autoTaxi = { pts: W.taxiR.pts.slice(1), i: 0, speed: 9 }; toast('Auto-taxi engaged'); } };
     if (f.parkBrake && gs < 1) return { label: 'Release the parking brake', run: () => { f.parkBrake = false; toast('Parking brake released'); } };
     return null;
   }
@@ -755,8 +754,8 @@ function pollInput(dt) {
   // throttle & brakes
   const shiftThr = (keys.ShiftLeft || keys.ShiftRight) && !keys.Enter && !keys.NumpadEnter && !keys.KeyT && !keys.KeyZ && !mouse.drag; // Shift+Enter / Shift+T / Shift+Z / Shift+click are not thrust
   const up = keys.PageUp || keys.Equal || keys.NumpadAdd || shiftThr, dn = keys.PageDown || keys.Minus || keys.NumpadSubtract || keys.KeyX;
-  if (up && !keys.KeyZ) { fdm.tl = Math.min(1, fdm.tl + dt * 0.45); if (fdm.ap.athr) { fdm.ap.athr = false; toast('A/THR off (manual thrust)'); } }
-  if (dn) { fdm.tl = Math.max(0, fdm.tl - dt * 0.55); if (fdm.ap.athr) { fdm.ap.athr = false; toast('A/THR off (manual thrust)'); } }
+  if (up && !keys.KeyZ) { fdm.tl = Math.min(1, fdm.tl + dt * 0.75); if (fdm.ap.athr) { fdm.ap.athr = false; toast('A/THR off (manual thrust)'); } }
+  if (dn) { fdm.tl = Math.max(0, fdm.tl - dt * 0.85); if (fdm.ap.athr) { fdm.ap.athr = false; toast('A/THR off (manual thrust)'); } }
   // wheel brakes: held = on, released = off (keyboard B or pad B)
   const brakeIn = !!keys.KeyB || (!!gp && !W.onFoot && !padUIActive && pad.held(pad.phys('brake')) && !pad.held(pad.phys('flapsUp')));
   if (brakeIn && fdm.autobrake && fdm.onGround) { fdm.autobrake = 0; toast('Autobrake disarmed'); }
@@ -1152,7 +1151,6 @@ function updateParkPrompt() {
   const gs = Math.hypot(fdm.vel.x, fdm.vel.z) / KT;
   if (W.parkedAt && !W.onFoot) txt = 'Enter  Stand up and walk out with the passengers';
   else if (fdm.onGround && gs < 4 && !W.push && W.mode !== 'challenge' && fdm.td) { const st = nearestFreeStand(120); if (st) txt = 'Enter  Park at gate ' + (st.gateName || '') + ' and shut down'; }
-  if (W.taxiR && W.taxiR.pts && fdm.onGround && !W.autoTaxi && !txt && gs < 30 && !fdm.belly && !W.evac) txt = 'Shift+Enter  Auto-taxi along the magenta route';
   if (!txt && fdm.ap.on && !fdm.onGround && (W.ptT = (W.ptT || 0) + 1) && (W.ptT % 20 === 0 ? (W.ptHand = handFlyAvailable()) : W.ptHand)) txt = 'U  Hand-fly the landing (autopilot off)';
   if (el.textContent !== txt) el.textContent = txt; el.hidden = !txt;
 }

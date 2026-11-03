@@ -109,7 +109,7 @@ export class FDM {
       const rev = this.reverser > 0.5;
       const cmd = rev ? 20 + 50 * this.tl : 20 + 76 * Math.min(this.tl, this.fail.thr[i] < 1 ? this.fail.thr[i] : 1);
       const run = this.engRun[i]; // a shut-down engine is driven by the systems model (start sequence / spool-down)
-      if (run) { const k = cmd > this.n1[i] ? 0.16 + 0.0105 * this.n1[i] : 0.55; this.n1[i] += (cmd - this.n1[i]) * Math.min(1, k * dt); this.n2[i] += ((58.6 + Math.max(0, this.n1[i] - 20) * 0.5) - this.n2[i]) * Math.min(1, dt * 1.5); }
+      if (run) { const k = (cmd > this.n1[i] ? 0.16 + 0.0105 * this.n1[i] : 0.55) * (this.assist === 'realistic' ? 1 : 1.8); this.n1[i] += (cmd - this.n1[i]) * Math.min(1, k * dt); this.n2[i] += ((58.6 + Math.max(0, this.n1[i] - 20) * 0.5) - this.n2[i]) * Math.min(1, dt * 1.5); }
       const f = run ? 0.04 + 0.96 * Math.pow(clamp((this.n1[i] - 20) / 80, 0, 1.1), 1.85) : 0;
       const ti = 120000 * f * Math.pow(atm.rho / 1.225, 0.75) * (1 - 0.45 * mach + 0.25 * mach * mach);
       const tie = this.reverser > 0.1 ? -ti * 0.42 * this.reverser : ti; T += tie; Tasym += i ? -tie : tie;
@@ -241,7 +241,7 @@ export class FDM {
     } else {
       if (qCmd == null) {
         const easy = this.assist === 'easy';
-        if (Math.abs(pIn) > 0.04) { qCmd = pIn * (easy ? 0.07 : 0.105); this.gammaHold = null; }
+        if (Math.abs(pIn) > 0.04) { qCmd = pIn * (easy ? 0.1 : this.assist === 'realistic' ? 0.105 : 0.13); this.gammaHold = null; }
         else { if (this.gammaHold == null) this.gammaHold = gamma; qCmd = 0.55 * (this.gammaHold - gamma); }
         qCmd += (G / Math.max(V, 40)) * Math.tan(phi) * Math.sin(phi) * (Math.abs(phi) < 0.6 ? 1 : 0.4);
         // easy flare (gear down, below 50 ft): the stick sets the pitch attitude around the approach attitude, gently and predictably;
@@ -273,9 +273,9 @@ export class FDM {
     else {
       if (pCmd == null) {
         if (this.assist === 'easy') { // attitude command: the stick sets the bank (max 30 deg); let go and the wings come gently level
-          if (Math.abs(rIn) > 0.04) this.phiHold = rIn * 30 * D2R; else this.phiHold -= clamp(this.phiHold, -4 * D2R * dt, 4 * D2R * dt);
-          pCmd = clamp(1.1 * (this.phiHold - phi), -0.18, 0.18);
-        } else if (Math.abs(rIn) > 0.04) { pCmd = rIn * 15 * D2R; this.phiHold = phi; }
+          if (Math.abs(rIn) > 0.04) this.phiHold = rIn * 33 * D2R; else this.phiHold -= clamp(this.phiHold, -9 * D2R * dt, 9 * D2R * dt);
+          pCmd = clamp(1.9 * (this.phiHold - phi), -0.33, 0.33); // snappier: ~19 deg/s max roll rate
+        } else if (Math.abs(rIn) > 0.04) { pCmd = rIn * (this.assist === 'realistic' ? 15 : 22) * D2R; this.phiHold = phi; }
         else if (this.assist === 'realistic') { pCmd = clamp(0.9 * (this.phiHold - phi), -0.15, 0.15); }
         else { let tgt = this.phiHold; if (Math.abs(phi) > 33 * D2R) tgt = Math.sign(phi) * 33 * D2R; if (Math.abs(phi) < 1.5 * D2R && Math.abs(this.phiHold) < 1.5 * D2R) tgt = 0; this.phiHold = tgt; pCmd = clamp(0.9 * (tgt - phi), -0.15, 0.15); }
         if (Math.abs(phi) > 67 * D2R) pCmd = Math.min(Math.abs(pCmd), 0) * Math.sign(phi) - Math.sign(phi) * 0.1;
@@ -289,7 +289,7 @@ export class FDM {
     else this.dr = clamp(yIn * 25 * D2R + this.rudTrim, -30 * D2R, 30 * D2R);
     const gsKt = Math.hypot(this.vel.x, this.vel.z) / KT;
     const steerMax = (gsKt < 20 ? 65 : gsKt < 80 ? 65 - (gsKt - 20) * 0.95 : 8) * D2R;
-    this.steer += (yIn * steerMax - this.steer) * Math.min(1, dt * 3);
+    this.steer += (yIn * steerMax - this.steer) * Math.min(1, dt * (this.assist === 'realistic' ? 3 : 6));
     // spoilers: ground spoilers deploy on touchdown when armed and thrust idle
     if (this.onGround && this.spoilersArmed && this.tl < 0.08 && gsKt > 40 && this.gndTime > 0.3) this.groundSpoilers = Math.min(1, this.groundSpoilers + dt * 2);
     else if (!this.onGround || this.tl > 0.3) this.groundSpoilers = Math.max(0, this.groundSpoilers - dt);
