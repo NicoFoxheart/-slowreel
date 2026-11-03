@@ -37,6 +37,8 @@ export const PA_LINES = [
     en: c => `Ladies and gentlemen, welcome to ${c.d}. The local time is ${c.timeEn} and the temperature is ${c.temp} degrees Celsius with ${c.wxEn}. Please remain seated until the seatbelt sign is turned off. Thank you for flying Nicofoxheart Air.`,
     es: c => `Señoras y señores, bienvenidos a ${c.dEs}. La hora local es ${c.timeEs} y la temperatura es de ${c.temp} grados con ${c.wxEs}. Gracias por volar con Nicofoxheart Air.`,
     ko: c => `손님 여러분, ${c.dKo}에 오신 것을 환영합니다. 현지 시각은 ${c.timeKo}이며 기온은 섭씨 ${c.temp}도, ${c.wxKo}입니다. 니코폭스하트 항공을 이용해 주셔서 감사합니다.` },
+  { id: 'meal', who: 'captain', label: 'Cabin crew, prepare for meal service', boost: 2,
+    en: () => 'Cabin crew, please prepare for the meal service.', es: () => 'Tripulación de cabina, preparen el servicio de comidas.', ko: () => '승무원은 기내식 서비스를 준비해 주십시오.' },
 ];
 // emergency lines (not in the numbered menu): the captain's briefing, brace, evacuate, oxygen masks
 export const PA_EMERG = [

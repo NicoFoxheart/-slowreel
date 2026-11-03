@@ -109,11 +109,13 @@ varying vec3 vW;
 void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w;
   #include <logdepthbuf_vertex>
 }`;
+const CLOUD_WORLD = { value: new THREE.Vector2() };
 const CLOUD_FS = /* glsl */`
-varying vec3 vW; uniform float uCover; uniform float uScale; uniform vec2 uOff; uniform vec3 uSunCol; uniform vec3 uAmbCol; uniform float uLayer; uniform float uDark; uniform float uFade;
+varying vec3 vW; uniform float uCover; uniform float uScale; uniform vec2 uOff; uniform vec2 uWorld; uniform vec3 uSunCol; uniform vec3 uAmbCol; uniform float uLayer; uniform float uDark; uniform float uFade;
 ${ATM_GLSL}
 ${NOISE_GLSL}
 float dens(vec2 p){
+  p += uWorld; // world-anchored: the cloud pattern survives floating-origin shifts
   float n = fbm5(p * uScale + uOff) ;
   float m = fbm5(p * uScale * 4.3 - uOff*1.7 + 11.0);
   float v = n*0.75 + m*0.35;
@@ -209,7 +211,7 @@ export class Sky {
     for (let i = 0; i < 2; i++) {
       const m = new THREE.ShaderMaterial({ vertexShader: CLOUD_VS, fragmentShader: '#include <common>\n#include <logdepthbuf_pars_fragment>\n' + CLOUD_FS, transparent: true, depthWrite: false, side: THREE.DoubleSide,
         blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
-        uniforms: { ...ATM, uCover: { value: 0 }, uScale: { value: 1 / 5200 }, uOff: { value: new THREE.Vector2(i * 37.1, i * 11.3) }, uLayer: { value: i }, uDark: { value: 0 }, uFade: { value: 70000 } } });
+        uniforms: { ...ATM, uCover: { value: 0 }, uScale: { value: 1 / 5200 }, uOff: { value: new THREE.Vector2(i * 37.1, i * 11.3) }, uWorld: CLOUD_WORLD, uLayer: { value: i }, uDark: { value: 0 }, uFade: { value: 70000 } } });
       const mesh = new THREE.Mesh(new THREE.PlaneGeometry(160000, 160000, 1, 1).rotateX(-Math.PI / 2), m);
       mesh.frustumCulled = false; mesh.renderOrder = 5 + i; mesh.visible = false; scene.add(mesh); this.clouds.push(mesh);
     }
@@ -242,6 +244,8 @@ export class Sky {
     this.sunElev = elevDeg; this.lutDirty = true; this.envAge = 1e9;
   }
 
+  // floating origin moved: new = old + d (metres); keep clouds where they were over the ground
+  shiftWorld(dx, dz) { CLOUD_WORLD.value.x -= dx; CLOUD_WORLD.value.y -= dz; }
   setWeather(kind, wind) {
     const W = {
       clear: { cover: 0.18, base: 2600, thick: 700, overcast: 0, rain: 0, vis: 110000, haze: 1.0, dark: 0 },

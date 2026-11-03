@@ -6,7 +6,7 @@ import { ATM, ATM_GLSL, NOISE_GLSL, atmos } from './sky.js';
 import { REGIONS, climateFor } from './surroundings.js';
 import { Geo, haversine, D2R } from './data.js';
 
-export const HILL_SCALE = 4000;
+export const HILL_SCALE = 4000, MOUNT = 3400, NAPT = 8; // hand-made region hills (masks) / planet mountain belts (ridged noise × amplitude)
 const NEAR_SIZE = 48000, WIDE_SIZE = 440000;
 
 const CLIMATES = {
@@ -28,6 +28,8 @@ function h12(x, y) { let a = fr(x * 0.1031), b = fr(y * 0.1031), c = fr(x * 0.10
 function vnoise(x, y) { const ix = Math.floor(x), iy = Math.floor(y), fx = x - ix, fy = y - iy; const ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy);
   const a = h12(ix, iy), b = h12(ix + 1, iy), c = h12(ix, iy + 1), d = h12(ix + 1, iy + 1); return (a + (b - a) * ux) * (1 - uy) + (c + (d - c) * ux) * uy; }
 function fbm4(x, y) { let s = 0, a = 0.5; for (let i = 0; i < 4; i++) { s += a * vnoise(x, y); const nx = 1.6 * x - 1.2 * y + 3.1, ny = 1.2 * x + 1.6 * y + 3.1; x = nx; y = ny; a *= 0.5; } return s; }
+function ridge(x, z) { let qx = x / 14000, qy = z / 14000, s = 0, a = 0.55; for (let i = 0; i < 5; i++) { const n = 1 - Math.abs(2 * vnoise(qx, qy) - 1); s += a * n * n; const nx = 1.6 * qx - 1.2 * qy + 1.7, ny = 1.2 * qx + 1.6 * qy + 1.7; qx = nx; qy = ny; a *= 0.5; } return s; } // twin of GLSL ridge()
+const _col = new THREE.Color();
 
 export class Masks {
   constructor(quality) { this.nearN = quality === 'low' ? 1024 : 2048; this.wideN = 1024; this.near = null; this.wide = null; }
@@ -67,9 +69,9 @@ export class Masks {
       for (const c of cities) blob(c.lat, c.lon, c.r * 1000, c.d, 'g');
       for (const r of regions) for (const h of r.hills) blob(h.lat, h.lon, h.r * 1000 * 1.25, h.h / HILL_SCALE, 'b');
       ctx.globalCompositeOperation = 'source-over';
-      // soften
-      const out = document.createElement('canvas'); out.width = out.height = N; const o = out.getContext('2d', { willReadFrequently: true });
-      o.filter = `blur(${N === this.wideN ? 1.2 : 1.6}px)`; o.drawImage(cv, 0, 0); o.filter = 'none';
+      // soften (only hand-made regions need it: city blobs are gradients and the runway carve sits under flattened airports)
+      let out = cv, o = ctx;
+      if (regions.length) { out = document.createElement('canvas'); out.width = out.height = N; o = out.getContext('2d', { willReadFrequently: true }); o.filter = `blur(${N === this.wideN ? 1.2 : 1.6}px)`; o.drawImage(cv, 0, 0); o.filter = 'none'; }
       const data = o.getImageData(0, 0, N, N).data;
       const tex = new THREE.CanvasTexture(out); tex.colorSpace = THREE.NoColorSpace; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter; tex.anisotropy = 4; tex.generateMipmaps = true;
       tex.flipY = false;
@@ -93,6 +95,7 @@ export class Masks {
     const un = (x - this.near.cx) / this.near.size + 0.5, vn = (z - this.near.cz) / this.near.size + 0.5;
     const e = 1 - Math.min(1, Math.max(0, (Math.max(Math.abs(un - 0.5), Math.abs(vn - 0.5)) - 0.45) / 0.05));
     const w = this.sampleOne(this.wide, x, z, [0, 0, 0]);
+    { const uw = (x - this.wide.cx) / this.wide.size, vw = (z - this.wide.cz) / this.wide.size, f = 1 - THREE.MathUtils.smoothstep(Math.max(Math.abs(uw), Math.abs(vw)), 0.46, 0.5); if (f < 1) { w[0] *= f; w[1] *= f; w[2] *= f; } } // twin of maskFade
     if (e <= 0) { out[0] = w[0]; out[1] = w[1]; out[2] = w[2]; return out; }
     const n = this.sampleOne(this.near, x, z, [0, 0, 0]);
     for (let c = 0; c < 3; c++) out[c] = w[c] + (n[c] - w[c]) * e;
@@ -101,29 +104,40 @@ export class Masks {
 }
 
 const TERRAIN_COMMON = /* glsl */`
+#define NAPT ${NAPT}
 uniform sampler2D uNear; uniform sampler2D uWide; uniform vec4 uNearR; uniform vec4 uWideR;
-uniform float uBase; uniform float uNoiseAmp; uniform vec4 uApt[4]; uniform float uAptElev[4];
+uniform float uBase; uniform float uNoiseAmp; uniform vec4 uApt[NAPT]; uniform float uAptElev[NAPT];
+uniform sampler2D uPlanet; uniform sampler2D uPBase; uniform vec4 uGeo; uniform float uPlanetOn; uniform vec2 uWorld;
 ${NOISE_GLSL}
 float fbm4(vec2 p){ float s = 0.0, a = 0.5; for (int i = 0; i < 4; i++) { s += a*vnoise(p); p = mat2(1.6, 1.2, -1.2, 1.6)*p + 3.1; a *= 0.5; } return s; }
+// planet fields (wld-planet.js) by latitude / longitude: r sea, g hand-made region cover, b mountain amplitude; uPBase = base elevation
+vec2 llUV(vec2 p){ float lat = clamp(uGeo.x - p.y / uGeo.w, -89.9, 89.9); float lon = uGeo.y + p.x / uGeo.z; return vec2(lon / 360.0 + 0.5, 0.5 - lat / 180.0); }
+vec4 planetAt(vec2 p){ return uPlanetOn > 0.5 ? textureLod(uPlanet, llUV(p), 0.0) : vec4(0.0); }
+float pBaseAt(vec2 p){ return textureLod(uPBase, llUV(p), 0.0).r; }
+float ridge(vec2 p){ vec2 q = p / 14000.0; float s = 0.0, a = 0.55; for (int i = 0; i < 5; i++) { float n = 1.0 - abs(2.0 * vnoise(q) - 1.0); s += a * n * n; q = mat2(1.6, 1.2, -1.2, 1.6) * q + 1.7; a *= 0.5; } return s; }
+float maskFade(vec2 u){ return 1.0 - smoothstep(0.46, 0.5, max(abs(u.x - 0.5), abs(u.y - 0.5))); } // regional masks end softly (the planet carries on)
 vec4 masksL(vec2 p){
   vec2 un = (p - uNearR.xy)/uNearR.z + 0.5; vec2 uw = (p - uWideR.xy)/uWideR.z + 0.5;
-  vec4 mw = textureLod(uWide, uw, 0.0);
+  vec4 mw = textureLod(uWide, uw, 0.0) * maskFade(uw);
   float e = 1.0 - clamp((max(abs(un.x-0.5), abs(un.y-0.5)) - 0.45)/0.05, 0.0, 1.0);
   if (e <= 0.0) return mw;
   return mix(mw, textureLod(uNear, un, 0.0), e);
 }
 float terrainH(vec2 p, vec4 m, out float flatF){
-  float n = fbm4(p / 6500.0);
-  float rough = uNoiseAmp * (n - 0.38) * 2.0 + 18.0 * (vnoise(p/900.0) - 0.5) * step(1.0, uNoiseAmp);
-  flatF = 1.0; float base = uBase; float wsum = 0.0;
-  for (int i = 0; i < 4; i++) { vec4 A = uApt[i]; if (A.z > 1.0) { float d = length(p - A.xy);
+  vec4 P = planetAt(p); float pl = uPlanetOn * (1.0 - P.g); vec2 q = p + uWorld;
+  float n = fbm4(q / 6500.0);
+  float amp = mix(uNoiseAmp, 30.0 + 150.0 * P.b, pl);
+  float rough = amp * (n - 0.38) * 2.0 + 18.0 * (vnoise(q/900.0) - 0.5) * step(1.0, amp);
+  flatF = 1.0; float base = uPlanetOn > 0.5 ? pBaseAt(p) : uBase; float wsum = 0.0;
+  for (int i = 0; i < NAPT; i++) { vec4 A = uApt[i]; if (A.z > 1.0) { float d = length(p - A.xy);
     float fl = clamp((d - A.z) / 1800.0, 0.0, 1.0); fl = fl * fl * (3.0 - 2.0 * fl); flatF = min(flatF, fl);
     float wb = clamp((d - A.z) / (A.z * 1.5 + 6000.0), 0.0, 1.0); wb = 1.0 - wb * wb * (3.0 - 2.0 * wb); base = mix(base, A.w, wb * (1.0 - wsum)); wsum = max(wsum, wb); } }
-  float hills = m.b * ${HILL_SCALE.toFixed(1)};
+  float hills = m.b * ${HILL_SCALE.toFixed(1)} + P.b * pl * ${MOUNT.toFixed(1)} * ridge(q);
   float land = base + (hills + max(rough, -base + 2.0)) * flatF - 0.15 * (1.0 - flatF);
-  float coast = smoothstep(0.08, 0.5, m.r);
+  float sea = max(m.r * smoothstep(0.0, 0.3, flatF), P.r * pl * flatF); // built airports always stay on dry land
+  float coast = smoothstep(0.08, 0.5, sea);
   land = mix(land, min(land, 1.2), coast * flatF);
-  return mix(land, -0.2, smoothstep(0.47, 0.53, m.r) * step(0.42, m.r));
+  return mix(land, -0.2, smoothstep(0.47, 0.53, sea) * step(0.42, sea));
 }
 `;
 
@@ -154,13 +168,14 @@ uniform vec3 cGrass; uniform vec3 cDry; uniform vec3 cDark; uniform vec3 cSoil; 
 varying vec3 vW; varying vec3 vN; varying float vFlat;
 vec4 masksF(vec2 p){
   vec2 un = (p - uNearR.xy)/uNearR.z + 0.5; vec2 uw = (p - uWideR.xy)/uWideR.z + 0.5;
-  vec4 mw = texture2D(uWide, uw);
+  vec4 mw = texture2D(uWide, uw) * maskFade(uw);
   float e = 1.0 - clamp((max(abs(un.x-0.5), abs(un.y-0.5)) - 0.45)/0.05, 0.0, 1.0);
   return e <= 0.0 ? mw : mix(mw, texture2D(uNear, un), e);
 }
 void main(){
-  vec2 p = vW.xz; vec3 rel = vW - cameraPosition; float dist = length(rel); vec3 vd = rel/dist;
-  vec4 m = masksF(p);
+  vec2 pL = vW.xz, p = pL + uWorld; vec3 rel = vW - cameraPosition; float dist = length(rel); vec3 vd = rel/dist; // pL: local frame (masks, planet); p: world-anchored (noise survives origin shifts)
+  vec4 m = masksF(pL);
+  { vec4 P = planetAt(pL); m.r = max(m.r * smoothstep(0.0, 0.3, vFlat), P.r * uPlanetOn * (1.0 - P.g) * vFlat); } // planet sea (airports stay dry)
   float n1 = fbm5(p / 2200.0), n2 = vnoise(p / 140.0), n3 = vnoise(p / 31.0);
   float wv = m.r + (n2 - 0.5) * 0.10 + (n1 - 0.5)*0.06;
   float water = smoothstep(0.49, 0.53, wv) * step(0.42, m.r);
@@ -251,25 +266,37 @@ export class Terrain {
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setIndex(idx);
     this.uniforms = {
       ...ATM, uNear: { value: null }, uWide: { value: null }, uNearR: { value: new THREE.Vector4() }, uWideR: { value: new THREE.Vector4() },
-      uBase: { value: 0 }, uNoiseAmp: { value: 30 }, uApt: { value: [0, 1, 2, 3].map(() => new THREE.Vector4(0, 0, 0, 0)) }, uAptElev: { value: [0, 0, 0, 0] },
+      uBase: { value: 0 }, uNoiseAmp: { value: 30 }, uApt: { value: Array.from({ length: NAPT }, () => new THREE.Vector4(0, 0, 0, 0)) }, uAptElev: { value: new Array(NAPT).fill(0) },
       uCenter: { value: new THREE.Vector2() }, uWet: { value: 0 },
+      uPlanet: { value: null }, uPBase: { value: null }, uGeo: { value: new THREE.Vector4(0, 0, 111000, 111000) }, uPlanetOn: { value: 0 }, uWorld: { value: new THREE.Vector2() },
       cGrass: { value: new THREE.Color() }, cDry: { value: new THREE.Color() }, cDark: { value: new THREE.Color() }, cSoil: { value: new THREE.Color() }, cShallow: { value: new THREE.Color() }, uFields: { value: 0.5 },
     };
     this.mat = new THREE.ShaderMaterial({ vertexShader: TERRAIN_VS, fragmentShader: TERRAIN_FS, uniforms: this.uniforms, extensions: { derivatives: true } });
     this.mesh = new THREE.Mesh(g, this.mat); this.mesh.frustumCulled = false; this.mesh.renderOrder = -5;
     scene.add(this.mesh);
-    this.apts = []; this.base = 0; this.noiseAmp = 30; this._m = [0, 0, 0];
+    this.apts = []; this.base = 0; this.noiseAmp = 30; this._m = [0, 0, 0]; this._p = [0, 0, 0, 0]; this.planet = null; this.clim = null;
   }
+  // the whole-world fields (wld-planet.js): sea, mountain belts and base elevation everywhere, so there is no edge to the world
+  setPlanet(P) { this.planet = P || null; const u = this.uniforms; u.uPlanet.value = P ? P.tex : null; u.uPBase.value = P ? P.baseTex : null; u.uPlanetOn.value = P ? 1 : 0; }
+  // airport flatten / dry-land zones (max 4, local frame) without rebuilding the masks
+  setZones(aptZones) { this.apts = aptZones.slice(0, NAPT); const u = this.uniforms; for (let i = 0; i < NAPT; i++) { const a = this.apts[i]; u.uApt.value[i].set(a ? a.x : 0, a ? a.z : 0, a ? a.r : 0, a ? a.elev : 0); } }
+  // ground colours by climate; sec > 0 blends over that many seconds (tick) so a long flight changes climate without a pop
+  setClimate(name, sec = 0) { const cl = CLIMATES[name] || CLIMATES.temperate; const u = this.uniforms; this.climate = name;
+    const to = { cGrass: cl.grass, cDry: cl.dry, cDark: cl.dark, cSoil: cl.soil, cShallow: cl.shallow };
+    if (!(sec > 0)) { for (const k in to) u[k].value.setRGB(...to[k]); u.uFields.value = cl.fields; this.clim = null; return; }
+    this.clim = { to, fields: cl.fields, t: 0, T: sec, from: Object.fromEntries(Object.keys(to).map(k => [k, u[k].value.clone()])), f0: u.uFields.value }; }
+  tick(dt) { const c = this.clim; if (!c) return; c.t += dt; const k = Math.min(1, c.t / c.T), u = this.uniforms;
+    for (const n in c.to) u[n].value.copy(c.from[n]).lerp(_col.setRGB(...c.to[n]), k); u.uFields.value = c.f0 + (c.fields - c.f0) * k; if (k >= 1) this.clim = null; }
   // airports: [{x, z, r, elev}] in local frame (max 4)
   setup(geo, cx, cz, aptZones, aptObjs, opts) {
-    this.geo = geo; this.apts = aptZones.slice(0, 4); this.aptObjs = aptObjs || []; this.base = opts.base; this.noiseAmp = opts.noiseAmp;
-    const cl = CLIMATES[opts.climate] || CLIMATES.temperate; const u = this.uniforms;
-    u.cGrass.value.setRGB(...cl.grass); u.cDry.value.setRGB(...cl.dry); u.cDark.value.setRGB(...cl.dark); u.cSoil.value.setRGB(...cl.soil); u.cShallow.value.setRGB(...cl.shallow); u.uFields.value = cl.fields;
+    this.geo = geo; this.apts = aptZones.slice(0, NAPT); this.aptObjs = aptObjs || []; this.base = opts.base; this.noiseAmp = this.planet ? 6 : opts.noiseAmp; // with the planet, noiseAmp only applies inside hand-made regions
+    const u = this.uniforms; u.uGeo.value.set(geo.lat0, geo.lon0, geo.kx, geo.kz);
+    if (opts.keepClimate && this.climate) { if (opts.climate !== this.climate) this.setClimate(opts.climate, 25); } else this.setClimate(opts.climate);
     this.masks.build(geo, cx, cz, aptObjs, opts.extraCities || []);
     u.uNear.value = this.masks.near.tex; u.uWide.value = this.masks.wide.tex;
     u.uNearR.value.set(cx, cz, this.masks.near.size, 0); u.uWideR.value.set(cx, cz, this.masks.wide.size, 0);
-    u.uBase.value = opts.base; u.uNoiseAmp.value = opts.noiseAmp;
-    for (let i = 0; i < 4; i++) { const a = this.apts[i]; u.uApt.value[i].set(a ? a.x : 0, a ? a.z : 0, a ? a.r : 0, a ? a.elev : 0); }
+    u.uBase.value = opts.base; u.uNoiseAmp.value = this.noiseAmp;
+    for (let i = 0; i < NAPT; i++) { const a = this.apts[i]; u.uApt.value[i].set(a ? a.x : 0, a ? a.z : 0, a ? a.r : 0, a ? a.elev : 0); }
     this.center = null;
   }
   update(camPos) {
@@ -279,14 +306,19 @@ export class Terrain {
   // JS twin of terrainH: ground height (m MSL) and water flag
   heightAt(x, z) {
     const m = this.masks.sample(x, z, this._m);
-    const n = fbm4(x / 6500, z / 6500);
-    const rough = this.noiseAmp * (n - 0.38) * 2 + (this.noiseAmp >= 1 ? 18 * (vnoise(x / 900, z / 900) - 0.5) : 0);
-    let flatF = 1, base = this.base, wsum = 0;
+    let Ps = null, pl = 0; if (this.planet && this.geo) { const ll = this.geo.toLatLon(x, z); Ps = this.planet.sample(ll.lat, ll.lon, this._p); pl = 1 - Ps[1]; }
+    const Wo = this.uniforms.uWorld.value, wx = x + Wo.x, wz = z + Wo.y; // world-anchored noise (same as the shader)
+    const n = fbm4(wx / 6500, wz / 6500);
+    const amp = Ps ? this.noiseAmp + (30 + 150 * Ps[2] - this.noiseAmp) * pl : this.noiseAmp;
+    const rough = amp * (n - 0.38) * 2 + (amp >= 1 ? 18 * (vnoise(wx / 900, wz / 900) - 0.5) : 0);
+    let flatF = 1, base = Ps ? Ps[3] : this.base, wsum = 0;
     for (const a of this.apts) { const d = Math.hypot(x - a.x, z - a.z); flatF = Math.min(flatF, THREE.MathUtils.smoothstep(d, a.r, a.r + 1800));
       const wb = 1 - THREE.MathUtils.smoothstep(d, a.r, a.r * 2.5 + 6000); base = base + (a.elev - base) * wb * (1 - wsum); wsum = Math.max(wsum, wb); }
-    let land = base + (m[2] * HILL_SCALE + Math.max(rough, -base + 2)) * flatF - 0.15 * (1 - flatF);
-    const coast = THREE.MathUtils.smoothstep(m[0], 0.08, 0.5); land = land + (Math.min(land, 1.2) - land) * coast * flatF;
-    const w = m[0] >= 0.42 ? THREE.MathUtils.smoothstep(m[0], 0.47, 0.53) : 0;
+    const hills = m[2] * HILL_SCALE + (Ps && Ps[2] > 0 ? Ps[2] * pl * MOUNT * ridge(wx, wz) : 0);
+    let land = base + (hills + Math.max(rough, -base + 2)) * flatF - 0.15 * (1 - flatF);
+    const sea = Math.max(m[0] * THREE.MathUtils.smoothstep(flatF, 0, 0.3), Ps ? Ps[0] * pl * flatF : 0);
+    const coast = THREE.MathUtils.smoothstep(sea, 0.08, 0.5); land = land + (Math.min(land, 1.2) - land) * coast * flatF;
+    const w = sea >= 0.42 ? THREE.MathUtils.smoothstep(sea, 0.47, 0.53) : 0;
     return { h: land + (-0.2 - land) * w, water: w > 0.5, urban: m[1] };
   }
 }
@@ -320,9 +352,12 @@ export function facadeMaterial(opts = {}) {
 export class City {
   constructor(scene, quality) { this.scene = scene; this.quality = quality; this.group = new THREE.Group(); scene.add(this.group); this.lights = null; }
   clear() { this.group.traverse(o => { if (o.geometry) o.geometry.dispose(); }); this.group.clear(); }
-  build(terrain, geo, cx, cz, airportsLocal) {
-    this.clear();
-    const q = this.quality; const max = { low: 0, medium: 2500, high: 6000, ultra: 11000 }[q] ?? 4000; if (!max) return;
+  build(terrain, geo, cx, cz, airportsLocal) { this.job = null; const g = this._gen(terrain, geo, cx, cz, airportsLocal); while (!g.next().done); }
+  // sliced rebuild for streaming: start(...), then step(ms) every frame until it returns true; the old blocks stay up until the new set is ready
+  start(terrain, geo, cx, cz, airportsLocal) { this.job = this._gen(terrain, geo, cx, cz, airportsLocal); this.at = { x: cx, z: cz }; }
+  step(ms = 3) { if (!this.job) return true; const t0 = performance.now(); while (performance.now() - t0 < ms) { if (this.job.next().done) { this.job = null; return true; } } return false; }
+  *_gen(terrain, geo, cx, cz, airportsLocal) {
+    const q = this.quality; this.at = { x: cx, z: cz }; const max = { low: 0, medium: 2500, high: 6000, ultra: 11000 }[q] ?? 4000; if (!max) return;
     const near = terrain.masks.near; if (!near) return;
     const cities = near.cities.map(c => ({ x: geo.x(c.lon), z: geo.z(c.lat), r: c.r * 1000, h: c.h, d: c.d }));
     const R = rng(1234), out = [];
@@ -333,7 +368,7 @@ export class City {
       for (const r of g.runways) keepOut.push([ox + r.cx, oz + r.cz, r.dir.x, r.dir.z, r.L / 2 + 300 + 40, r.W / 2 + 150 + 40]);
       if (g.apron) { const ap = g.apron; keepOut.push([ox + ap.x, oz + ap.z, ap.dx, ap.dz, ap.len / 2 + 450, ap.dep / 2 + 650]); } }
     const kept = (x, z) => { for (const k of keepOut) { const dx = x - k[0], dz = z - k[1]; if (Math.abs(dx * k[2] + dz * k[3]) < k[4] && Math.abs(-dx * k[3] + dz * k[2]) < k[5]) return false; } return true; };
-    for (let z = cz - range; z < cz + range && out.length < max * 1.4; z += step0) for (let x = cx - range; x < cx + range; x += step0) {
+    for (let z = cz - range; z < cz + range && out.length < max * 1.4; z += step0) { yield; for (let x = cx - range; x < cx + range; x += step0) {
       const jx = x + (R() - 0.5) * step0 * 0.7, jz = z + (R() - 0.5) * step0 * 0.7;
       const m = terrain.masks.sample(jx, jz); if (m[0] > 0.3 || m[1] < 0.18) continue;
       if (R() > m[1] * 1.15) continue;
@@ -345,7 +380,8 @@ export class City {
       const fp = tall ? 22 + R() * 26 : 14 + R() * 26;
       const t = terrain.heightAt(jx, jz); if (t.water) continue;
       out.push([jx, t.h, jz, fp * (0.7 + R() * 0.6), Math.max(5, h), fp, R() * Math.PI, R()]);
-    }
+    } }
+    this.clear();
     out.sort((a, b) => Math.hypot(a[0] - cx, a[2] - cz) - Math.hypot(b[0] - cx, b[2] - cz));
     const list = out.slice(0, max);
     const geo1 = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
