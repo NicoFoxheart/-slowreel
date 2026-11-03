@@ -17,9 +17,17 @@ const M = (c, o = {}) => atmos(new THREE.MeshStandardMaterial({ color: c, roughn
 function person(mats, opts = {}) { const o = new THREE.Object3D(); o.userData = { mode: 'idle', ...opts }; return o; }
 function pose(p, t, mode) { p.userData.mode = mode; } // modes: idle | walk | wave | salute | push | guide
 
+// services the player can call and dismiss (each maps to one or more turnaround vehicles; 'gpu' is the stand GPU)
+export const SERVICES = [
+  { id: 'fuel', name: 'Fuel', sub: 'hydrant dispenser · right wing', v: ['fuel'] }, { id: 'cat1', name: 'Catering front', sub: 'hi-lift truck · door R1', v: ['cat1'] },
+  { id: 'cat2', name: 'Catering aft', sub: 'hi-lift truck · door R2', v: ['cat2'] }, { id: 'bags', name: 'Baggage & cargo', sub: 'belt loaders · ULD loader · baggage train', v: ['belt1', 'belt2', 'train', 'cont'] },
+  { id: 'lav', name: 'Lavatory service', sub: 'waste truck · aft panel', v: ['lav'] }, { id: 'water', name: 'Potable water', sub: 'water truck · aft panel', v: ['water'] },
+  { id: 'clean', name: 'Cabin cleaning', sub: 'cleaning crew + van', v: ['van'] }, { id: 'gpu', name: 'Ground power', sub: 'GPU · 400 Hz to the nose', gpu: true }];
+const RANK = { working: 5, coming: 4, leaving: 3, done: 2, away: 1 };
+
 export class GroundCrew {
   constructor(scene, quality = 'high') {
-    this.g = new THREE.Group(); this.g.name = 'groundcrew'; this.g.visible = false; scene.add(this.g); this.state = 'off'; this.t = 0;
+    this.g = new THREE.Group(); this.g.name = 'groundcrew'; this.g.userData.crew = this; this.g.visible = false; scene.add(this.g); this.state = 'off'; this.t = 0;
     const q = this.q = (() => { try { return JSON.parse(localStorage.getItem('foxheart.settings') || '{}').quality || quality; } catch (e) { return quality; } })();
     const mats = gseMats(q); this.mats = mats;
     // crew: slots 0-2 headset / wing walker / marshaller, 3-15 turnaround staff (env-turnaround.js)
@@ -37,6 +45,22 @@ export class GroundCrew {
     // people
     this.headset = person(mats, { headset: true }); this.wing = person(mats); this.marsh = person(mats, { wands: true });
   }
+  // ---- manual ground services (call / dismiss); only while parked at a stand with the parking brake set
+  get autoServices() { return this._auto !== false; } set autoServices(v) { this._auto = !!v; }
+  canService() { if (this.state !== 'parked' || !this.turn.mode) return 'Ground services are available when parked at a gate'; if (this.fdm && !this.fdm.parkBrake) return 'Set the parking brake first'; return ''; }
+  services() { const why = this.canService();
+    return SERVICES.map(S => { let state = 'away';
+      if (S.gpu) state = this.state !== 'off' && this.gpu.visible ? 'working' : 'away';
+      else if (this.turn.mode) for (const id of S.v) { const st = this.turn.vstate(this.turn.V[id]); if (RANK[st] > RANK[state]) state = st; }
+      return { id: S.id, name: S.name, sub: S.sub, state, allowed: !why, why }; }); }
+  callService(id) { const why = this.canService(), S = SERVICES.find(s => s.id === id); if (!S) return { ok: false, msg: 'Unknown service' }; if (why) return { ok: false, msg: why };
+    if (S.gpu) { this.gpu.visible = this.cable.visible = true; return { ok: true, msg: 'GPU connected' }; }
+    S.v.forEach((v, i) => this.turn.call(this.turn.V[v], i * 2.5)); return { ok: true, msg: S.name + ' is on the way' }; }
+  dismissService(id) { const S = SERVICES.find(s => s.id === id); if (!S) return { ok: false, msg: 'Unknown service' }; if (this.state === 'off' || !this.turn.mode) return { ok: false, msg: 'No ground services here' };
+    if (S.gpu) { this.gpu.visible = this.cable.visible = false; return { ok: true, msg: 'GPU disconnected' }; }
+    S.v.forEach(v => this.turn.dismiss(this.turn.V[v])); return { ok: true, msg: S.name + ': finishing up and leaving' }; }
+  dismissAll() { const why = this.state === 'off' || !this.turn.mode; if (why) return { ok: false, msg: 'No ground services here' }; SERVICES.filter(s => !s.gpu).forEach(s => this.dismissService(s.id)); return { ok: true, msg: 'All ground services are leaving the stand' }; }
+  callAll() { const why = this.canService(); if (why) return { ok: false, msg: why }; SERVICES.forEach((s, i) => s.gpu ? this.callService(s.id) : s.v.forEach((v, j) => this.turn.call(this.turn.V[v], i * 3 + j * 2.5))); return { ok: true, msg: 'All ground services called' }; }
   commit() { // proxies -> instances
     const C = this.crew, Z = new THREE.Matrix4().makeScale(0, 0, 0), m = new THREE.Matrix4();
     [this.headset, this.wing, this.marsh].forEach((o, i) => { const p = C.p[i]; p.vis = o.visible && this.g.visible; p.pos.copy(o.position); p.yaw = o.rotation.y; p.mode = o.userData.mode; });
@@ -60,7 +84,7 @@ export class GroundCrew {
     const gh = ground(ac.position.x, ac.position.z).h, hAC = ac.position.y - gh, W = (x, y, z) => { const p = ac.localToWorld(V(x, 0, z)); return [p.x, gh + y, p.z]; };
     this.place(this.gpu, ac, 4.2, -16.8, ground, 0.4); this.gpu.visible = !arriving;
     this.cable.traverse(o => o.geometry && o.geometry.dispose()); this.cable.clear(); this.cable.add(hoseMesh([W(4.65, 1.0, -15.73), W(3.6, 0.12, -15.45), W(1.7, 0.1, -15.1), W(0.8, hAC - 2.25, -15.0), W(0.6, hAC - 1.75, -15.0)], 0.035)); this.cable.visible = !arriving;
-    if (arriving) this.turn.clear(); else this.turn.start(ac, gh, this.acYaw(ac), svcMode);
+    if (arriving) this.turn.clear(); else this.turn.start(ac, gh, this.acYaw(ac), svcMode, this.autoServices);
     this.tug.visible = false; this.bar.visible = false;
     this.place(this.headset, ac, -1.8, nz - 0.6, ground, Math.PI / 2); this.place(this.wing, ac, -DIM.span / 2 + 1, 3, ground, Math.PI); this.place(this.marsh, ac, 0, nz - 16, ground, 0);
     this.headset.visible = !arriving; this.wing.visible = !arriving; this.marsh.visible = arriving;
@@ -69,7 +93,7 @@ export class GroundCrew {
     this.tugFrom = this.gp(ac, 6, DIM.noseGearZ - 14, this.ground); this.tugYaw = this.acYaw(ac) + Math.PI * 0.5; this.turn.prep(); }
   release() { if (this.state === 'pushing' || this.state === 'prep') { this.state = 'release'; this.t = 0; this.bar.visible = false; } }
   clear() { this.state = 'off'; this.g.visible = false; this.turn.clear(); }
-  update(dt, ac, fdm, ground) { if (this.state === 'off') return; this._step(dt, ac, fdm, ground); if (this.state !== 'off') { this.turn.update(dt); this.commit(); } }
+  update(dt, ac, fdm, ground) { this.fdm = fdm; if (this.state === 'off') return; this._step(dt, ac, fdm, ground); if (this.state !== 'off') { this.turn.update(dt); this.commit(); } }
   _step(dt, ac, fdm, ground) {
     this.t += dt; const t = this.t; ground = ground || this.ground; this.ground = ground;
     const nz = DIM.noseGearZ, yaw = this.acYaw(ac);

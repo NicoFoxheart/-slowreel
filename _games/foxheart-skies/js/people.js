@@ -3,6 +3,7 @@
 // buckle, safety demo). One InstancedMesh per body part; matrices are composed on the CPU.
 import * as THREE from 'three';
 import { atmos } from './sky.js';
+import { PeopleHD } from './ppl-core.js';
 
 const SKIN = ['#f3d2b8', '#e7b48f', '#c98c62', '#9a6440', '#6b4126'];
 const HAIRC = ['#1b130e', '#3b2416', '#6b4423', '#b88a4a', '#d8c08a', '#8a8a8a', '#d9d9d9', '#7a2a1a'];
@@ -85,7 +86,18 @@ function mergeGeo(gs) {
 }
 
 // ---------------------------------------------------------------- people set
+// People: the HD implementation (ppl-core.js: one smooth GPU-skinned body per person, sculpted heads, hands,
+// layered clothes, hair, LOD). Falls back to the legacy rigid-part people below if it cannot be built
+// (for example without float textures). Same API either way: p[], paint(p), setCrew(i[, role]), setExposure(k), commit(t, camLocal).
 export class People {
+  constructor(parent, n, rnd, opts = {}) {
+    if (!opts.legacy && !LEGACY) { try { return new PeopleHD(parent, n, rnd, opts); } catch (e) { console.warn('People HD failed, using legacy people:', e); LEGACY = true; } }
+    return new LegacyPeople(parent, n, rnd, opts);
+  }
+  static setQuality(q) { PeopleHD.setQuality(q); }
+}
+let LEGACY = false;
+class LegacyPeople {
   constructor(parent, n, rnd, opts = {}) {
     const G = geos(); this.n = n; this.rnd = rnd; this.parent = parent; this.meshes = {};
     this.mat = atmos(new THREE.MeshBasicMaterial({ vertexColors: true })); this.mat.userData.key = 'ppl2';

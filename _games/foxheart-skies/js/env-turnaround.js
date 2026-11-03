@@ -36,7 +36,7 @@ export class Turnaround {
     this._m = new THREE.Matrix4(); this._m2 = new THREE.Matrix4(); this._v = new THREE.Vector3();
   }
   // ac: aircraft (world), groundH: apron height, mode 'dep' | 'arr'
-  start(ac, groundH, yaw, mode) {
+  start(ac, groundH, yaw, mode, auto = true) {
     this.mode = mode; this.t = 0; this.prepT = null; this.svc.visible = true;
     this.svc.position.set(ac.position.x, groundH, ac.position.z); this.svc.rotation.set(0, yaw, 0); this.svc.updateMatrixWorld(true);
     const h = this.hAC = ac.position.y - groundH; this.hDoor = h - 0.55; this.hCargo = h - 1.55;
@@ -57,8 +57,8 @@ export class Turnaround {
       train: [[[100, RZ], [40, RZ], [LX + 1, RZ - 6], [LX, 26], [16, 15], [13.2, 6], [12.8, 0], [12.8, -8.6]], null, [[LX, 26], [16, 15], [13.2, 6], [12.8, 0], [12.8, -8.6], [12.8, -14], [14.5, -22], [LX, -31], [28, FZ], [100, FZ]]],
     };
     for (const id in V) {
-      const v = V[id], [x, z, yw] = D[id], [pin, prev, pfwd] = P[id], tl = mode === 'dep' ? DEP[id] : [ARR[id], null];
-      Object.assign(v, { dock: { x, z, yaw: yw }, legIn: new Leg(pin, false, id === 'train' ? 4 : 5.2), legRev: prev && new Leg(prev, true, 2.2), legFwd: new Leg(pfwd, false, id === 'train' ? 4 : 5.5), at: tl[0], out: tl[1], dep: DEPLOY[v.type === 'btug' ? 'train' : v.type] ?? 0, fast: 1, gone: false });
+      const v = V[id], [x, z, yw] = D[id], [pin, prev, pfwd] = P[id], tl = !auto ? [Infinity, null] : mode === 'dep' ? DEP[id] : [ARR[id], null];
+      Object.assign(v, { dock: { x, z, yaw: yw }, legIn: new Leg(pin, false, id === 'train' ? 4 : 5.2), legRev: prev && new Leg(prev, true, 2.2), legFwd: new Leg(pfwd, false, id === 'train' ? 4 : 5.5), at: tl[0], out: tl[1], dep: DEPLOY[v.type === 'btug' ? 'train' : v.type] ?? 0, fast: 1, gone: false, docked: v.at === null, recall: false });
       v.legIn.T = Math.max(v.legIn.T, 8); if (id === 'train') v.s0 = v.legFwd.near(12.8, -8.6);
     }
     // hoses and cables (stand frame, static once docked)
@@ -74,6 +74,13 @@ export class Turnaround {
     if (this.prepT != null || !this.mode) return; this.prepT = this.t;
     for (const id in this.V) { const v = this.V[id], tin = v.at == null ? -1e9 : v.at; if (this.t < tin + v.legIn.T) { v.gone = true; continue; } if (v.out == null || v.out > this.t) { v.out = this.t; v.fast = 3.2; } }
   }
+  // ---- manual services: state of one vehicle, call (drive in + dock + work), dismiss (undock + leave now)
+  vstate(v) { const t = this.t; if (!this.mode) return 'away'; if (v.gone) return v.recall ? 'coming' : v.docked ? 'done' : 'away'; if (v.at === Infinity) return 'away'; const tin = v.at == null ? -1e9 : v.at;
+    if (t < tin || (v.at != null && t < tin + v.legIn.T)) return 'coming'; if (v.out == null || t < v.out) return 'working'; return 'leaving'; }
+  call(v, delay = 0) { const st = this.vstate(v); if (st === 'leaving') { v.recall = true; return; } if (st === 'coming' || st === 'working') return;
+    Object.assign(v, { at: this.t + delay, out: null, gone: false, fast: 1, docked: false }); }
+  dismiss(v) { const st = this.vstate(v); v.recall = false; if (st === 'working') v.out = Math.max(this.t, v.out == null ? this.t : Math.min(v.out, this.t));
+    else if (st === 'coming') { if (v.at > this.t) { v.at = Infinity; v.gone = false; } else v.out = v.at + v.legIn.T - v.dep; } }
   clear() { this.svc.visible = false; this.mode = null; for (let i = 3; i < this.crew.n; i++) this.crew.p[i].vis = false; }
   // phase of a vehicle at time t: { vis, x, z, yaw, k (deploy 0..1), work (s since docked, -1 if not working), s (train arc) }
   phase(v, t, o) {
@@ -82,6 +89,7 @@ export class Turnaround {
     o.vis = true;
     if (v.at != null && t < tin + v.legIn.T) { const u = (t - tin) / v.legIn.T; if (v.id === 'train') { o.s = v.legIn.L * u * u * (3 - 2 * u); o.legT = v.legIn; } else v.legIn.pose(u, o); return o; }
     const tDock = v.at == null ? -20 - v.dep : tin + v.legIn.T; const park = () => { o.x = v.dock.x; o.z = v.dock.z; o.yaw = v.dock.yaw; if (v.id === 'train') { o.s = v.legIn.L; o.legT = v.legIn; } };
+    v.docked = true;
     if (v.out == null || t < v.out) { park(); o.k = v.dep ? clamp((t - tDock) / v.dep, 0, 1) : 1; o.work = o.k >= 1 ? t - tDock - v.dep : -1; return o; }
     let u = (t - v.out) * v.fast;
     if (u < v.dep) { park(); o.k = 1 - u / v.dep; return o; } u -= v.dep;
@@ -94,7 +102,7 @@ export class Turnaround {
     if (this.prepT != null && t - this.prepT > 6.6) for (const id in this.V) this.V[id].gone = true;
     const ph = {};
     for (const id in this.V) {
-      const v = this.V[id]; this.phase(v, t, o); ph[id] = { vis: o.vis, k: o.k, work: o.work };
+      const v = this.V[id]; if (v.gone && v.recall) { v.recall = false; this.call(v, 1.5); } this.phase(v, t, o); ph[id] = { vis: o.vis, k: o.k, work: o.work };
       v.obj.visible = o.vis; if (v.cars) v.cars.forEach(c => c.obj.visible = o.vis);
       if (!o.vis) continue;
       if (o.s != null) { o.legT.at(o.s, o); v.obj.position.set(o.x, 0, o.z); v.obj.rotation.y = o.yaw; v.cars.forEach((c, i) => { o.legT.at(o.s - CART_OFF[i], o); c.obj.position.set(o.x, 0, o.z); c.obj.rotation.y = o.yaw; }); }
@@ -117,8 +125,8 @@ export class Turnaround {
       for (let n = 0; n < 6; n++) { const d0 = ((w * 0.95 + n * 2.3) % 13.8); if (d0 > v.Lb - 0.5) continue; const d = dep ? d0 + 0.3 : v.Lb - 0.2 - d0;
         M2.copy(T(0, v.py + 0.13 * Math.cos(phi) + d * Math.sin(phi), v.pz - d * Math.cos(phi), (n % 3) * 0.4 - 0.4, phi)); B.setMatrixAt(bi++, M.multiplyMatrices(v.obj.matrix, M2)); }
     }
-    const tr = this.V.train; const tDockTrain = (tr.at == null ? -1e9 : tr.at) + tr.legIn.T;
-    const fill = i => dep ? 1 - clamp((t - i * 40) / 140, 0, 1) : clamp((t - tDockTrain - 15 - i * 30) / 140, 0, 1);
+    const tr = this.V.train; const tDockTrain = tr.at == null ? -20 : tr.at + tr.legIn.T;
+    const fill = i => dep ? 1 - clamp((t - tDockTrain - 20 - i * 40) / 140, 0, 1) : clamp((t - tDockTrain - 15 - i * 30) / 140, 0, 1);
     if (ph.train.vis) for (let ci = 0; ci < 2; ci++) { const c = tr.cars[ci], nb = Math.round(fill(ci) * 20);
       for (let j = 0; j < nb && bi < 64; j++) { const L = Math.floor(j / 8), r = j % 8; M2.copy(T((r % 2) * 0.66 - 0.33, 0.62 + L * 0.27, Math.floor(r / 2) * 0.68 - 1.02, ((j * 7) % 3) * 0.5)); B.setMatrixAt(bi++, M.multiplyMatrices(c.obj.matrix, M2)); } }
     for (let i = bi; i < 64; i++) B.setMatrixAt(i, ZERO); B.instanceMatrix.needsUpdate = true; B.count = 64;
