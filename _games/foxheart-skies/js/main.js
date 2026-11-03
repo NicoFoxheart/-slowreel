@@ -1284,9 +1284,12 @@ function buildMenu() {
   $$('#nav button').forEach(b => b.onclick = () => { $$('#nav button').forEach(x => x.setAttribute('aria-current', x === b)); $$('#sheet .sec').forEach(s => s.hidden = s.dataset.sec !== b.dataset.sec); if (b.dataset.sec === 'logbook') renderLog(); });
   const seg = (id, fn) => $$(`#${id} button`).forEach(b => b.onclick = () => { $$(`#${id} button`).forEach(x => x.setAttribute('aria-pressed', x === b)); fn(b.dataset.v); });
   seg('startSeg', v => sel.start = v); seg('wxSeg', v => sel.wx = v);
+  { const dq = $('#destQ'), dr = $('#destRes'); // destination picker (empty = automatic)
+    dq.oninput = () => { const q = dq.value.trim(); if (!q) { sel.dest = null; destInfo(); } const r = q ? search(q, 8).map(x => World.byIcao.get(x.icao) || x).filter(D => D !== sel.apt) : []; dr.replaceChildren(); dr.hidden = !r.length;
+      for (const D of r) { const b = document.createElement('button'), t = document.createElement('b'), m = document.createElement('small'); t.textContent = D.icao; m.textContent = [D.iata, D.city || D.name].filter(Boolean).join(' · '); b.append(t, m); b.onclick = () => { sel.dest = D; dq.value = D.icao + ' · ' + D.name; dr.hidden = true; destInfo(); }; dr.appendChild(b); } }; }
   const tod = $('#tod'), wd = $('#wdir'), ws = $('#wspd'); const upd = () => { $('#todv').textContent = fmtTime(+tod.value); $('#wdirv').textContent = String(wd.value).padStart(3, '0') + '°'; $('#wspdv').textContent = ws.value + ' kt'; };
   tod.oninput = upd; wd.oninput = upd; ws.oninput = upd; upd();
-  $('#fly').onclick = () => { audio.start(); const g = airportGeometry(sel.apt); go({ apt: sel.apt, end: sel.end, start: sel.start, tod: +tod.value, wx: sel.wx || 'clear', windFrom: +wd.value, windKt: +ws.value, gusts: $('#gusts').checked, mode: 'free', cold: $('#coldDark').checked }); };
+  $('#fly').onclick = () => { audio.start(); const g = airportGeometry(sel.apt); go({ apt: sel.apt, end: sel.end, start: sel.start, dest: sel.dest && sel.dest !== sel.apt ? sel.dest.icao : undefined, tod: +tod.value, wx: sel.wx || 'clear', windFrom: +wd.value, windKt: +ws.value, gusts: $('#gusts').checked, mode: 'free', cold: $('#coldDark').checked }); };
   for (const k of ['landBoxes', 'landAutoSpd']) { const el = $('#' + k); el.checked = settings[k] !== false; el.onchange = () => { settings[k] = el.checked; store.set('settings', settings); }; }
   // challenges
   const chl = $('#chList'); const best = store.get('best', {});
@@ -1333,8 +1336,11 @@ function applySettings(key) {
   if (key === 'music' || key === 'musicVol' || key === 'termMusic') { music.on = settings.music !== false; music.vol = +settings.musicVol; music.term = settings.termMusic !== false; syncMusicUI(); }
   if (key === 'quality') { toast('Graphics quality applies on reload'); location.hash = ''; setTimeout(() => location.reload(), 600); }
 }
+function autoDest(A) { return World.byIcao.get(DEST_DEFAULT[A.icao]) || nearestAirports(A.lat, A.lon, 900000, 6).find(x => x !== A && x.large) || null; }
+function destInfo() { const el = $('#destInfo'); if (!el) return; const A = sel.apt; if (!A) { el.textContent = ''; return; } const D = sel.dest && sel.dest !== A ? sel.dest : autoDest(A);
+  el.textContent = D ? (sel.dest && sel.dest !== A ? 'Flight plan ' : 'Automatic ') + A.icao + ' → ' + D.icao + ' · ' + Math.round(haversine(A.lat, A.lon, D.lat, D.lon) / 1852) + ' nm' : ''; }
 function selectAirport(A, quiet) {
-  if (!A) return; sel.apt = A; const g = airportGeometry(A);
+  if (!A) return; sel.apt = A; const g = airportGeometry(A); destInfo();
   $$('#cards .card').forEach(c => c.setAttribute('aria-pressed', c.querySelector('.code span').textContent === A.icao));
   $('#setupWrap').hidden = false; $('#freeTitle').textContent = (A.iata ? A.iata + ' · ' : '') + A.name;
   const ends = g.ends.filter(e => e.ident); sel.end = (ends.find(e => e.length > 2000) || ends[0])?.ident;
