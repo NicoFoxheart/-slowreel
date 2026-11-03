@@ -3,7 +3,7 @@
 // through focusables(). Usage: const svc = ServicePanel(crew, { toast }); svc.toggle(); svc.update(dt) each frame.
 const COL = { working: '#55e08f', coming: '#ffb84d', leaving: '#66d7ea', done: '#8e99a8', away: '#4b5563' };
 const LABEL = { working: 'WORKING', coming: 'ON THE WAY', leaving: 'LEAVING', done: 'DONE', away: 'NOT CALLED' };
-export function ServicePanel(crew, { toast = () => { } } = {}) {
+export function ServicePanel(crew, { toast = () => { }, onAuto = null } = {}) {
   const root = document.createElement('div'); root.id = 'svcPanel'; root.className = 'glass'; root.hidden = true;
   root.style.cssText = 'position:fixed;z-index:6;right:max(16px,env(safe-area-inset-right,0px));top:170px;width:min(430px,92vw);max-height:calc(100vh - 210px);overflow:auto;padding:12px;display:grid;gap:10px;pointer-events:auto;background:rgba(14,18,24,.92)';
   const btn = 'padding:5px 11px;border-radius:6px;border:1px solid var(--line2);background:rgba(255,255,255,.05);font:11px var(--f-mono);letter-spacing:.06em;color:var(--ink);white-space:nowrap';
@@ -16,7 +16,7 @@ export function ServicePanel(crew, { toast = () => { } } = {}) {
   q('close').onclick = () => api.toggle(false);
   q('all').onclick = () => { say(crew.callAll()); refresh(); };
   q('none').onclick = () => { say(crew.dismissAll()); refresh(); };
-  const auto = q('auto'); auto.checked = crew.autoServices; auto.onchange = () => { crew.autoServices = auto.checked; toast(auto.checked ? 'Automatic turnaround: services come by themselves at the next gate' : 'Manual turnaround: call each service yourself'); };
+  const auto = q('auto'); auto.checked = crew.autoServices; auto.onchange = () => { crew.autoServices = auto.checked; if (onAuto) onAuto(auto.checked); toast(auto.checked ? 'Automatic turnaround: services come by themselves at the next gate' : 'Manual turnaround: call each service yourself'); };
   function build(list) {
     rowsEl.innerHTML = ''; rows.clear();
     for (const s of list) {

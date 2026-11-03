@@ -75,13 +75,14 @@ const gplane = (B, w, h, m, tint = 0xffffff) => B.add('glass', new THREE.PlaneGe
 function prof(pts, width) { const s = new THREE.Shape(pts.map(p => new THREE.Vector2(p[0], p[1]))); const g = new THREE.ExtrudeGeometry(s, { depth: width, bevelEnabled: false, curveSegments: 6 }); g.translate(0, 0, -width / 2); g.rotateY(-H); return g; }
 
 // ---------------------------------------------------------------- sign atlas (per airport)
-function signAtlas(apt, gates, taxiTexts) {
-  const A = new Atlas(1024, 1024), c = A.c;
+function signAtlas(apt, gates, taxiTexts, full) {
+  const A = new Atlas(1024, full ? 1024 : 256), c = A.c;
   const F = (s, w = 700) => `${w} ${s}px "Saira Condensed", "Arial Narrow", "Roboto Condensed", sans-serif`;
   const txt = (s, x, y, size, col, al = 'center', w = 700) => { c.fillStyle = col; c.font = F(size, w); c.textAlign = al; c.textBaseline = 'middle'; c.fillText(s, x, y); };
   const name = (apt.name || apt.icao).replace(/\bAirport\b/i, '').trim().toUpperCase().slice(0, 42);
   A.cell('name', 1024, 96, (c, w, h) => { c.fillStyle = '#1d232b'; c.fillRect(0, 0, w, h); txt(name, w / 2, h / 2 + 2, name.length > 30 ? 46 : 58, '#f3f4f5'); });
   A.cell('nameL', 1024, 96, (c, w, h) => { c.fillStyle = '#f3f4f5'; c.fillRect(0, 0, w, h); txt('DEPARTURES  ·  ' + (apt.iata || apt.icao), w / 2, h / 2 + 2, 54, '#1d232b'); });
+  if (!full) { A.texture(); return A; }
   for (const gname of gates) A.cell('g' + gname, 96, 96, (c, w, h) => { c.fillStyle = '#20262e'; c.fillRect(0, 0, w, h); c.fillStyle = '#ffd34d'; c.fillRect(0, h - 10, w, 10); txt(String(gname), w / 2, h / 2 - 3, 60, '#ffffff'); });
   A.cell('fire', 512, 80, (c, w, h) => { c.fillStyle = '#b3141a'; c.fillRect(0, 0, w, h); txt('FIRE & RESCUE', w / 2, h / 2 + 2, 52, '#fff'); });
   for (let i = 1; i <= 4; i++) A.cell('hangar' + i, 256, 80, (c, w, h) => { c.fillStyle = '#2b3138'; c.fillRect(0, 0, w, h); txt('HANGAR ' + i, w / 2, h / 2 + 2, 50, '#f3f4f5'); });
@@ -110,7 +111,7 @@ function bridgeParts() {
     for (let z = z0 + 0.6; z < z0 + L; z += 2.4) B.add('panel', box(w + 0.12, h + 0.12, 0.14), M4(0, h / 2, z), 0xd2d5d8); B.add('panel', box(w * 0.6, 0.12, L), M4(0, h + 0.06, z0 + L / 2), G); B.add('panel', box(w, 0.2, L), M4(0, -0.1, z0 + L / 2), G); });
   P.tunA = tunnel(2.9, 2.9, 14, -14); P.tunB = tunnel(3.25, 3.25, 13, 0);
   P.cab = one(B => { B.add('panel', box(3.8, 3.3, 3.2), M4(0, 1.65, -1.6), W); for (const s of [-1, 1]) B.add('panel', box(0.03, 1.2, 2.2), M4(s * 1.91, 2.0, -1.6), D);
-    for (let i = 0; i < 6; i++) B.add('panel', box(3.6 - i * 0.05, 3.1 - i * 0.04, 0.18), M4(0, 1.6, -3.3 - i * 0.2), i % 2 ? 0x1c1f23 : 0x30353b);
+    for (let i = 0; i < 6; i++) B.add('panel', box(3.6 - i * 0.05, 3.1 - i * 0.04, 0.18), M4(0, 1.6, -3.3 - i * 0.2), i % 2 ? 0x3a3f45 : 0x4d535a);
     B.add('panel', box(3.2, 0.25, 0.4), M4(0, 0.1, -4.4), Y); B.add('panel', box(0.9, 0.7, 0.8), M4(1.4, 0.1, -1.0), G); });
   P.legs = one(B => { for (const s of [-1, 1]) B.add('panel', box(0.32, 1, 0.32), M4(s * 1.1, 0.5, 0), G, 2); B.add('panel', box(2.6, 0.35, 0.5), M4(0, 0.95, 0), G); });
   P.bogie = one(B => { B.add('panel', box(2.8, 0.5, 1.1), M4(0, 0.85, 0), Y); for (const s of [-1, 1]) { B.add('panel', new THREE.TorusGeometry(0.42, 0.18, 8, 16).rotateY(H), M4(s * 1.15, 0.6, 0), 0x1b1c1e); B.add('panel', cyl(0.3, 0.3, 0.3, 12).rotateZ(H), M4(s * 1.15, 0.6, 0), 0x8a9096); } });
@@ -167,7 +168,7 @@ export function buildAirportArt(group, ctx) {
   const toT = p => ({ x: (p.x - O.x) * xA.x + (p.z - O.z) * xA.z, z: (p.x - O.x) * zA.x + (p.z - O.z) * zA.z });
   const gateNames = stands.map((s, i) => String(i + 1)), taxiTexts = [];
   if (full) for (const net of ctx.taxiNet) { const idt = `${net.r.a.ident}-${net.r.b.ident}`; taxiTexts.push({ key: 'h' + net.k, kind: 'hold', text: idt, w: 3 }); for (const c of [...net.conns, ...net.links]) { taxiTexts.push({ key: 'l' + c.name, kind: 'loc', text: c.name, w: 1 }); taxiTexts.push({ key: 'd' + c.name, kind: 'dir', text: '← ' + net.name + ' →', w: 2 }); } }
-  const SA = signAtlas(apt, full ? gateNames : [], taxiTexts); const signMat = atmos(Object.assign(new THREE.MeshBasicMaterial({ vertexColors: true, map: SA.tex }), { userData: { key: 'bldSign' } }));
+  const SA = signAtlas(apt, full ? gateNames : [], taxiTexts, full); const signMat = atmos(Object.assign(new THREE.MeshBasicMaterial({ vertexColors: true, map: SA.tex }), { userData: { key: 'bldSign' } }));
   const S = new Bk(); const sign = (name, w, h, m) => S.add('sign', new THREE.PlaneGeometry(w, h), m, 0xffffff, 1, SA.R[name]);
   // ---- terminal: apron-level service wall, curtain wall above, ends, landside wall, wave roof + overhang + columns, name signs
   B.add('panel', box(Lw, FL, 0.4), TM(0, FL / 2, 0.2), 0xd9dbdc, 3);
@@ -177,12 +178,15 @@ export function buildAirportArt(group, ctx) {
   for (const s of [-1, 1]) { gplane(B, TD, TH, TM(s * Lw / 2, TH / 2, TD / 2, s * H)); B.add('panel', box(0.6, TH, 0.6), TM(s * Lw / 2, TH / 2, 0), 0xc8cbcd); }
   gplane(B, Lw, TH, TM(0, TH / 2, TD));
   const rp = [[-9, TH + 1.0], [-9, TH + 1.9], [TD * 0.25, TH + 3.6], [TD * 0.6, TH + 3.9], [TD + 12, TH + 2.2], [TD + 12, TH + 1.5], [TD, TH + 0.3], [0, TH + 0.3]];
-  B.add('roof', prof(rp, Lw + 10), TM(0, 0, 0), 0xd5d9dc, 2);
+  B.add('roof', prof(rp, Lw + 10), TM(0, 0, 0), 0xe4e7e9, 2); B.add('metal', box(Lw + 10, 0.9, 0.5), TM(0, TH + 1.45, -9.1), 0xc9cdd0);
+  const ry = z => z < TD * 0.25 ? TH + 1.9 + (z + 9) / (TD * 0.25 + 9) * 1.7 : z < TD * 0.6 ? TH + 3.6 + (z - TD * 0.25) / (TD * 0.35) * 0.3 : TH + 3.9 - (z - TD * 0.6) / (TD * 0.4 + 12) * 1.7;
+  for (const zz of [TD * 0.3, TD * 0.55]) gplane(B, Lw - 20, 3.2, TM(0, ry(zz) + 0.06, zz, 0, -H)); // skylight bands
+  for (let x = -Lw / 2 + 25; x < Lw / 2 - 20; x += 55 + R() * 30) { const zz = TD * (0.65 + R() * 0.2); B.add('panel', box(8 + R() * 6, 2.2, 5 + R() * 3), TM(x, ry(zz) + 1.0, zz), 0xb8bdc1, 3); B.add('dark', cyl(1.1, 1.1, 0.6, 12), TM(x + 2, ry(zz) + 2.4, zz), 0x50565c); }
   for (let x = -Lw / 2 + 4; x <= Lw / 2 - 4; x += 18) { B.add('metal', cyl(0.22, 0.32, TH + 1.8 - FL, 10), TM(x, FL + (TH + 1.8 - FL) / 2, -7.2), 0xdfe2e4); B.add('metal', cyl(0.22, 0.32, TH + 2.2, 10), TM(x, (TH + 2.2) / 2, TD + 10), 0xdfe2e4); }
   sign('name', Math.min(60, Lw * 0.45), 5.6, TM(0, TH + 4.6, -5.5, PI)); B.add('metal', box(Math.min(60, Lw * 0.45), 0.25, 1.2), TM(0, TH + 1.9, -5.3), 0x6d747a); sign('nameL', Math.min(50, Lw * 0.4), 4.7, TM(0, TH + 4.4, TD + 9));
   // fixed links, stair towers and gate numbers at every stand
   stands.forEach((st, i) => { const F1 = along(st.s, f.dep / 2 + 6), p = toT({ x: F1.x - nz * 6.98, z: F1.z + nx * 6.98 }), lxT = p.x, sx = lxT + 4.4 * Math.sign(lxT - toT(F1).x || 1);
-    B.add('panel', box(4.2, TH - FL - 1, 4.2), TM(sx, (TH - 1) / 2, -2.1), 0x5d646b, 3); B.add('dark', box(0.8, TH - 3, 0.02), TM(sx, (TH - 1) / 2, -4.22), 0x1b2026);
+    B.add('panel', box(4.2, TH - 1, 4.2), TM(sx, (TH - 1) / 2, -2.1), 0xaab1b8, 3); gplane(B, 1.2, TH - 4, TM(sx, (TH - 1) / 2, -4.21, PI));
     if (full) sign('g' + gateNames[i], 3.2, 3.2, TM(lxT, Math.min(TH - 2.2, FL + 6.5), -0.25, PI)); });
   // ---- landside: departures deck with canopy, arrivals road, car park, cars
   const roadMat = 0x3a3b3d;

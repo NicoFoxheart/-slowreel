@@ -64,10 +64,14 @@ void main() {
   int row = int(aPid + 0.5); vPid = row;
   vec3 mw = (uMS * dataT(5, row)).xyz;
   vec3 pos = position + aM0 * mw.x + aM1 * mw.y + aM2 * mw.z; vec3 nrm = normal; vB = position; vLoc = vec3(0.); vCov = vec2(0.);
-  vec3 tng = aExt.xyz;
+  vec3 tng = aExt.xyz; float seated = texelFetch(uBones, ivec2(${DYN}, row), 0).w;
+#ifdef CLOTH
+  { float sl = aExt.x; if (seated > 0.5 && (sl < 0.5 || sl > 8.5) && aExt.w < 3.5) pos -= nrm * 0.032 * smoothstep(0.955, 0.915, position.y); } // shirt tucked behind the waistband when seated
+#endif
 #ifdef BODY
   { vec4 g6 = dataT(6, row); float neck = g6.w > 0.5 ? aReg.w : aReg.z;
-    float cT = step(0.0, g6.x) * smoothstep(0.0, 0.035, g6.x - aReg.x) * smoothstep(0.0, 0.035, position.y - g6.y) * smoothstep(0.0, 0.015, -neck);
+    float hemY = seated > 0.5 ? max(g6.y, 0.95) : g6.y;
+    float cT = step(0.0, g6.x) * smoothstep(0.0, 0.035, g6.x - aReg.x) * smoothstep(0.0, 0.035, position.y - hemY) * smoothstep(-0.007, 0.012, -neck);
     float cB = step(0.0, g6.z) * smoothstep(0.0, 0.035, g6.z - aReg.y) * smoothstep(0.0, 0.03, 1.0 - position.y) * step(aReg.x, -0.04);
     vCov = vec2(cT, cB); if (uPart < 0.5) pos -= nrm * max(cT, cB) * 0.013; }
 #endif
@@ -237,6 +241,7 @@ void main() {
   vec3 tb = normalize(vExt.xyz + 1e-5); vec3 q = vB - tb * dot(vB, tb);
   float strand = vn(q * 520.) * 0.55 + vn(q * 1500.) * 0.45, clump = fbm(q * 110. + tb * 6.0);
   float thr = vLayer * 0.36 + (1.0 - edge) * 0.9 + fac * 0.5;
+  float nv = abs(dot(N, normalize(cameraPosition - vW))); thr += pow(1.0 - nv, 3.0) * (0.35 + 0.3 * vLayer) * (1.0 - fac);
   if (strand * 0.75 + clump * 0.35 < thr) discard;
   float shade = 0.72 + 0.4 * strand * (0.6 + 0.4 * clump);
   vec3 alb = hc * shade * (0.85 + 0.25 * clump) * mix(1.0, 0.75, fac);
@@ -286,7 +291,7 @@ export function makeMaterials(U) {
   const M = {};
   const mk = (name, fs, defines, part, side) => { const m = base(fs, defines, 'ppl-' + name, { side }); if (part != null) { m.uniforms = { ...U, uPart: { value: part }, uFace: { value: faceAtlas() } }; } M[name] = m; };
   mk('body', FS_SKIN, { BODY: '' }, 0); mk('head', FS_SKIN, {}, 1); mk('hands', FS_SKIN, {}, 2); mk('fig', FS_SKIN, { BODY: '' }, 3);
-  mk('cloth', FS_CLOTH, {}, null, THREE.DoubleSide); mk('hair', FS_HAIR, { HAIR: '' }, null, THREE.DoubleSide); mk('eye', FS_EYE, { EYE: '' }, null);
+  mk('cloth', FS_CLOTH, { CLOTH: '' }, null, THREE.DoubleSide); mk('hair', FS_HAIR, { HAIR: '' }, null, THREE.DoubleSide); mk('eye', FS_EYE, { EYE: '' }, null);
   M.cloth.uniforms = { ...U, uPart: { value: 0 } }; M.hair.uniforms = { ...U, uPart: { value: 0 } }; M.eye.uniforms = { ...U, uPart: { value: 0 } };
   // morph selectors: body-like (fem, heavy) vs head-like (fem, wide, nose)
   const bodySel = new THREE.Matrix4().set(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), headSel = new THREE.Matrix4().set(1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0);

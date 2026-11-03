@@ -10,12 +10,12 @@ import { ATM, NOISE_GLSL, atmos } from './sky.js';
 export function apronMaterial(wet, glyphTex, P) {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.88, metalness: 0, depthWrite: false });
   m.userData.key = 'apronEnv';
-  const U = { uWet: wet, uNight: ATM.uNight, uGlyph: { value: glyphTex }, uStandT: { value: P.standT }, uK: { value: new THREE.Vector2(P.k0, P.k1) } };
+  const U = { uWet: wet, uNight: ATM.uNight, uGlyph: { value: glyphTex }, uStandT: { value: P.standT }, uHand: { value: P.hand || 1 }, uK: { value: new THREE.Vector2(P.k0, P.k1) } };
   m.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, U);
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec3 aTw; varying vec3 vTw;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvTw = aTw;');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-uniform float uWet, uNight, uStandT; uniform vec2 uK; uniform sampler2D uGlyph; varying vec3 vTw; float paintM = 0.0, poolM = 0.0;
+uniform float uWet, uNight, uStandT, uHand; uniform vec2 uK; uniform sampler2D uGlyph; varying vec3 vTw; float paintM = 0.0, poolM = 0.0;
 ${NOISE_GLSL}
 float band(float x, float a, float b){ float w = fwidth(x) + 1e-4; float c = clamp(min(x - a, b - x)/w + 0.5, 0.0, 1.0); return min(c, max(b - a, 0.0)/w); }
 float glyph(float idx, vec2 p){ if (idx < 0.0 || p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0) return 0.0; return smoothstep(0.35, 0.65, texture2D(uGlyph, vec2((idx + 0.08 + p.x*0.84)/16.0, 0.04 + p.y*0.92)).r); }`)
@@ -26,7 +26,7 @@ float glyph(float idx, vec2 p){ if (idx < 0.0 || p.x < 0.0 || p.x > 1.0 || p.y <
   vec2 sl = floor(P / 5.0); float sh = h12(sl + 3.7), n = vnoise(P * 0.4), n2 = vnoise(P * 0.035), n3 = vnoise(P * 2.3);
   vec3 base = vec3(0.6, 0.592, 0.565) * (0.87 + 0.11 * sh) * (0.9 + 0.12 * n) * (0.9 + 0.14 * n2) * (0.96 + 0.06 * n3);
   vec2 jf = abs(fract(P / 5.0 + 0.5) - 0.5) * 5.0; float jw = max(fwidth(P.x), fwidth(P.y)); float joint = 1.0 - smoothstep(0.025, 0.05 + jw, min(jf.x, jf.y));
-  base *= 1.0 - 0.38 * joint * (0.7 + 0.3 * n3);
+  base *= 1.0 - 0.24 * joint * (0.7 + 0.3 * n3) * (1.0 - smoothstep(0.08, 0.35, jw));
   float tyre = inS * (exp(-u * u / 0.9) * smoothstep(-26.0, -13.0, v) * smoothstep(60.0, 20.0, v) + exp(-pow(abs(u) - 3.8, 2.0) / 0.5) * smoothstep(-6.0, -1.0, v) * smoothstep(14.0, 3.0, v)) * (0.45 + 0.55 * vnoise(P * vec2(0.15, 1.8)));
   float oil = inS * smoothstep(0.55, 0.85, vnoise(P * 0.9 + 13.0)) * (exp(-(pow(abs(u) - 5.8, 2.0) + pow(v + 7.0, 2.0)) / 18.0) + exp(-(u * u + pow(v + 22.0, 2.0)) / 10.0));
   float grime = smoothstep(0.5, 0.9, vnoise(P * 0.09 + 5.0)) * 0.6 + smoothstep(0.6, 0.95, n3) * 0.15;
@@ -41,7 +41,7 @@ float glyph(float idx, vec2 p){ if (idx < 0.0 || p.x < 0.0 || p.x > 1.0 || p.y <
   Y = max(Y, inS * band(abs(v + 14.9), -1.0, 0.15) * step(abs(u), 2.6)); Bk = max(Bk, inS * band(abs(v + 14.9), 0.15, 0.3) * step(abs(u), 2.75));
   Y = max(Y, inS * band(abs(u), -1.0, 0.1) * band(v, -17.6, -14.9));
   // stand number on a black box on the lead-in line, upright for the pilot taxiing in
-  float g = k - uK.x + 1.0, d1 = floor(g / 10.0), d2 = mod(g, 10.0); vec2 q = vec2(-u, -(v - 25.0)); float boxM = inS * step(abs(u), 3.1) * step(abs(v - 25.0), 2.9);
+  float g = k - uK.x + 1.0, d1 = floor(g / 10.0), d2 = mod(g, 10.0); vec2 q = vec2(u * uHand, -(v - 25.0)); float boxM = inS * step(abs(u), 3.1) * step(abs(v - 25.0), 2.9);
   float num = g < 9.5 ? glyph(d2, vec2((q.x + 1.2) / 2.4, (q.y + 2.3) / 4.6)) : max(glyph(d1, vec2((q.x + 2.55) / 2.4, (q.y + 2.3) / 4.6)), glyph(d2, vec2((q.x - 0.15) / 2.4, (q.y + 2.3) / 4.6)));
   Bk = max(Bk, boxM); Y = max(Y * (1.0 - boxM), boxM * num);
   // equipment restraint area (red) and hatched equipment staging areas between stands (white)
@@ -61,9 +61,9 @@ float glyph(float idx, vec2 p){ if (idx < 0.0 || p.x < 0.0 || p.x > 1.0 || p.y <
   col = mix(col, vec3(0.05, 0.05, 0.05), Bk * 0.9); col = mix(col, vec3(0.9, 0.66, 0.08) * wornP, Y * 0.95); col = mix(col, vec3(0.92, 0.92, 0.9) * wornP, Wh * 0.9); col = mix(col, vec3(0.75, 0.1, 0.08) * wornP, Rd * 0.9);
   paintM = max(max(Y, Wh), max(Rd, Bk));
   diffuseColor.rgb = col * (1.0 - uWet * 0.3);
-  float pd = length(vec2(32.5 - abs(u), v - 35.0)); poolM = uNight * (exp(-pd * pd / 1500.0) + 0.35 * exp(-pd * pd / 6000.0));
+  float pd = length(vec2(32.5 - abs(u), v - 35.0)); poolM = uNight * (exp(-pd * pd / 900.0) + 0.18 * exp(-pd * pd / 4000.0));
 }`).replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(mix(0.9, 0.62, paintM), 0.12, uWet);')
-      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * (uNight * 0.08 * vec3(1.0, 0.9, 0.75) + poolM * 0.95 * vec3(1.0, 0.84, 0.62));');
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * (uNight * 0.025 * vec3(1.0, 0.9, 0.75) + poolM * 0.42 * vec3(1.0, 0.84, 0.62));');
   };
   return atmos(m);
 }

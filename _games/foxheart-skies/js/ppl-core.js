@@ -19,7 +19,7 @@ const lin = (hex, out) => { const c = new THREE.Color(hex); out[0] = c.r; out[1]
 const hash = (a, b) => { let x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
 let QUALITY = null;
 function quality() { if (QUALITY) return QUALITY; try { const o = JSON.parse(localStorage.getItem('foxheart.settings') || '{}'); return o.quality || 'high'; } catch (e) { return 'high'; } }
-const LOD_R = { low: [1.5, 5], medium: [2.2, 7], high: [2.8, 8.5], ultra: [3.4, 10] };
+export const LOD_R = { low: [1.2, 3.4, 2, 12], medium: [1.6, 4.5, 4, 18], high: [2.0, 5.5, 6, 24], ultra: [2.6, 7, 8, 32] }; // [lod0 radius, lod1 radius, max lod0, max lod1]
 
 // ---------------------------------------------------------------- 3x4 affine helpers (row-major)
 const M12 = () => new Float64Array(12);
@@ -144,12 +144,14 @@ export class PeopleHD {
     const R = LOD_R[this.q] || LOD_R.high, r0 = R[0] * R[0], r1 = R[1] * R[1];
     for (const k in this.layers) this.layers[k].list.length = 0;
     const add = (name, i) => { const L = this.layers[name]; if (L) L.list.push(i); };
-    for (const p of this.p) {
-      if (p.hidden || p.y < -50) continue;
-      const d2 = this.hasCam ? this.camPos.distanceToSquared(this.V.set(p.x, p.y + 1, p.z)) : 25; const lod = d2 < r0 ? 0 : d2 < r1 ? 1 : 2;
+    const vis = this._vis || (this._vis = []); vis.length = 0;
+    for (const p of this.p) { if (p.hidden || p.y < -50) continue; p._d2 = this.hasCam ? this.camPos.distanceToSquared(this.V.set(p.x, p.y + 1, p.z)) : 25; vis.push(p); }
+    vis.sort((a, b) => a._d2 - b._d2); let n0 = 0, n1 = 0;
+    for (const p of vis) {
+      const d2 = p._d2; let lod = d2 < r0 && n0 < R[2] ? 0 : d2 < r1 && n1 < R[3] ? 1 : 2; if (lod === 0) n0++; else if (lod === 1) n1++;
       const far = d2 > 900; if (!(far && (this.frame + p.i) % 3 && p._init)) { this.pose(p, t); p._init = true; }
       const T = p._t, i = p.i;
-      if (lod === 2) { add('fig2', i); if (T.hair !== 'none') add('hair_' + T.hair + '1', i); if (T.bot === 'skirt') add('skirt1', i); if (T.hat) add('hat', i); }
+      if (lod === 2) { add('fig2', i); if (T.hair !== 'none') add('hair_' + T.hair + '2', i); if (T.bot === 'skirt') add('skirt1', i); if (T.hat) add('hat', i); }
       else { const s = String(lod); add('body' + s, i); add('head' + s, i); add('hands' + s, i); add('eyes' + s, i); add(T.top + s, i); if (T.vest) add('vest' + s, i); if (T.top === 'hoodie') add('hood' + s, i);
         add(T.bot + s, i); add(T.shoe + s, i); if (T.hair !== 'none') add('hair_' + T.hair + s, i); if (T.beard === 'beard') add('beard' + s, i); else if (T.beard === 'moustache' && lod === 0) add('moustache0', i);
         if (T.acc) add(T.acc, i); if (T.hat) add('hat', i);
@@ -253,6 +255,6 @@ export class PeopleHD {
       const o = row + B.prop1 * 12; out.set(Array.from(W[B.prop1]), o); }
     if (p.suitcase) { if (p.mode === 'walk') mEuler(R, -0.38, 0, 0, 0.32, 0, -0.42); else mEuler(R, 0, 0.3, 0, 0.36, 0, 0.12); mMul(W[B.prop2], rootM, R); out.set(Array.from(W[B.prop2]), row + B.prop2 * 12); }
     // eyes: blink, gaze
-    const d = row + DYN * 4; out[d] = blink; out[d + 1] = gy; out[d + 2] = gp; out[d + 3] = 0;
+    const d = row + DYN * 4; out[d] = blink; out[d + 1] = gy; out[d + 2] = gp; out[d + 3] = p.mode === 'sit' ? 1 : 0;
   }
 }

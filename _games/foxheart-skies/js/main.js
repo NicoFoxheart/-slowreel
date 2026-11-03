@@ -26,6 +26,7 @@ import { Speech } from './speech.js';
 import { GroundCrew } from './groundcrew.js';
 import { LandingAids, fdGuide, coachLine } from './landing.js';
 import { Music, moodFor } from './music.js';
+import { ServicePanel } from './env-svcpanel.js';
 import { buildCabin } from './interiors.js';
 import { rng } from './terrain.js';
 
@@ -80,6 +81,9 @@ const traffic = new Traffic(scene);
 const atc = new ATC(audio);
 const foot = new OnFoot(scene, camera, aircraft, audio);
 const crew = new GroundCrew(scene); // tug, chocks, cones, GPU and ramp crew at the stand
+crew.autoServices = settings.autoTurn ?? true; // ground services: automatic turnaround, or call / dismiss each one (I / GND / PA panel)
+const svcPanel = ServicePanel(crew, { toast, onAuto: v => { settings.autoTurn = v; store.set('settings', settings); } });
+function toggleSvc(v) { const o = v ?? !svcPanel.open; if (o) { if (radioOpen) toggleRadio(false); if (paOpen) togglePA(false); } svcPanel.toggle(o); }
 const aids = new LandingAids(scene); // PAPI + glide path boxes for hand-flown landings
 const pa = new PA(audio);
 // one speech queue for PA, ATC, ATIS, chatter and callouts, with subtitles and a PA-live indicator
@@ -416,7 +420,7 @@ function renderRadio() {
 }
 atc.on(() => renderRadio()); atc.onNote = t => toast(t, 4000);
 function paKey(n) { if (n === 0) setSigns(!W.signs.belt, W.signs.smoke); else { const l = PA_LINES[n - 1]; if (l) paSay(l.id); } }
-function toggleRadio(v) { radioOpen = v ?? !radioOpen; $('#radio').hidden = !radioOpen; if (radioOpen && paOpen) togglePA(false); if (radioOpen) $('#atcCap').style.opacity = 0; renderRadio(); }
+function toggleRadio(v) { radioOpen = v ?? !radioOpen; $('#radio').hidden = !radioOpen; if (radioOpen && svcPanel.open) svcPanel.toggle(false); if (radioOpen && paOpen) togglePA(false); if (radioOpen) $('#atcCap').style.opacity = 0; renderRadio(); }
 // ---------------------------------------------------------------- cabin PA, signs, passenger comfort, cabin camera
 let paOpen = false; const paLog = [];
 W.signs = { belt: true, smoke: true };
@@ -477,7 +481,7 @@ function updateMood() {
   if (!paOpen) return; const v = Math.round(CC.v); const m = $('#pMeter'); m.style.width = v + '%'; m.style.background = v >= 60 ? 'var(--green)' : v >= 35 ? 'var(--amber)' : '#e0564c';
   $('#pMood').textContent = moodOf(v) + ' ' + v + '%';
 }
-function togglePA(v) { paOpen = v ?? !paOpen; $('#pa').hidden = !paOpen; if (paOpen && radioOpen) toggleRadio(false); renderPA(); }
+function togglePA(v) { paOpen = v ?? !paOpen; $('#pa').hidden = !paOpen; if (paOpen && svcPanel.open) svcPanel.toggle(false); if (paOpen && radioOpen) toggleRadio(false); renderPA(); }
 $('#pClose').onclick = () => { togglePA(false); canvas.focus(); };
 $('#pBelt').onclick = () => { setSigns(!W.signs.belt, W.signs.smoke); canvas.focus(); };
 $('#pSmoke').onclick = () => { setSigns(W.signs.belt, !W.signs.smoke); canvas.focus(); };
@@ -533,6 +537,8 @@ addEventListener('keydown', e => {
     return;
   }
   // an open panel is modal for number keys and Esc
+  if (svcPanel.open && e.code === 'Escape') { svcPanel.toggle(false); return; }
+  if (e.code === 'KeyI' && !W.onFoot && !W.menuMode) { toggleSvc(); return; }
   if ((radioOpen || paOpen) && e.code === 'Escape') { if (radioOpen) toggleRadio(false); if (paOpen) togglePA(false); return; }
   if (radioOpen && /^(Digit|Numpad)\d$/.test(e.code)) { const n = +e.code.slice(-1); const o = n ? atc.options()[n - 1] : null; if (o) atc.choose(o.id); return; }
   if (paOpen && /^(Digit|Numpad)\d$/.test(e.code)) { paKey(+e.code.slice(-1)); return; }
@@ -596,7 +602,7 @@ let padTick = 0, padUIActive = false, navEl = null, navIdx = 0, padHelpOn = fals
 function padPoll(dt) { if (pad._tick === padTick) return pad.gp; pad._tick = padTick; return pad.poll(dt); }
 function padRoot() {
   const vis = s => { const e = $(s); return e && !e.hidden ? e : null; };
-  return vis('#result') || vis('#help') || vis('#pause') || (paOpen ? $('#pa') : null) || (radioOpen ? $('#radio') : null) || (W.menuMode ? vis('#menu') : null);
+  return vis('#result') || vis('#help') || vis('#pause') || (paOpen ? $('#pa') : null) || (svcPanel.open ? svcPanel.el : null) || (radioOpen ? $('#radio') : null) || (W.menuMode ? vis('#menu') : null);
 }
 function setNav(el) { if (navEl === el) return; if (navEl) navEl.classList.remove('padfocus'); navEl = el; if (el) { el.classList.add('padfocus'); try { el.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (e) { } } }
 function navStep(els, cur, d) {
@@ -1032,7 +1038,7 @@ function renderFrame(dt) {
   const hc = $('#hudc'); const hx = hc.getContext('2d');
   if (!W.menuMode && !W.onFoot && settings.hud && W.view !== 'cockpit' && W.view !== 'cabin' && W.S) drawHUD(hx, hc.width, hc.height, W.S, camera, settings.units, settings.extHud); else hx.clearRect(0, 0, hc.width, hc.height);
   audio.update({ fdm, apuN: sys.apuN, paused: W.paused || W.menuMode, ground: fdm.onGround, camDist: camera.position.distanceTo(aircraft.position), rain: W.wx === 'rain', nearAirport: true, groundH: gh, flapTarget: FLAPS[fdm.flapIdx].flap }, dt, W.view);
-  music.update(dt, musicWant()); musicNowUI();
+  music.update(dt, musicWant()); musicNowUI(); if (svcPanel.open) svcPanel.update(dt);
   if (!W.menuMode && (rescue.g.visible || fdm.scrape > 0 || rescue.evac || sys.fire[0].on || sys.fire[1].on || rescue.sparks.live || rescue.smoke.live)) rescue.update(dt, aircraft, { scrape: fdm.scrape, fire: [sys.fire[0].on, sys.fire[1].on], ground, foamOn: W.foam, smoulder: !!fdm.belly && W.simTime - W.bellyT < 120 });
   if (!W.menuMode && !W.onFoot) { updateUI(); updateParkPrompt(); updateCoach(); } else if (!$('#coach').hidden) $('#coach').hidden = true;
 }
@@ -1257,7 +1263,7 @@ function bindFCU() {
     case 'loc': if (!W.ils) armAppr(); ap.locArmed = true; break; case 'appr': armAppr(); break; } canvas.focus(); }));
 }
 function togglePause() { if (!W.started || W.menuMode) return; const p = $('#pause'); p.hidden = !p.hidden; W.paused = !p.hidden; }
-function toMenu() { foot.dispose(); disposeFlightCabin(); if (paOpen) togglePA(false); W.onFoot = false; $('#foot').hidden = true; $('#radio').hidden = true; radioOpen = false; showTaxi(null); W.push = null; W.autoTaxi = null; crew.clear(); try { document.exitPointerLock && document.exitPointerLock(); } catch (e) { } $('#pause').hidden = true; W.paused = false; $('#flight').hidden = true; $('#menu').hidden = false; W.menuMode = true; startMenuScene(); }
+function toMenu() { foot.dispose(); disposeFlightCabin(); if (paOpen) togglePA(false); svcPanel.toggle(false); W.onFoot = false; $('#foot').hidden = true; $('#radio').hidden = true; radioOpen = false; showTaxi(null); W.push = null; W.autoTaxi = null; crew.clear(); try { document.exitPointerLock && document.exitPointerLock(); } catch (e) { } $('#pause').hidden = true; W.paused = false; $('#flight').hidden = true; $('#menu').hidden = false; W.menuMode = true; startMenuScene(); }
 
 // ---- menu
 const featured = () => World.featured.map(i => World.byIcao.get(i)).filter(Boolean);
@@ -1326,7 +1332,7 @@ function buildMenu() {
   $('#pSet').onclick = () => { $('#pause').hidden = true; W.paused = false; toMenu(); $('#nav button[data-sec=settings]').click(); };
   bindFCU();
   $('#engStartBtn').onclick = () => { startEngines(); canvas.focus(); };
-  $('#radioBtn').onclick = () => { toggleRadio(); canvas.focus(); }; $('#paBtn').onclick = () => { togglePA(); canvas.focus(); }; $('#rClose').onclick = () => toggleRadio(false);
+  $('#radioBtn').onclick = () => { toggleRadio(); canvas.focus(); }; $('#svcBtn').onclick = () => { toggleSvc(); canvas.focus(); }; $('#pSvc').onclick = () => toggleSvc(true); $('#paBtn').onclick = () => { togglePA(); canvas.focus(); }; $('#rClose').onclick = () => toggleRadio(false);
   $('#rAuto').onchange = () => { atc.auto = $('#rAuto').checked; settings.atcAuto = atc.auto; store.set('settings', settings); };
   $('#rSpeak').onchange = () => { atc.speakMe = $('#rSpeak').checked; };
   $$('#pLights button').forEach(b => b.onclick = () => { settings.cabinLights = b.dataset.c; store.set('settings', settings); syncLightsUI(); toast('Cabin lights: ' + b.textContent.replace('Lights: ', '')); }); syncLightsUI();
@@ -1410,7 +1416,7 @@ const ROUTES = [
 ];
 const KEYS = [['W S / ↑ ↓', 'Pitch (↑ nose down)'], ['A D / ← →', 'Roll'], ['Q E', 'Rudder / nose-wheel steering'], ['Shift / PgUp / =', 'Thrust up'], ['X / PgDn / −', 'Thrust down'], ['Shift T', 'TOGA thrust'],
   ['Start engines', 'Button at the top while parked (automatic start); or do it yourself on the overhead and pedestal'],
-  ['T', 'Radio (ATC): while open, 1–6 pick a call, Esc closes'], ['Y', 'Cabin PA: while open, 1–9 announce, 0 seat belt sign, Esc closes'], ['K / Enter', 'Pushback / park at gate'], ['J', 'Next step: checklists, ECAM actions after a failure, ATC calls (same as A on a controller)'], ['Shift Enter', 'Auto-taxi along the magenta route'],
+  ['T', 'Radio (ATC): while open, 1–6 pick a call, Esc closes'], ['Y', 'Cabin PA: while open, 1–9 announce, 0 seat belt sign, Esc closes'], ['K / Enter', 'Pushback / park at gate'], ['I / GND', 'Ground services at the gate: call or dismiss fuel, catering, baggage, water, toilets, cleaning, power (also in the PA panel)'], ['J', 'Next step: checklists, ECAM actions after a failure, ATC calls (same as A on a controller)'], ['Shift Enter', 'Auto-taxi along the magenta route'],
   ['F / V', 'Flaps extend / retract'], ['G', 'Landing gear'], ['B', 'Wheel brakes (hold)'], ['Space', 'Parking brake'], ['R', 'Reversers (on ground)'], ['/', 'Speed brake'], ['[ ]', 'Pitch trim (direct law)'],
   ['Z', 'Autopilot on / off'], ['Shift Z', 'Autothrust on / off'], ['O', 'Arm ILS approach (LOC + G/S)'], ['U', 'Hand-fly the landing (autopilot off, flight director on)'], ['L', 'Landing lights'], ['C / 1–7', 'Camera: deck, chase, orbit, tower, runway, fly-by, cabin'], ['8 / 9 / 0', 'Flight deck only: look at pedestal / overhead / side window (again: ahead)'], ['Mouse on the deck', 'Hover a switch for its name, click to operate, scroll on knobs'],
   ['Mouse drag', 'Look / orbit camera'], ['Wheel', 'Zoom'], ['M', 'Mouse yoke'], ['N', 'Navigation display overlay'], ['H', 'Outside views: clean HUD ↔ full HUD + PFD'], ['. ,', 'Time acceleration'], ['P / Esc', 'Pause / menu'], ['?', 'This help'],

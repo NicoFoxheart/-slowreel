@@ -223,7 +223,7 @@ export function buildLayers(q = 'high') {
   if (CACHE[q]) return CACHE[q]; const t0 = performance.now(); const lowQ = q === 'low';
   const L = {}; let tl = performance.now(); const put = (name, m, kind, part = 0, extra = {}) => { const t = performance.now(); L[name] = { geo: toGeo(m), kind, part, tris: m.I.length / 3, ms: Math.round(t - tl), ...extra }; tl = performance.now(); };
   const b0 = bodyMesh(lowQ ? 0.027 : 0.022), b1 = bodyMesh(0.042);
-  put('body0', b0, 'skin', 0); put('body1', b1, 'skin', 0); put('fig2', figureMesh(0.052), 'skin', 3);
+  put('body0', b0, 'skin', 0); put('body1', b1, 'skin', 0); put('fig2', figureMesh(0.058), 'skin', 3);
   put('head0', headMesh(lowQ ? 0.0065 : 0.0055, 0.011), 'skin', 1); put('head1', headMesh(0.015, 0.022), 'skin', 1);
   put('hands0', handsMesh(lowQ ? 0.0085 : 0.0068), 'skin', 2); put('hands1', handsMesh(0.017), 'skin', 2);
   put('eyes0', eyesMesh(lowQ ? 12 : 16), 'eye'); put('eyes1', eyesMesh(6), 'eye');
@@ -232,7 +232,7 @@ export function buildLayers(q = 'high') {
   put('skirt0', skirtMesh(0.016, 0.5), 'cloth'); put('skirt1', skirtMesh(0.05, 0.5), 'cloth');
   put('hood0', hoodMesh(0.012), 'cloth'); put('hood1', hoodMesh(0.024), 'cloth');
   for (const k of ['sneaker', 'dress']) { put(k + '0', shoeMesh(lowQ ? 0.011 : 0.0092, k), 'cloth'); put(k + '1', shoeMesh(0.024, k), 'cloth'); }
-  for (const k of HAIR_STYLES) { put('hair_' + k + '0', hairMesh(k, lowQ ? 0.009 : 0.0072, 0.012), 'hair', 0, { shells: lowQ ? 1 : 2 }); put('hair_' + k + '1', hairMesh(k, 0.018, 0.025), 'hair'); }
+  for (const k of HAIR_STYLES) { put('hair_' + k + '0', hairMesh(k, lowQ ? 0.009 : 0.0072, 0.012), 'hair', 0, { shells: lowQ ? 1 : 2 }); put('hair_' + k + '1', hairMesh(k, 0.018, 0.025), 'hair'); put('hair_' + k + '2', hairMesh(k, 0.03, 0.036), 'hair'); }
   put('beard0', beardMesh('beard', 0.005), 'hair'); put('beard1', beardMesh('beard', 0.013), 'hair'); put('moustache0', beardMesh('moustache', 0.0042), 'hair');
   const A = accessories(); for (const [k, m] of Object.entries(A)) put(k, m, 'cloth');
   // hair fur shells: duplicate LOD0 hair with a layer index in aExt? (layer in skinWeight slot unused) → separate attribute

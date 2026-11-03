@@ -7,8 +7,10 @@ import { ATM, ATM_GLSL, NOISE_GLSL, atmos } from './sky.js';
 import { airportGeometry, FT, D2R, ilsFreq } from './data.js';
 import { TERMINAL_HINTS } from './surroundings.js';
 import { trafficAirliner } from './ac-traffic.js';
-import { facadeMaterial, rng } from './terrain.js';
+import { rng } from './terrain.js';
 import { Site, obb, overlap, runwayBox } from './env-site.js';
+import { apronMaterial } from './env-apron.js';
+import { buildAirportArt, buildBridges } from './env-buildings.js';
 
 const GLYPHS = '0123456789LRC';
 let glyphTex = null;
@@ -329,11 +331,12 @@ export function buildAirport(apt, opts) {
   const stands = [];
   // apron surface
   {
-    const pts = [{ x: ax - adx * L2 / 2, z: az - adz * L2 / 2 }, { x: ax + adx * L2 / 2, z: az + adz * L2 / 2 }];
-    const ag = stripGeom(pts, dep, 0.0, 65); // aTw.z = stand spacing
-    // flip across so that t<0 is the terminal side
-    const at = ag.attributes.aTw; const sgn = ((-adz) * nx + adx * nz) > 0 ? 1 : -1; for (let i = 0; i < at.count; i++) at.setX(i, at.getX(i) * sgn);
-    const am = new THREE.Mesh(ag, taxiMaterial(wet, true, dep / 2)); am.renderOrder = 1; am.receiveShadow = true; am.frustumCulled = false; group.add(am);
+    // extended 6 m to the façade (head-of-stand road); aTw = (t across, t < 0 terminal side; s along; stand spacing)
+    const pts = [{ x: ax - adx * L2 / 2 - nx * 3, z: az - adz * L2 / 2 - nz * 3 }, { x: ax + adx * L2 / 2 - nx * 3, z: az + adz * L2 / 2 - nz * 3 }];
+    const ag = stripGeom(pts, dep + 6, 0.0, 65);
+    const at = ag.attributes.aTw; const sgn = ((-adz) * nx + adx * nz) > 0 ? 1 : -1; for (let i = 0; i < at.count; i++) at.setX(i, at.getX(i) * sgn - 3);
+    const k0 = Math.max(1, Math.ceil(0.1 * L2 / 65 - 1e-9)), k1 = Math.ceil(0.9 * L2 / 65 - 1e-9) - 1;
+    const am = new THREE.Mesh(ag, apronMaterial(wet, glyphAtlas(), { standT: -(dep / 2 - 45), k0, k1, hand: Math.sign(nz * adx - nx * adz) || 1 })); am.renderOrder = 1; am.receiveShadow = true; am.frustumCulled = false; group.add(am);
   }
   // ---- taxiways (approximate) ----
   const taxis = [], taxiNet = [];
@@ -372,6 +375,7 @@ export function buildAirport(apt, opts) {
     if (full || quality !== 'low') {
       const [a, b] = t; const l = Math.hypot(b.x - a.x, b.z - a.z), ux = (b.x - a.x) / l, uz = (b.z - a.z) / l;
       for (let s = 0; s < l; s += 50) for (const sd of [-1, 1]) lights.add(a.x + ux * s - uz * sd * (tw / 2 + 0.8), 0.3, a.z + uz * s + ux * sd * (tw / 2 + 0.8), B_, 0, [0, 0, 0], B_, 0, 0.45);
+      if (full) for (let s = 15; s < l - 10; s += 30) lights.add(a.x + ux * s, 0.12, a.z + uz * s, G_, 0, [0, 0, 0], G_, 0, 0.32);
     }
   }
   // ---- buildings ----
@@ -380,29 +384,16 @@ export function buildAirport(apt, opts) {
   const site = new Site(g); for (const t of taxis) site.addTaxi(t[0], t[1], tw / 2); site.addApron(obb(ax, az, adx, adz, L2 / 2 + 10, dep / 2));
   // try candidate (s, d) spots in order for a w (along) x dd (across) footprint; returns the world centre or null
   const spot = (cands, w, dd, sets) => { for (const [s0, d0] of cands) { const p = along(s0, d0); if (site.place(p.x, p.z, adx, adz, w / 2, dd / 2, [[0, 0]], sets)) return p; } return null; };
-  const yaw = Math.atan2(-adz, adx);
-  const facade = sharedMats?.facade || facadeMaterial({ glass: true });
-  const plain = sharedMats?.plain || atmos(new THREE.MeshStandardMaterial({ color: 0xc8c4bc, roughness: 0.8 }));
-  const roofM = sharedMats?.roof || atmos(new THREE.MeshStandardMaterial({ color: 0x8a9096, roughness: 0.55, metalness: 0.4 }));
-  const box = (w, h, d, x, z, mat, rot = yaw, y = 0) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y + h / 2, z); m.rotation.y = rot; m.castShadow = quality === 'ultra'; m.receiveShadow = quality === 'ultra'; group.add(m); return m; };
   const termDepth = apt.large ? 70 : 40, termH = apt.large ? 24 : 12;
-  const tc = along(0, dep / 2 + termDepth / 2 + 6);
-  box(L2 * 0.82, termH, termDepth, tc.x, tc.z, facade);
-  box(L2 * 0.84, 2.5, termDepth + 6, tc.x, tc.z, roofM, yaw, termH);
-  // gates & jet bridges & parked aircraft
+  // gates & parked aircraft (jet bridges are instanced in env-buildings.js)
   const spacing = 65;
   const parked = [];
   for (let k = 1, i = 0; spacing * k - L2 / 2 < L2 * 0.4; k++) {
     const s = spacing * k - L2 / 2; if (s < -L2 * 0.4) continue; i++;
-    const doorP = along(s, dep / 2 + 2);
     const standP = along(s, dep / 2 - 45);
-    const st = { x: standP.x, z: standP.z, s, gate: i + (apt.large ? 0 : 0), outHdg: (Math.atan2(nx, -nz) * 180 / Math.PI + 360) % 360, inHdg: (Math.atan2(-nx, nz) * 180 / Math.PI + 360) % 360, used: false };
+    const st = { x: standP.x, z: standP.z, s, gate: i, outHdg: (Math.atan2(nx, -nz) * 180 / Math.PI + 360) % 360, inHdg: (Math.atan2(-nx, nz) * 180 / Math.PI + 360) % 360, used: false };
     stands.push(st);
-    if (full) {
-      const jb = new THREE.Mesh(new THREE.BoxGeometry(3.2, 3.2, 22), plain); st.jb = jb;
-      const bx = doorP.x + nx * 11 - adx * 8, bz = doorP.z + nz * 11 - adz * 8; jb.position.set(bx, 5.2, bz); jb.rotation.y = Math.atan2(nx, nz) + 0.35; group.add(jb);
-      if (R() < 0.72 && i % 7 !== 3) { stands[stands.length - 1].used = true; parked.push({ x: standP.x - nx * 2, z: standP.z - nz * 2, rot: Math.atan2(nx, nz), tail: LIVERY_TAILS[(R() * LIVERY_TAILS.length) | 0], s: apt.large && R() < 0.3 ? 1.35 : 1 }); }
-    }
+    if (full && R() < 0.72 && i % 7 !== 3) { st.used = true; const p = { x: standP.x - nx * 2, z: standP.z - nz * 2, rot: Math.atan2(nx, nz), tail: LIVERY_TAILS[(R() * LIVERY_TAILS.length) | 0], s: apt.large && R() < 0.3 ? 1.35 : 1 }; st.parkS = p.s; parked.push(p); }
   }
   if (full && parked.length) {
     const pg = parkedAirlinerGeometry();
@@ -413,33 +404,17 @@ export function buildAirport(apt, opts) {
     parked.forEach((p, i) => { Q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), p.rot); S.setScalar(p.s); Pv.set(p.x, 3.6 * p.s, p.z); M.compose(Pv, Q, S); ib.setMatrixAt(i, M); iF.setMatrixAt(i, M); C.setRGB(...p.tail); iF.setColorAt(i, C); });
     ib.castShadow = iF.castShadow = quality === 'ultra'; ib.frustumCulled = iF.frustumCulled = false; group.add(ib, iF);
   }
-  // tower
+  // tower and hangar spots through the Site; art in env-buildings.js
   const th = apt.large ? 72 : 32;
-  const tp = spot([[L2 * 0.5 + 120, dep / 2 + 40], [L2 * 0.5 + 60, dep / 2 + 110], [-L2 * 0.5 - 120, dep / 2 + 40], [-L2 * 0.5 - 60, dep / 2 + 110], [L2 * 0.5 + 40, dep / 2 + 220]], 24, 24) || along(L2 * 0.3, dep / 2 + 6 + termDepth * 0.6); // fallback: on the terminal roof
+  const tp = spot([[L2 * 0.5 + 120, dep / 2 + 40], [L2 * 0.5 + 60, dep / 2 + 110], [-L2 * 0.5 - 120, dep / 2 + 40], [-L2 * 0.5 - 60, dep / 2 + 110], [L2 * 0.5 + 40, dep / 2 + 220], [L2 * 0.32, dep / 2 + termDepth + 75], [-L2 * 0.32, dep / 2 + termDepth + 75], [L2 * 0.32, dep / 2 + termDepth + 160], [-L2 * 0.32, dep / 2 + termDepth + 160]], 30, 28) || along(L2 * 0.3, dep / 2 + 6 + termDepth * 0.6); // fallback: on the terminal roof
   const tBase = site.placed.length && Math.hypot(site.placed[site.placed.length - 1].cx - tp.x, site.placed[site.placed.length - 1].cz - tp.z) < 1 ? 0 : termH;
-  const tmat = plain;
-  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 4.2, th, 12), tmat); shaft.position.set(tp.x, tBase + th / 2, tp.z); group.add(shaft);
-  const cab = new THREE.Mesh(new THREE.CylinderGeometry(9, 7, 7, 8), facade); cab.position.set(tp.x, tBase + th + 3.5, tp.z); group.add(cab);
-  const cap = new THREE.Mesh(new THREE.CylinderGeometry(9.5, 9.5, 1.2, 8), roofM); cap.position.set(tp.x, tBase + th + 7.6, tp.z); group.add(cap);
-  lights.add(tp.x, tBase + th + 10, tp.z, R_, 0, [0, 0, 0], R_, 0, 1.4);
-  // hangars and cargo sheds
-  if (full) {
-    const nh = apt.large ? 4 : 2;
-    for (let i = 0; i < nh; i++) {
-      const s0 = -L2 / 2 - 140 - i * 110, hp = spot([[s0, dep / 2 - 20], [s0, dep / 2 + 90], [s0, dep / 2 + 200], [L2 / 2 + 220 + i * 110, dep / 2 + 60], [L2 / 2 + 220 + i * 110, dep / 2 + 170]], 82, 76); if (!hp) continue;
-      const hg = new THREE.Group(); hg.position.set(hp.x, 0, hp.z); hg.rotation.y = yaw + Math.PI / 2;
-      const roof = new THREE.Mesh(new THREE.CylinderGeometry(40, 40, 72, 20, 1, false, -Math.PI / 2, Math.PI), roofM); roof.rotation.z = Math.PI / 2; roof.scale.set(0.45, 1, 1); roof.position.y = 12; hg.add(roof);
-      const walls = new THREE.Mesh(new THREE.BoxGeometry(72, 12, 80), plain); walls.position.y = 6; hg.add(walls);
-      group.add(hg);
-    }
-    // landside: car park + low buildings behind terminal
-    const cp = spot([[0, dep / 2 + termDepth + 70]], L2 * 0.5, 60, ['rw', 'tw']); if (cp) box(L2 * 0.5, 14, 60, cp.x, cp.z, plain);
-    for (let i = 0; i < 8; i++) { const w = 30 + R() * 50, hh = 8 + R() * 18, d = 30 + R() * 40, s0 = (R() - 0.5) * L2 * 1.4, d0 = dep / 2 + termDepth + 160 + R() * 250, m = R() < 0.5 ? plain : facade; const p = spot([[s0, d0]], w, d); if (p) box(w, hh, d, p.x, p.z, m); }
-    // apron floodlight masts
-    for (let s = -L2 / 2; s <= L2 / 2; s += 160) { const p = along(s, -dep / 2 + 8); const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 30, 6), roofM); mast.position.set(p.x, 15, p.z); group.add(mast); lights.add(p.x, 30.5, p.z, [1, 0.85, 0.6], 0, [0, 0, 0], [1, 0.85, 0.6], 0, 2.4); }
-  }
+  const hangarSpots = [];
+  if (full) for (let i = 0; i < (apt.large ? 4 : 2); i++) { const s0 = -L2 / 2 - 140 - i * 110, hp = spot([[s0, dep / 2 - 20], [s0, dep / 2 + 90], [s0, dep / 2 + 200], [L2 / 2 + 220 + i * 110, dep / 2 + 60], [L2 / 2 + 220 + i * 110, dep / 2 + 170]], 132, 96); if (hp) hangarSpots.push(hp); }
+  const art = { ax, az, adx, adz, nx, nz, dep, L2, termDepth, termH };
+  buildAirportArt(group, { apt, g, f: art, along, stands, site, spot, lights, quality, full, R, taxiNet, ilsEnds, towerAt: { p: tp, base: tBase, h: th }, hangarSpots });
+  if (full) buildBridges(group, stands, art, along);
   const pts = lights.build(); group.add(pts);
-  const towerPos = new THREE.Vector3(tp.x, tBase + th + 4, tp.z);
+  const towerPos = new THREE.Vector3(tp.x, tBase + th + 2.6, tp.z);
   const frame = { ax, az, adx, adz, nx, nz, dep, L2, termDepth, termH, facadeD: dep / 2 + 6 };
   return { group, stands, towerPos, ilsEnds, geom: g, lightsCount: lights.p.length / 3, taxis, taxiNet, frame, site, placed };
 }

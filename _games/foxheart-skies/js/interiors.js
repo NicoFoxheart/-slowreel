@@ -6,6 +6,7 @@ import { atmos } from './sky.js';
 import { foxHeart } from './aircraft.js';
 import { SHORT } from './atc.js';
 import { People } from './people.js';
+import { buildHall } from './env-hall.js';
 
 const AT = 2048;
 export const ACCENTS = {
@@ -186,6 +187,7 @@ function frameFn(O, xAxis, zAxis) { return (x, y, z) => new THREE.Vector3(O.x + 
 // ---------------------------------------------------------------- terminal hall
 // opts: { icao, mode: 'dep'|'arr', gate, dest, O (world, façade point at the bridge door, y = apron level), n (unit toward apron/runway), depth, doorX }
 export function buildTerminal(opts, rnd) {
+  try { return buildHall(opts, rnd); } catch (e) { console.warn('env-hall failed, using the simple hall', e); }
   const { icao, mode, gate, dest } = opts;
   const at = buildAtlas(icao, gate, dest); const mat = atlasMaterial(at.tex); const A = at.accent;
   const F = 4.6, D = Math.max(46, opts.depth - 4), HW = 44; // floor height, depth, half width
@@ -259,7 +261,7 @@ export function buildTerminal(opts, rnd) {
   const glass = new THREE.Mesh(new THREE.PlaneGeometry(HW * 2, 11), new THREE.MeshBasicMaterial({ color: 0x9ccbe0, transparent: true, opacity: 0.07, depthWrite: false, side: THREE.DoubleSide }));
   glass.position.set(0, F + 5.5, 0.04); group.add(glass);
   // benches at the gate (instanced: one bench = 6 seats)
-  const bb = new Builder(() => 0.95); for (let k = 0; k < 6; k++) { bb.box(k * 0.62 - 1.55, 0.44, 0, 0.56, 0.08, 0.55, 'fabric'); bb.box(k * 0.62 - 1.55, 0.78, -0.26, 0.56, 0.62, 0.07, 'fabric'); } bb.box(0, 0.2, 0, 3.8, 0.06, 0.4, 'metal');
+  const bb = new Builder(() => 0.95); for (let k = 0; k < 6; k++) { bb.box(k * 0.62 - 1.55, 0.44, 0, 0.56, 0.08, 0.55, 'fabric'); bb.box(k * 0.62 - 1.55, 0.78, 0.26, 0.56, 0.62, 0.07, 'fabric'); } bb.box(0, 0.2, 0, 3.8, 0.06, 0.4, 'metal');
   const benchPos = []; for (const z of [5.5, 8.6, 11.7]) for (const x of [-34, -27, -20, -13, 13, 20, 27, 34]) if (Math.abs(x - dx) > 5 && Math.abs(x - dx - 7) > 3) benchPos.push([x, z]);
   const benches = new THREE.InstancedMesh(bb.geometry(), mat, benchPos.length); const M = new THREE.Matrix4();
   benchPos.forEach(([x, z], i) => { M.makeTranslation(x, F, z); benches.setMatrixAt(i, M); }); benches.frustumCulled = false; group.add(benches);
