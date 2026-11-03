@@ -1,6 +1,8 @@
 // songs.js - Nico's songs as sound sources. Files are only read, never changed.
 // loadSong(ctx, id, baseUrl) fetches `${baseUrl}${id}.mp3`, decodes once and caches the AudioBuffer for every context.
 
+import { linkSongList, isUserSong, userSongBytes } from '../../lib/user-songs.js?v=8';
+
 export const SONGS = [
   { id: 'after-the-storm', title: 'After the Storm', duration: 209.9 },
   { id: 'ballet-of-life', title: 'Ballet of Life', duration: 135.4 },
@@ -12,6 +14,7 @@ export const SONGS = [
   { id: 'nature-of-love', title: 'Nature of Love', duration: 63.5 },
   { id: 'sleepy-rain', title: 'Sleepy Rain', duration: 52.3 },
 ];
+linkSongList(SONGS);   // music Nico added from his computer (lib/user-songs.js)
 
 const buffers = new Map();   // id -> AudioBuffer
 const gains = new Map();     // id -> linear gain that brings the song's loud parts to ~ -20 dBFS RMS (song cloud only)
@@ -34,8 +37,8 @@ export function loadSong(ctx, id, baseUrl = 'audio/') {
   if (buffers.has(id)) return Promise.resolve(buffers.get(id));
   if (pending.has(id)) return pending.get(id);
   if (!SONGS.some(s => s.id === id)) return Promise.reject(new Error('unknown song ' + id));
-  const p = fetch(baseUrl + id + '.mp3')
-    .then(r => { if (!r.ok) throw new Error('song ' + id + ' HTTP ' + r.status); return r.arrayBuffer(); })
+  const p = (isUserSong(id) ? userSongBytes(id).then(ab => ab.slice(0)) : fetch(baseUrl + id + '.mp3')
+    .then(r => { if (!r.ok) throw new Error('song ' + id + ' HTTP ' + r.status); return r.arrayBuffer(); }))
     .then(ab => new Promise((res, rej) => { const q = ctx.decodeAudioData(ab, res, rej); if (q && q.then) q.then(res, rej); }))
     .then(buf => { buffers.set(id, buf); gains.set(id, measureGain(buf)); pending.delete(id); return buf; })
     .catch(e => { pending.delete(id); throw e; });

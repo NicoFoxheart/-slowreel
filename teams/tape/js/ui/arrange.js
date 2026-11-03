@@ -1,10 +1,10 @@
 // arrange.js - the multitrack timeline: track heads, lanes, clips (move / resize / duplicate / delete, also by keyboard),
 // ruler with seek + loop strip, playhead, zoom, snap. All edits go through state.edit / begin+end (undoable).
-import { S, on, emit, edit, begin, end, track, clipOf, snapTo, songBeats, bpb, uid, clamp, isSongTrack, instDef, optName, instGroups } from './state.js?v=10b';
-import { h, icon } from './controls.js?v=10b';
-import { SONGS, getSong } from '../../lib/songs.js?v=10b';
-import { TRACK_COLORS } from './sample-project.js?v=10b';
-import { createAutomationEditor, automationTargets } from './automation.js?v=10b';
+import { S, on, emit, edit, begin, end, track, clipOf, snapTo, songBeats, bpb, uid, clamp, isSongTrack, instDef, optName, instGroups } from './state.js?v=8';
+import { h, icon } from './controls.js?v=8';
+import { SONGS, getSong } from '../../lib/songs.js?v=8';
+import { TRACK_COLORS } from './sample-project.js?v=8';
+import { createAutomationEditor, automationTargets } from './automation.js?v=8';
 
 const HEAD = 196, ROW = 50, RULER = 30, MAX_TRACKS = 16;
 let root, scroller, overlay = {}, laneW = 0, totalBeats = 0;
@@ -289,8 +289,12 @@ export function createClipAt(t, beat, opts = {}) {
     const bps = S.project.bpm / 60;
     c.song = { songId, offsetSec: opts.offsetSec ?? 0, gainDb: -6, fadeInSec: 2, fadeOutSec: 3, rate: 1 };
     c.lengthBeats = opts.lengthBeats || Math.min(Math.round(Math.min(s.duration, 32) * bps / B) * B || B, 16 * B);
+    if (s?.user && !opts.lengthBeats) c.lengthBeats = Math.max(B, Math.ceil(s.duration * bps / B) * B);   // music from Nico's computer: the whole song
   }
-  edit(p => { p.tracks.find(x => x.id === t.id).clips.push(c); }, { type: 'clips', trackId: t.id });
+  edit(p => {
+    p.tracks.find(x => x.id === t.id).clips.push(c);
+    const end = Math.ceil((c.startBeat + c.lengthBeats) / B); if (c.song && end > p.lengthBars) p.lengthBars = Math.min(256, end);   // the tape grows to fit a long song clip
+  }, { type: 'clips', trackId: t.id });
   selectClip(c.id, t.id);
   requestAnimationFrame(() => document.getElementById('clip-' + c.id)?.focus({ preventScroll: true }));
   return c;

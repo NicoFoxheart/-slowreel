@@ -5,6 +5,8 @@
 // Files are found at ../audio/<id>.mp3 relative to this module (teams/<key>/lib/ -> teams/<key>/audio/);
 // call setSongBase(url) if your audio lives elsewhere.
 
+import { linkSongList, isUserSong, userSongBytes } from './user-songs.js?v=8';
+
 export const SONGS = [
   { id: "after-the-storm", title: "After the Storm", file: 'audio/after-the-storm.mp3', duration: 209.9,
     peaks: [0.27,0.21,0.19,0.19,0.21,0.51,0.34,0.32,0.46,0.53,0.41,0.26,0.27,0.53,0.28,0.23,0.29,0.27,0.57,0.42,0.4,0.44,0.82,0.75,0.44,0.45,0.34,0.5,0.48,0.65,0.29,0.8,0.61,0.74,0.34,0.46,0.47,0.54,0.5,0.72,0.69,0.44,0.53,0.31,0.56,0.48,0.49,0.29,0.73,0.43,0.51,0.37,0.37,0.45,0.51,0.3,1,0.66,0.54,0.44,0.52,0.52,0.48,0.25,0.5,0.76,0.43,0.52,0.5,0.65,0.46,0.44,0.46,0.79,0.62,0.55,0.47,0.62,0.42,0.52,0.5,0.99,0.62,0.49,0.34,0.33,0.26,0.43,0.42,0.53,0.72,0.47,0.72,0.46,0.38,0.74,0.44,0.36,0.38,0.65,0.21,0.48,0.46,0.32,0.38,0.49,0.44,0.23,0.23,0.16,0.01,0.01,0,0,0,0,0,0,0,0] },
@@ -25,10 +27,17 @@ export const SONGS = [
   { id: "sleepy-rain", title: "Sleepy Rain", file: 'audio/sleepy-rain.mp3', duration: 52.3,
     peaks: [0.02,0.17,0.24,0.25,0.26,0.24,0.29,0.5,0.58,0.86,0.63,0.66,0.85,0.79,0.85,0.64,0.66,0.74,0.57,0.84,0.75,0.66,0.68,0.59,0.71,0.88,0.88,1,0.8,0.84,0.86,0.82,0.69,0.68,0.72,0.59,0.82,0.83,0.69,0.6,0.63,0.78,0.6,0.56,0.71,0.53,0.67,0.56,0.53,0.57,0.66,0.66,0.63,0.58,0.72,0.8,0.73,0.68,0.69,0.84,0.63,0.79,0.87,0.77,0.71,0.84,0.53,0.58,0.67,0.58,0.64,0.65,0.74,0.6,0.7,0.69,0.68,0.62,0.87,0.66,0.62,0.5,0.83,0.82,0.64,0.59,0.71,0.64,0.63,0.7,0.75,0.71,0.54,0.83,0.66,0.56,0.62,0.78,0.71,0.58,0.68,0.84,0.53,0.42,0.61,0.59,0.48,0.46,0.51,0.59,0.4,0.33,0.39,0.35,0.25,0.19,0.19,0.14,0.13,0.16] },];
 
+linkSongList(SONGS);   // music Nico added from his computer goes at the end (lib/user-songs.js)
+
 let base = null;
 /** Change where the mp3s are fetched from (a URL or a path relative to the page). Default: ../audio/ next to lib/. */
 export function setSongBase(url) { base = url.endsWith('/') ? url : url + '/'; }
 export const getSong = id => SONGS.find(s => s.id === id) || null;
+/** The song's audio file as an ArrayBuffer (a copy, safe to decode). Works for added music too, which has no URL. */
+export async function songBytes(id) {
+  if (isUserSong(id)) return (await userSongBytes(id)).slice(0);
+  const r = await fetch(songUrl(id)); if (!r.ok) throw new Error('could not load the song'); return r.arrayBuffer();
+}
 export function songUrl(id) {
   if (!getSong(id)) throw new Error(`unknown song "${id}"`);
   return base ? new URL(`${id}.mp3`, new URL(base, document.baseURI)).href : new URL(`../audio/${id}.mp3`, import.meta.url).href;
@@ -43,7 +52,7 @@ export function loadSong(ctx, id) {
   const key = `${ctx.sampleRate}:${id}`;
   if (!decoded.has(key)) {
     if (!bytes.has(id)) {
-      bytes.set(id, fetch(songUrl(id)).then(r => { if (!r.ok) throw new Error(`song ${id}: HTTP ${r.status}`); return r.arrayBuffer(); })
+      bytes.set(id, (isUserSong(id) ? userSongBytes(id) : fetch(songUrl(id)).then(r => { if (!r.ok) throw new Error(`song ${id}: HTTP ${r.status}`); return r.arrayBuffer(); }))
         .catch(e => { bytes.delete(id); throw e; }));
     }
     decoded.set(key, bytes.get(id).then(ab => ctx.decodeAudioData(ab.slice(0))).catch(e => { decoded.delete(key); throw e; }));

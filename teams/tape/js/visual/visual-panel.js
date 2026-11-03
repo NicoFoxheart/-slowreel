@@ -3,12 +3,12 @@
 // export with the audio inside. Everything 3D happens in workers: the live hero preview and the scene-card thumbnails
 // in preview-worker.js (cards are rendered lazily, one at a time, when they scroll into view), the export in
 // render-worker.js. The page only draws DOM, so the studio's audio never waits on the GPU.
-import { h, icon } from '../ui/controls.js?v=10b';
-import { SONGS, songUrl } from '../../lib/songs.js?v=10b';
-import { FORMATS, RESOLUTIONS, DEFAULT_RES, videoSize, videoBitrate, pickCodecs, encodeSupport, makeVideo, renderProjectAudio, decodeAudio, saveVideo } from './video.js?v=10b';
-import { kbmb, previewPacer } from './common.js?v=10b';
-import { createPreview } from './preview.js?v=10b';
-import { listScenes, GROUPS, DEFAULT_SCENE } from './scenes/index.js?v=10b';
+import { h, icon } from '../ui/controls.js?v=8';
+import { SONGS, songBytes } from '../../lib/songs.js?v=8';
+import { FORMATS, RESOLUTIONS, DEFAULT_RES, videoSize, videoBitrate, pickCodecs, encodeSupport, makeVideo, renderProjectAudio, decodeAudio, saveVideo } from './video.js?v=8';
+import { kbmb, previewPacer } from './common.js?v=8';
+import { createPreview } from './preview.js?v=8';
+import { listScenes, GROUPS, DEFAULT_SCENE } from './scenes/index.js?v=8';
 
 let H = null;            // hooks from app.js
 let ui = null;           // open window state
@@ -37,7 +37,7 @@ const grad = sw => `linear-gradient(135deg, ${(sw || ['#1d2024', '#4a5056'])[0]}
 
 /** Get the exact audio for a source: the rendered project mix, Nico's song or the imported file, decoded unchanged. */
 async function sourceAudio(src, { seconds, onProgress } = {}) {
-  if (src.kind === 'song') { const r = await fetch(songUrl(src.id)); if (!r.ok) throw new Error('could not load the song'); return decodeAudio(await r.arrayBuffer()); }
+  if (src.kind === 'song') return decodeAudio(await songBytes(src.id));
   if (src.kind === 'file') { if (!imported?.buffer) throw new Error('import an audio file first'); return imported.buffer; }
   return renderProjectAudio(H.S.engine, H.S.project, { seconds, onProgress });
 }
@@ -196,7 +196,7 @@ export async function openVisual(source = { kind: 'project' }) {
       const buf = await decodeAudio(await file.arrayBuffer());
       if (!ui) return;
       note.textContent = 'Listening for the beats…';
-      const { computeFeatures } = await import('./features.js?v=10b');
+      const { computeFeatures } = await import('./features.js?v=8');
       const F = await computeFeatures(buf, { fps: 30 });
       if (!ui) return;
       if (imported?.url) URL.revokeObjectURL(imported.url);
@@ -475,7 +475,7 @@ function fitPreview() {
 function startLoop() { if (ui && !ui.raf && !document.hidden && !ui.exporting) { ui.pacer?.reset(); ui.raf = requestAnimationFrame(frame); } }
 function stopLoop() { if (ui?.raf) { cancelAnimationFrame(ui.raf); ui.raf = 0; } }
 let featMod = null;
-import('./features.js?v=10b').then(m => { featMod = m; });
+import('./features.js?v=8').then(m => { featMod = m; });
 function frame(now) {
   if (!ui) return;
   ui.raf = 0;

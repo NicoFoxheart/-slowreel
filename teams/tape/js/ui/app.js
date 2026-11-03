@@ -1,28 +1,29 @@
 // app.js - Slowreel boot + the deck (transport, counter, master), Nico's tapes, projects, export dialog, the dock,
 // QWERTY playing / recording, keyboard shortcuts, the visual loop and the test hook window.__studio.
 import { S, on, emit, edit, track, clipOf, clamp, uid, clone, bpb, songBeats, fmtTime, isSongTrack, instDef, isSongParam,
-  doUndo, doRedo, canUndo, canRedo, resetHistory } from './state.js?v=10b';
-import { h, icon, knob } from './controls.js?v=10b';
-import { loadEngine } from './engine.js?v=10b';
-import { initArrange, render as renderArrange, fitZoom, zoomBy, setPlayhead, updateLoop, updateMeters, addClipHere, duplicateClip, deleteClip, addTrack, createClipAt, selectClip } from './arrange.js?v=10b';
-import { initRoll, render as renderRoll, setRollHead, zoom as rollZoom } from './pianoroll.js?v=10b';
-import { initPanels, renderTab, renderSongClip, updateMixMeters, animateCloud, KEYMAP, markKbKey } from './panels.js?v=10b';
-import { createDeck, createVU } from './deck.js?v=10b';
-import { exportMaster, renderProject, songSeconds, kb } from './exporter.js?v=10b';
-import { initPhone, phoneFrame } from './phone.js?v=10b';
-import { KEYS, CHORDS, scaleGroups } from './theory.js?v=10b';
-import { TRACK_COLORS } from './sample-project.js?v=10b';
-import { SONGS, loadSong } from '../../lib/songs.js?v=10b';
-import { openProjects, autosave } from '../../lib/storage.js?v=10b';
-import { measure } from '../../lib/export.js?v=10b';
-import { initVisual, openVisual, isVisualOpen, exportVideoFor } from '../visual/visual-panel.js?v=10b';
-import { mountStudio3D } from '../ui3d/studio3d.js?v=10b';
-import { initSteps, renderSteps, isDrumTrack } from './steps.js?v=10b';
-import { openChooser, closeChooser, blankProject, starterProject as styleStarter, guideFor, starterById } from './starters.js?v=10b';
-import { createLiveArp } from '../sound/arp.js?v=10b';
-import { CK, CHORD_STYLES, chordExtras, setChordKeys, setChordStyle, styleById } from './chordkeys.js?v=10b';
+  doUndo, doRedo, canUndo, canRedo, resetHistory } from './state.js?v=8';
+import { h, icon, knob } from './controls.js?v=8';
+import { loadEngine } from './engine.js?v=8';
+import { initArrange, render as renderArrange, fitZoom, zoomBy, setPlayhead, updateLoop, updateMeters, addClipHere, duplicateClip, deleteClip, addTrack, createClipAt, selectClip } from './arrange.js?v=8';
+import { initRoll, render as renderRoll, setRollHead, zoom as rollZoom } from './pianoroll.js?v=8';
+import { initPanels, renderTab, renderSongClip, updateMixMeters, animateCloud, KEYMAP, markKbKey } from './panels.js?v=8';
+import { createDeck, createVU } from './deck.js?v=8';
+import { exportMaster, renderProject, songSeconds, kb } from './exporter.js?v=8';
+import { initPhone, phoneFrame } from './phone.js?v=8';
+import { KEYS, CHORDS, scaleGroups } from './theory.js?v=8';
+import { TRACK_COLORS } from './sample-project.js?v=8';
+import { SONGS, loadSong } from '../../lib/songs.js?v=8';
+import { addUserSongs, removeUserSong } from '../../lib/user-songs.js?v=8';
+import { openProjects, autosave } from '../../lib/storage.js?v=8';
+import { measure } from '../../lib/export.js?v=8';
+import { initVisual, openVisual, isVisualOpen, exportVideoFor } from '../visual/visual-panel.js?v=8';
+import { mountStudio3D } from '../ui3d/studio3d.js?v=8';
+import { initSteps, renderSteps, isDrumTrack } from './steps.js?v=8';
+import { openChooser, closeChooser, blankProject, starterProject as styleStarter, guideFor, starterById } from './starters.js?v=8';
+import { createLiveArp } from '../sound/arp.js?v=8';
+import { CK, CHORD_STYLES, chordExtras, setChordKeys, setChordStyle, styleById } from './chordkeys.js?v=8';
 import { initRhythm, onPlay, onStop, countIn, wantsCountIn, afterRecording, tightenTools, settingsRows, newTapeMix, applyAutoMix, closePop,
-  addGroove, removeGroove, toggleBreathe, tightenClip, autoState, remix, tighten, gridFor, R as rhythmPrefs } from './rhythm.js?v=10b';
+  addGroove, removeGroove, toggleBreathe, tightenClip, autoState, remix, tighten, gridFor, R as rhythmPrefs } from './rhythm.js?v=8';
 
 const $ = id => document.getElementById(id);
 const LAST_KEY = 'slowreel:last';
@@ -208,7 +209,9 @@ function renderTapes() {
   SONGS.forEach((s, i) => {
     const cv = h('canvas', { 'aria-hidden': 'true' });
     const li = h('li', { class: 'tape', id: `tape-${s.id}`, style: { '--c': TRACK_COLORS[i % TRACK_COLORS.length] } },
-      h('h3', { text: s.title, title: s.title }), h('span', { class: 'dur', text: fmtDur(s.duration) }), cv,
+      h('h3', { text: s.title, title: s.user ? `${s.title} (added from your computer)` : s.title }),
+      s.user ? h('span', { class: 'meta' }, h('span', { class: 'dur', text: fmtDur(s.duration) }), h('button', { class: 'key sm rm', id: `tape-rm-${s.id}`, 'aria-label': `Remove ${s.title}`, title: 'Remove from your tapes', onclick: e => removeMusic(s, e.currentTarget) }, '✕'))
+        : h('span', { class: 'dur', text: fmtDur(s.duration) }), cv,
       h('div', { class: 'acts' },
         h('button', { class: 'key sm', id: `tape-listen-${s.id}`, 'aria-pressed': 'false', 'aria-label': `Listen to ${s.title}`, onclick: () => togglePreview(s.id) }, icon('play'), h('span', { class: 'lb', text: 'Listen' })),
         h('button', { class: 'key sm', id: `tape-clip-${s.id}`, 'aria-label': `Add ${s.title} as a song clip at the playhead`, title: 'Add a section of this song to a song track', onclick: () => addSongClip(s.id) }, icon('plus'), h('span', { class: 'lb', text: 'Clip' })),
@@ -217,6 +220,35 @@ function renderTapes() {
     ul.append(li);
     requestAnimationFrame(() => drawPeaks(cv, s.peaks, getComputedStyle(li).getPropertyValue('--c')));
   });
+}
+// music from Nico's computer: the + Add music button, or drop audio files anywhere on Nico's tapes
+const AUDIO_EXT = /\.(mp3|wav|wave|ogg|oga|opus|flac|m4a|aac|webm|aif|aiff)$/i;
+const pickMusic = h('input', { type: 'file', accept: 'audio/*,.mp3,.wav,.ogg,.opus,.flac,.m4a,.aac,.aif,.aiff', multiple: true, hidden: true, onchange: () => { addMusic(pickMusic.files); pickMusic.value = ''; } });
+document.body.append(pickMusic);
+$('tape-add').onclick = () => pickMusic.click();
+{
+  const box = document.querySelector('.module.tapes'), hasFiles = e => [...(e.dataTransfer?.types || [])].includes('Files');
+  box.addEventListener('dragover', e => { if (hasFiles(e)) { e.preventDefault(); box.classList.add('drop'); } });
+  box.addEventListener('dragleave', e => { if (!box.contains(e.relatedTarget)) box.classList.remove('drop'); });
+  box.addEventListener('drop', e => { if (!hasFiles(e)) return; e.preventDefault(); box.classList.remove('drop'); addMusic(e.dataTransfer.files); });
+}
+async function addMusic(list) {
+  const files = [...(list || [])].filter(f => f.type.startsWith('audio/') || AUDIO_EXT.test(f.name));
+  if (!files.length) { toast('Pick an audio file: mp3, wav, m4a, ogg or flac.'); return; }
+  const btn = $('tape-add'); btn.disabled = true; btn.textContent = 'Adding…';
+  try {
+    const { added, skipped } = await addUserSongs(S.ctx, files);
+    renderTapes();
+    if (added.length) { $(`tape-${added[0].id}`)?.scrollIntoView({ block: 'nearest' }); toast(added.length > 1 ? `${added.length} songs added to your tapes.` : `"${added[0].title}" is in your tapes: Listen, add a Clip, or make a Video.`); }
+    if (skipped.length) setTimeout(() => toast(`"${skipped[0].name}" ${skipped[0].why}.`), added.length ? 3000 : 0);
+  } finally { btn.disabled = false; btn.textContent = '+ Add music'; }
+}
+function removeMusic(s, btn) {
+  if (!btn.classList.contains('armed')) {   // two clicks, so a slip never deletes anything
+    btn.classList.add('armed'); btn.textContent = 'Remove?'; setTimeout(() => { if (btn.isConnected) { btn.classList.remove('armed'); btn.textContent = '✕'; } }, 3000); return;
+  }
+  if (preview?.id === s.id) stopPreview();
+  removeUserSong(s.id).then(() => { renderTapes(); toast(`"${s.title}" removed from your tapes.`); });
 }
 const fmtDur = d => `${Math.floor(d / 60)}:${String(Math.round(d % 60)).padStart(2, '0')}`;
 function drawPeaks(cv, peaks, col, progress = -1) {
@@ -247,9 +279,13 @@ function stopPreview() {
   preview = null;
 }
 function addSongClip(songId) {
-  let t = track(); if (!isSongTrack(t)) t = S.project.tracks.find(isSongTrack) || addTrack('song', { name: 'Songs' });
-  if (!t) return;
   const s = SONGS.find(x => x.id === songId);
+  let t = track();
+  if (s.user) {   // music from Nico's computer gets its own track (named after it), unless that track is the one selected
+    if (!(isSongTrack(t) && t.clips.some(c => c.song?.songId === songId))) t = S.project.tracks.find(x => isSongTrack(x) && x.clips.some(c => c.song?.songId === songId)) || addTrack('song', { name: s.title }) || t;
+  }
+  if (!isSongTrack(t)) t = S.project.tracks.find(isSongTrack) || addTrack('song', { name: 'Songs' });
+  if (!t) return;
   const c = createClipAt(t, S.engine.position().beat, { songId });
   edit(p => { const tr = p.tracks.find(x => x.id === t.id); if (tr.clips.length === 1 && /^(Song|Songs)$/.test(tr.name)) tr.name = s.title; }, { type: 'track', trackId: t.id });
   toast(`${s.title} is on "${track(t.id).name}" at bar ${Math.floor(c.startBeat / bpb()) + 1}.`);
@@ -564,7 +600,7 @@ async function restoreDemo() {
 // The second demo, "Night Garage" (Antent-style future garage: drums, 808, supersaw pad with pump, chops, arp, automation).
 // Fetched when asked for (demo-night-garage.json next to index.html); opening it always gives a fresh copy.
 async function nightGarageCopy() {
-  const r = await fetch('demo-night-garage.json?v=10b', { cache: 'no-cache' }); if (!r.ok) throw new Error('HTTP ' + r.status);
+  const r = await fetch('demo-night-garage.json?v=8', { cache: 'no-cache' }); if (!r.ok) throw new Error('HTTP ' + r.status);
   const d = await r.json(); d.id = 'demo-night-garage'; d.schema = d.schema || 'nfx-studio/1'; d.updatedAt = Date.now(); return d;
 }
 async function openNightGarage() {
@@ -576,7 +612,7 @@ async function openNightGarage() {
 }
 // ---------------------------------------------------------------- recipes (js/recipes + js/ui/recipes-panel.js)
 let recipesMod = null;
-const recipesPanel = () => (recipesMod ||= import('./recipes-panel.js?v=10b'));
+const recipesPanel = () => (recipesMod ||= import('./recipes-panel.js?v=8'));
 /** Load a recipe project the way opening a project or the demo does: the current tape is saved first, the recipe becomes
  *  the current project (its own id, saved, autosaved from here on) and starts with a clean undo history. */
 async function loadRecipeProject(project, recipe) {
@@ -817,7 +853,7 @@ window.__studio = {
     finish: () => { toggleRec(); stop(); return true; },
   },
   // load a recipe by id through the same path as the Recipes panel (tests)
-  async loadRecipe(id) { const m = await import('../recipes/recipes.js?v=10b'); const r = m.recipeById?.(id) || m.RECIPES.find(x => x.id === id); if (!r) return null; const p = await loadRecipeProject(m.recipeProject ? m.recipeProject(r) : clone(r.project), r); return { id: p.id, name: p.name, tracks: p.tracks.length }; },
+  async loadRecipe(id) { const m = await import('../recipes/recipes.js?v=8'); const r = m.recipeById?.(id) || m.RECIPES.find(x => x.id === id); if (!r) return null; const p = await loadRecipeProject(m.recipeProject ? m.recipeProject(r) : clone(r.project), r); return { id: p.id, name: p.name, tracks: p.tracks.length }; },
 };
 
 // ---------------------------------------------------------------- go
@@ -843,6 +879,6 @@ function showPcOnly() {
   const draw = () => d.draw({ playing: false, frac: 0.38, level: 0, analyser: null, dt: 0, still: true });
   requestAnimationFrame(draw); new ResizeObserver(() => requestAnimationFrame(draw)).observe(cv);
   // the studio stays PC only, but a phone can make a music video of one of Nico's songs (or a file from the phone)
-  $('pc-video').onclick = () => import('../visual/phone-maker.js?v=10b').then(m => m.openPhoneMaker()).catch(e => { console.error('[slowreel] video maker', e); });
+  $('pc-video').onclick = () => import('../visual/phone-maker.js?v=8').then(m => m.openPhoneMaker()).catch(e => { console.error('[slowreel] video maker', e); });
 }
 void renderTab; void instDef; void kb;
