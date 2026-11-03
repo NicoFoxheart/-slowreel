@@ -264,11 +264,16 @@ export class ATC {
       case 'app': if (!this.flags.appClr && s.distArrNm < 40) add('ils', 'APP', `Request the ILS runway ${c.arrEnd().ident}`, false, false); break;
     }
     const em = c.emergency && c.emergency();
-    if (!this.flags.emer && (!s.onGround || s.gsKt > 30 || em)) { const k = this.curK(); add('mayday', k, em ? `MAYDAY: ${em.nature}` : 'MAYDAY (declare an emergency)', false, !!em && em.kind === 'mayday'); add('pan', k, em ? `PAN-PAN: ${em.nature}` : 'PAN-PAN (urgency)', false, !!em && em.kind === 'pan'); }
     if (this.flags.emer && !this.waiting() && (!em || (s.onGround && s.gsKt < 5))) add('cancel', this.curK(), s.onGround ? `Cancel ${this.flags.emer === 'mayday' ? 'MAYDAY' : 'PAN-PAN'}, vacate the runway` : `Cancel ${this.flags.emer === 'mayday' ? 'MAYDAY' : 'PAN-PAN'}`, false, true);
     if (this.atisWanted(s)) { const A = this.apt(); add('atis', 'ATIS', `Listen to ATIS (${this.city(A)})`, false, false); }
     if (this.flags.tfc) { const k = this.tuned?.kind || 'APP'; add('tfc_sight', k, 'Traffic in sight', false, false); add('tfc_look', k, 'Looking for the traffic', true, false); }
     if (this.lastInstr && this.t - this.lastInstr.t < 150 && !this.waiting()) add('sayagain', this.lastInstr.kind, 'Say again', false, false);
+    // emergencies always come LAST in the list (number keys of normal calls never shift onto them). With a real failure they are offered
+    // directly; without one they sit behind an 'Emergency…' entry that needs a second, deliberate confirm (opened menu times out after 20 s)
+    if (!this.flags.emer && (!s.onGround || s.gsKt > 30 || em)) { const k = this.curK(), ask = this.emerAsk != null && this.t - this.emerAsk < 20;
+      if (em) { add('mayday', k, `MAYDAY: ${em.nature}`, false, em.kind === 'mayday'); add('pan', k, `PAN-PAN: ${em.nature}`, false, em.kind === 'pan'); }
+      else if (ask) { add('emer_back', k, 'Back: no emergency', false, false); add('mayday', k, 'Confirm MAYDAY (distress)', false, false); add('pan', k, 'Confirm PAN-PAN (urgency)', false, false); }
+      else add('emer_menu', k, 'Emergency… (MAYDAY / PAN-PAN)', false, false); }
     return out;
   }
   atisWanted(s) { if (this.atisOn) return false; const p = this.phase; if (s.onGround) return ['gate', 'clr_ok', 'pushing', 'pushed', 'rwy_start'].includes(p); return ['ctr', 'to_ctr', 'to_app', 'app'].includes(p) && s.distArrNm < 140 && this.heard[this.arr.icao] !== this.atisLetter(this.arr); }
@@ -288,7 +293,9 @@ export class ATC {
       case 'taxi': return this.reqTaxi();
       case 'ready': return this.reqDeparture();
       case 'descent': return this.reqDescent();
-      case 'mayday': case 'pan': return this.declare(id);
+      case 'emer_menu': this.emerAsk = this.t; this.emit(); return;
+      case 'emer_back': this.emerAsk = null; this.emit(); return;
+      case 'mayday': case 'pan': this.emerAsk = null; return this.declare(id);
       case 'cancel': return this.cancelEmer();
       case 'ils': { const re = c.arrEnd(); this.me('APP', M(this.fac('APP').name, ', ', CS, ', request the I L S runway ', this.rwyM(re.ident), '.')); this.atc('APP', M(CS, ', roger, expect vectors for the I L S runway ', this.rwyM(re.ident), '.'), 1.6, null, { reply: true }); this.flags.ilsReq = true; return; }
     }
