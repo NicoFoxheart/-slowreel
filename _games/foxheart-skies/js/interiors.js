@@ -428,7 +428,7 @@ export function buildCabin(icao, rnd) {
   const pickWalkers = () => { if (LV.walkers.length) return; const cand = pax.filter(p => p.act !== 'baby' && p.act !== 'sleep' && Math.abs(p.x) < 1.0); for (let i = 0; i < 4 && cand.length; i++) { const p = cand.splice((rnd() * cand.length) | 0, 1)[0]; LV.walkers.push({ p, st: 'sit', t: 6 + i * 9 + rnd() * 10, hx: p.x, hz: p.z, gx: (rnd() - 0.5) * 0.9, gz: 11.2 + rnd() * 0.6 }); } };
   const walkTo = (p, x, z, sp, dt) => { const dx = x - p.x, dz = z - p.z, d = Math.hypot(dx, dz); if (d < 0.04) return true; const st = Math.min(d, sp * dt); p.x += dx / d * st; p.z += dz / d * st; p.yaw = Math.atan2(dx, dz); return false; };
   const live = (dt, t, cam, st) => { // st: { belt, airborne, comfort, nervous }
-    shell?.mood(st.airborne, dt); shell?.setFlight(true);
+    shell?.mood(st.airborne, dt, st.lights); shell?.setFlight(true);
     if (!pax[0].baseAct) for (const p of pax) p.baseAct = p.act;
     LV.reactT -= dt; if (LV.reactT <= 0) LV.react = null;
     for (const p of pax) { if (p.walking) continue; let a = p.baseAct;

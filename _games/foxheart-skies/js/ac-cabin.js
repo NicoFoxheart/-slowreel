@@ -274,7 +274,10 @@ export function buildCabinShell(o) {
   };
   const apply = () => { U.uAmb.value.copy(cur.amb); U.uCove.value.copy(cur.cove); U.uWin.value.copy(cur.win); U.uEmit.value.copy(cur.emit); };
   { const w = want(false, ATM.uNight.value); for (const k in cur) cur[k].copy(w[k]); apply(); }
-  const mood = (airborne, dt = 1) => { const w = want(airborne, ATM.uNight.value), a = 1 - Math.exp(-dt / 2.5); for (const k in cur) cur[k].lerp(w[k], a); apply(); };
+  // cabin light level (PA panel / automatic): scales the overhead wash + cove; IFE screens, signs and window light stay as they are
+  const LVL = { auto: [1, 1], bright: [1.18, 1.1], dim: [0.5, 0.6], night: [0.2, 0.32], off: [0.05, 0.04] };
+  const mood = (airborne, dt = 1, lights = 'auto') => { const w = want(airborne, ATM.uNight.value), L = LVL[lights] || LVL.auto, a = 1 - Math.exp(-dt / 2.5);
+    w.amb.multiplyScalar(L[0]); w.cove.multiplyScalar(L[1]); for (const k in cur) cur[k].lerp(w[k], a); apply(); };
   const setK = k => { U.uK.value = k; };
   return { group, mat, mood, setK, seatsMesh: im, setFlight(on) { doors.visible = on; }, dispose() { group.traverse(o => { if (o.geometry) o.geometry.dispose(); }); A.map.dispose(); A.nrm.dispose(); mat.dispose(); } };
 }

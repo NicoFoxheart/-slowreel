@@ -32,7 +32,7 @@ import { rng } from './terrain.js';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const errors = []; window.addEventListener('error', e => errors.push(String(e.message))); window.addEventListener('unhandledrejection', e => errors.push(String(e.reason)));
 const store = { get(k, d) { try { const v = localStorage.getItem('foxheart.' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('foxheart.' + k, JSON.stringify(v)); } catch (e) { } } };
-const settings = Object.assign({ quality: 'high', res: 'auto', units: 'aviation', law: 'fbw', invert: '0', mouseSens: 1, vol: 0.7, voice: true, hud: true, padAssist: 'easy', padSens: 1, padDz: 0.15, padInvert: '0', padRumble: true, failRand: 'off', landBoxes: true, landAutoSpd: true, extHud: 'min', music: true, musicVol: 0.5, termMusic: true }, store.get('settings', {}));
+const settings = Object.assign({ quality: 'high', res: 'auto', units: 'aviation', law: 'fbw', invert: '0', mouseSens: 1, vol: 0.7, voice: true, hud: true, padAssist: 'easy', padSens: 1, padDz: 0.15, padInvert: '0', cabinLights: 'auto', padRumble: true, failRand: 'off', landBoxes: true, landAutoSpd: true, extHud: 'min', music: true, musicVol: 0.5, termMusic: true }, store.get('settings', {}));
 const TODAY = new Date(Date.UTC(2026, 9, 27));
 
 // ---------------------------------------------------------------- renderer
@@ -1012,8 +1012,8 @@ function renderFrame(dt) {
   updateCamera(dt);
   sky.update(dt, camera, W.simTime);
   updateShadows();
-  { const cb = cabinObj(); if (cb && !W.onFoot) { const vis = W.view === 'cabin'; cb.group.visible = vis; if (vis) { const k = Math.min(1.05, 0.5 / sky.exposure); cb.mat.color.setScalar(k); cb.crowd.setExposure(k); cb.light(k); }
-    cb.live(W.paused ? 0 : dt * W.timeAccel, W.simTime, vis ? camera.position : null, { belt: W.signs.belt, airborne: !fdm.onGround, comfort: CC.v, visible: vis }); } }
+  { const cb = cabinObj(); if (cb && !W.onFoot) { const vis = W.view === 'cabin'; cb.group.visible = vis; if (vis) { const k = Math.min(1.05, 0.5 / sky.exposure); cb.mat.color.setScalar(k); cb.crowd.setExposure(k * ({ bright: 1.05, dim: 0.7, night: 0.45, off: 0.22 }[W.cabLv] ?? 1)); cb.light(k); }
+    cb.live(W.paused ? 0 : dt * W.timeAccel, W.simTime, vis ? camera.position : null, { belt: W.signs.belt, airborne: !fdm.onGround, comfort: CC.v, visible: vis, lights: cabinLights(dt) }); } }
   if (W.onFoot) { const fi = footInput(dt); foot.update(dt, fi, sky.exposure); $('#footPrompt').textContent = foot.prompt; }
   if (cockpit.userData.setDoor) cockpit.userData.setDoor(W.onFoot);
   updateDeck(dt);
@@ -1038,6 +1038,14 @@ function renderFrame(dt) {
 }
 // boarding / deplaning music in the cabin while parked with power on; ambient music in the terminal halls
 const MOOD_NAME = { bossa: 'bossa nova', pentatonic: 'pentatonic', lounge: 'lounge jazz' };
+// cabin lights: manual (PA panel) or automatic, like a real crew: dimmed for taxi/takeoff/landing at night, dimmed on long legs once
+// the aircraft has been cruising for a while (night setting after dark)
+function cabinLights(dt) {
+  W.airT = fdm.onGround ? 0 : (W.airT || 0) + (W.paused ? 0 : dt * W.timeAccel); const m = settings.cabinLights || 'auto'; if (m !== 'auto') return (W.cabLv = m);
+  const night = ATM.uNight.value > 0.5, run = fdm.engRun[0] || fdm.engRun[1];
+  return (W.cabLv = fdm.onGround ? (night && run && !W.parkedAt ? 'dim' : 'auto') : fdm.pos.y / FT < 10000 ? (night ? 'dim' : 'auto') : W.airT > 1200 ? (night ? 'night' : 'dim') : 'auto');
+}
+function syncLightsUI() { $$('#pLights button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.c === (settings.cabinLights || 'auto')))); }
 function musicNowUI() { // PA panel 'now playing' readout
   const el = $('#pMusicNow'); if (!el) return; const p = music.now;
   const t = settings.music === false ? 'off' : p ? '♪ ' + (p === 'ambient' ? 'terminal ambient' : MOOD_NAME[p] || p) : 'plays at the gate';
@@ -1321,6 +1329,7 @@ function buildMenu() {
   $('#radioBtn').onclick = () => { toggleRadio(); canvas.focus(); }; $('#paBtn').onclick = () => { togglePA(); canvas.focus(); }; $('#rClose').onclick = () => toggleRadio(false);
   $('#rAuto').onchange = () => { atc.auto = $('#rAuto').checked; settings.atcAuto = atc.auto; store.set('settings', settings); };
   $('#rSpeak').onchange = () => { atc.speakMe = $('#rSpeak').checked; };
+  $$('#pLights button').forEach(b => b.onclick = () => { settings.cabinLights = b.dataset.c; store.set('settings', settings); syncLightsUI(); toast('Cabin lights: ' + b.textContent.replace('Lights: ', '')); }); syncLightsUI();
   $('#pMusic').onclick = () => { settings.music = settings.music === false; store.set('settings', settings); applySettings('music'); toast('Boarding music ' + (settings.music ? 'on' : 'off')); };
   $('#pMusicVol').oninput = () => { settings.musicVol = +$('#pMusicVol').value; store.set('settings', settings); applySettings('musicVol'); }; syncMusicUI();
   selectAirport(World.byIcao.get('KTPA'), true);
@@ -1448,7 +1457,7 @@ window.__sim = {
   pa(id, custom) { if (!paOpen) togglePA(true); paSay(id, custom); return this.paState(); }, paOpen(v) { togglePA(v); },
   paState() { return { open: paOpen, lang: pa.lang, signs: { ...W.signs }, comfort: +CC.v.toFixed(1), why: CC.why, log: paLog.map(l => l.who + ': ' + l.text), cabin: !!cabinObj() }; },
   signs(b, sm) { setSigns(b, sm ?? W.signs.smoke); }, comfort(v) { if (v != null) CC.v = v; return CC.v; }, paLang(l) { pa.lang = l; renderPA(); }, cabLook(y, p, rear) { cabLook.yaw = y; cabLook.pitch = p; cabLook.rear = !!rear; },
-  cabinLive(sec) { const c = cabinObj(); for (let i = 0; i < sec * 30; i++) c.live(1 / 30, W.simTime + i / 30, null, { belt: W.signs.belt, airborne: !fdm.onGround, comfort: CC.v, visible: false }); },
+  cabinLive(sec) { const c = cabinObj(); for (let i = 0; i < sec * 30; i++) c.live(1 / 30, W.simTime + i / 30, null, { belt: W.signs.belt, airborne: !fdm.onGround, comfort: CC.v, visible: false, lights: cabinLights(0) }); },
 };
 
 // ---------------------------------------------------------------- boot
