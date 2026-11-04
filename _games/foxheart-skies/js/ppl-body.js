@@ -9,7 +9,12 @@ const nrm = v => { const l = Math.hypot(...v); return v.map(x => x / l); }, sub 
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2], cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], lerp = (a, b, t) => a.map((x, i) => x + (b[i] - x) * t);
 const mx = (s, v) => [v[0] * s, v[1], v[2]];
 // ---------------------------------------------------------------- joints (right side; left = mirrored)
-export const LM = { SH: [0.185, 1.43, -0.035], EL: [0.245, 1.146, -0.044], WR: [0.2875, 0.902, -0.009], HIP: [0.09, 0.92, 0], KNEE: [0.095, 0.495, 0.005], ANK: [0.10, 0.075, -0.025], CLAV: [0.02, 1.425, 0.0], NECK: [0, 1.45, -0.04], HEAD: [0, 1.585, -0.02], EYE: [0.032, 1.647, 0.061], EYER: 0.012, NECKCUT: 1.486 };
+export const LM = { SH: [0.185, 1.43, -0.035], EL: [0.245, 1.146, -0.044], WR: [0.2875, 0.902, -0.009], HIP: [0.09, 0.92, 0], KNEE: [0.095, 0.495, 0.005], ANK: [0.10, 0.075, -0.025], CLAV: [0.02, 1.425, 0.0], NECK: [0, 1.45, -0.04], HEAD: [0, 1.585, -0.02], EYE: [0.032, 1.647, 0.0636], EYER: 0.013, NECKCUT: 1.486 };
+// eye construction (metres, eye-local; lx = lateral from the eye centre): lid shell = ellipsoid (R + LID) x (LX, 1, 1); fissure 29 mm x 11.2 mm,
+// +4 deg canthal tilt, upper lid 1.7 mm over the iris top, lower lid on the iris bottom (+0.5 mm 'pleasant neutral' lift)
+export const EO = { LID: 0.0016, LX: 1.08, W: 0.0146, C0: 0.0004, UP: 0.0050, LO: -0.0062, TILT: 0.07, IRIS: 0.515, CLOSE: 0.93 };
+export function lidUp(lx) { const t = Math.max(-1, Math.min(1, (lx - EO.C0 + 0.0012) / (EO.W + 0.0012 * Math.sign(lx - EO.C0 + 0.0012)))); return EO.UP * Math.pow(Math.max(0, 1 - t * t), 0.72) + EO.TILT * (lx - EO.C0); }
+export function lidLo(lx) { const t = Math.max(-1, Math.min(1, (lx - EO.C0 - 0.0015) / (EO.W - 0.0015 * Math.sign(lx - EO.C0 - 0.0015)))); return EO.LO * Math.pow(Math.max(0, 1 - t * t), 0.9) + EO.TILT * (lx - EO.C0); }
 const HA = nrm(sub(LM.WR, LM.EL)); // forearm / hand axis (toward fingers)
 // right-hand local frame: X = back of hand (lateral), Y = up the arm, Z = thumb (forward)
 const HPN = nrm(sub([-1, 0, 0], mul(HA, dot([-1, 0, 0], HA)))); export const HF = { X: mul(HPN, -1), Y: mul(HA, -1) }; HF.Z = cross(HF.X, HF.Y);
@@ -26,7 +31,7 @@ for (const s of [-1, 1]) { const S = s < 0 ? 'L' : 'R'; QB[B['arm' + S]] = qFrom
 // ---------------------------------------------------------------- body (no head; neck shared with the head shape)
 // par: { fem 0..1, heavy -1..1 }
 function sharedNeck(par) { const f = par.fem || 0, h = par.heavy || 0;
-  return [P.ell([0, 1.272, -0.022], [0.150 - f * 0.016 + h * 0.016, 0.166 - f * 0.006, 0.106 + h * 0.014 - f * 0.01], { k: 0.06, bones: [[B.chest, 1]], tag: 'rib' }),P.cap([0, 1.40, -0.035], [0, 1.62, -0.012], 0.0565 - f * 0.0075, { k: 0.03, bones: [[B.neck, 1]], tag: 'neck' }),
+  return [P.ell([0, 1.272, -0.022], [0.150 - f * 0.016 + h * 0.016, 0.166 - f * 0.006, 0.106 + h * 0.014 - f * 0.01], { k: 0.06, bones: [[B.chest, 1]], tag: 'rib' }),P.cap([0, 1.40, -0.035], [0, 1.62, -0.014], 0.0535 - f * 0.0085, { k: 0.03, bones: [[B.neck, 1]], tag: 'neck' }),
     ...[-1, 1].map(s => P.cap([0, 1.474, -0.06], [s * 0.15, 1.444, -0.05], 0.038 - f * 0.004, { k: 0.045, bones: [[B.chest, 0.45], [B.neck, 0.25], [B['clav' + (s < 0 ? 'L' : 'R')], 0.3]], tag: 'trap' })),
     ...[-1, 1].map(s => P.cap([s * 0.022, 1.432, 0.034], [s * 0.15, 1.452, -0.004], 0.016, { k: 0.03, bones: [[B.chest, 0.5], [B['clav' + (s < 0 ? 'L' : 'R')], 0.5]], tag: 'clav' }))]; }
 export function bodyPrims(par = {}) {
@@ -38,7 +43,7 @@ export function bodyPrims(par = {}) {
     L.push(P.ell([s * 0.064, 0.895, -0.052 - f * 0.01], [0.080 + f * 0.012 + h * 0.012, 0.098 + f * 0.006, 0.072 + f * 0.014 + h * 0.012], { k: 0.04, bones: [[B.pelvis, 0.75], [B['thigh' + S], 0.25]], tag: 'glute' }));
     L.push(P.ell([s * 0.088, 1.255, -0.058], [0.072 - f * 0.012, 0.13, 0.056], { k: 0.045, bones: [[B.chest, 1]], tag: 'lat' }));
     L.push(P.ell([s * 0.066, 1.315, 0.03 - f * 0.03], [0.062 - f * 0.02, 0.05, 0.033], { k: 0.035, bones: [[B.chest, 1]], tag: 'pec' }));
-    L.push(P.ell([s * (0.074 + f * 0.004), 1.27 + f * 0.004, 0.035 + f * 0.04], [0.058, 0.056, 0.045 + f * 0.008], { k: 0.035, bones: [[B.chest, 1]], tag: 'breast' }));
+    L.push(P.ell([s * (0.074 + f * 0.004), 1.27 + f * 0.004, 0.03 + f * 0.045], [0.05 + f * 0.008, 0.05 + f * 0.006, 0.036 + f * 0.017], { k: 0.04, bones: [[B.chest, 1]], tag: 'breast' }));
     L.push(P.ell([s * (0.09 + f * 0.045), 0.87, -0.004], [0.05 + f * 0.012, 0.1, 0.07], { k: 0.05, bones: [[B.pelvis, 0.5], [B['thigh' + S], 0.5]], tag: 'hipside' }));
     if (hp > 0) L.push(P.ell([s * 0.13, 1.03, -0.01], [0.04 + hp * 0.02, 0.06, 0.07], { k: 0.05, bones: [[B.spine, 0.6], [B.pelvis, 0.4]], tag: 'flank' }));
   }
@@ -106,20 +111,22 @@ export function headPrims(par = {}) {
   }
   L.push(P.ell([0, 1.549 + f * 0.003, 0.068], [0.0235 - f * 0.004 + w * 0.003, 0.02, 0.019], { k: 0.022, bones: hd, tag: 'chin' }));
   L.push(P.ell([0, 1.582, 0.061], [0.036, 0.03, 0.036], { k: 0.02, bones: hd, tag: 'muzzle' }));
-  // eye sockets, then eyelids around the eyeball
-  for (const s of [-1, 1]) L.push(P.sph([s * E[0], E[1] + 0.003, E[2] + 0.003], 0.0168, { k: 0.007, sub: true, tag: 'socket' }));
-  for (const s of [-1, 1]) L.push(P.sph([s * E[0], E[1], E[2]], LM.EYER + 0.0014, { k: 0.0045, bones: hd, tag: 'lid' }));
-  // nose
+  // eye sockets, then the lid shell (an ellipsoid hugging the 13 mm eyeball, wider than it so the fissure reaches 29 mm), (the upper-lid crease is painted)
+  const R = LM.EYER, RL = R + EO.LID;
+  for (const s of [-1, 1]) L.push(P.ell([s * (E[0] - 0.005), E[1] + 0.001, E[2] + 0.0015], [0.0215, 0.016, 0.0158], { k: 0.012, sub: true, tag: 'socket' }));
+  for (const s of [-1, 1]) L.push(P.ell([s * E[0], E[1], E[2]], [RL * EO.LX, RL, RL], { k: 0.007, bones: hd, tag: 'lid' }));
+  // nose: narrower bridge, everything blended softer (no cone silhouette); nostrils are shallow and read through AO
   const nl = 1 + n * 0.12 - f * 0.08;
-  L.push(P.cone([0, 1.664, 0.08], [0, 1.664 - 0.054 * nl, 0.08 + 0.025 * nl], 0.0078 - f * 0.001, 0.0092 + n * 0.0008, { k: 0.012, bones: hd, tag: 'bridge' }));
-  L.push(P.sph([0, 1.664 - 0.058 * nl, 0.078 + 0.025 * nl], 0.0112 + n * 0.0012 - f * 0.001, { k: 0.008, bones: hd, tag: 'tip' }));
-  for (const s of [-1, 1]) L.push(P.sph([s * (0.0132 + n * 0.0012), 1.6, 0.0895], 0.0084 + n * 0.0006, { k: 0.008, bones: hd, tag: 'ala' }));
-  for (const s of [-1, 1]) L.push(P.ell([s * 0.0082, 1.5948, 0.0962 + n * 0.002], [0.0034, 0.0021, 0.0042], { k: 0.0015, sub: true, tag: 'nostril' }));
-  // mouth
-  L.push(P.ell([0, 1.5826, 0.0897], [0.0232 - f * 0.001, 0.0062 + f * 0.0008, 0.0082 + f * 0.0008], { k: 0.006, bones: hd, tag: 'ulip' }));
-  L.push(P.ell([0, 1.5707, 0.0868], [0.0208, 0.0071 + f * 0.0012, 0.0093 + f * 0.0012], { k: 0.006, bones: hd, tag: 'llip' }));
-  L.push(P.ell([0, 1.5768, 0.0975 + f * 0.001], [0.0245, 0.0011, 0.012], { k: 0.0016, sub: true, tag: 'mline' }));
-  L.push(P.cap([0, 1.5965, 0.0985], [0, 1.589, 0.0985], 0.0026, { k: 0.003, sub: true, tag: 'philtrum' }));
+  L.push(P.cone([0, 1.664, 0.08], [0, 1.664 - 0.054 * nl, 0.08 + 0.025 * nl], 0.0066 - f * 0.001, 0.0086 + n * 0.0008, { k: 0.018, bones: hd, tag: 'bridge' }));
+  L.push(P.sph([0, 1.664 - 0.058 * nl, 0.0775 + 0.025 * nl], 0.0108 + n * 0.0012 - f * 0.001, { k: 0.012, bones: hd, tag: 'tip' }));
+  for (const s of [-1, 1]) L.push(P.sph([s * (0.0128 + n * 0.0013), 1.6005, 0.0885], 0.0082 + n * 0.0006, { k: 0.012, bones: hd, tag: 'ala' }));
+  for (const s of [-1, 1]) L.push(P.ell([s * 0.0078, 1.5952, 0.0955 + n * 0.002], [0.0028, 0.0017, 0.0034], { k: 0.0022, sub: true, tag: 'nostril' }));
+  // mouth: lips sculpted into the face (soft blends), a mouth line with the corners lifted 1 mm (pleasant neutral), corner pits and a philtrum
+  L.push(P.ell([0, 1.5828, 0.0888], [0.0228 - f * 0.001, 0.0062 + f * 0.0008, 0.0076 + f * 0.0008], { k: 0.011, bones: hd, tag: 'ulip' }));
+  L.push(P.ell([0, 1.5708, 0.0858], [0.0204, 0.0072 + f * 0.0012, 0.0086 + f * 0.0012], { k: 0.011, bones: hd, tag: 'llip' }));
+  L.push(P.fn((x, y, z) => { const u = Math.min(1, Math.abs(x) / 0.0236), yc = 1.5768 + 0.0011 * u * u * u; return Math.max(Math.hypot(Math.max(0, Math.abs(x) - 0.0228), y - yc) - 0.0007, 0.084 - z); }, [-0.026, 1.573, 0.08], [0.026, 1.581, 0.11], { k: 0.0018, sub: true, tag: 'mline' }));
+  for (const s of [-1, 1]) L.push(P.sph([s * 0.0245, 1.5786, 0.0835], 0.0024, { k: 0.004, sub: true, tag: 'modiolus' }));
+  L.push(P.cap([0, 1.5965, 0.0985], [0, 1.589, 0.0985], 0.0026, { k: 0.004, sub: true, tag: 'philtrum' }));
   // ears
   for (const s of [-1, 1]) { L.push(P.ell([s * 0.0775, 1.636, -0.014], [0.0095, 0.031, 0.0195], { k: 0.006, rot: [0.22, s * 0.12, 0], bones: hd, tag: 'ear' }));
     L.push(P.ell([s * 0.0865, 1.631, -0.01], [0.0052, 0.0165, 0.0115], { k: 0.003, rot: [0.22, s * 0.12, 0], sub: true, tag: 'concha' })); }
@@ -131,10 +138,8 @@ export function craniumPrims() { return [P.ell([0, 1.668, -0.028], [0.0765, 0.09
 export const shape = prims => new Shape(prims.slice());
 // eye opening (almond) on the lid sphere: >0 outside the opening
 export function eyeOpening(x, y, z) { const E = LM.EYE; let r = 1;
-  for (const s of [-1, 1]) { const lx = (x - s * E[0]) * s, ly = y - E[1], lz = z - E[2]; if (lz < 0.003 || Math.hypot(lx, ly, lz) > LM.EYER + 0.0034) continue;
-    const W = 0.0134, c0 = 0.0006, t = Math.max(-1, Math.min(1, (lx - c0) / W)), q = 1 - t * t;
-    const up = 0.0066 * Math.pow(q, 0.8) + 0.0011 * t + 0.0003, lo = -0.0047 * Math.pow(q, 1.05) + 0.001 * t - 0.0004;
-    r = Math.min(r, Math.max(Math.abs(lx - c0) - W, ly - up, lo - ly)); }
+  for (const s of [-1, 1]) { const lx = (x - s * E[0]) * s, ly = y - E[1], lz = z - E[2]; if (lz < -0.001 || Math.hypot(lx / EO.LX, ly, lz) > LM.EYER + EO.LID + 0.0026) continue;
+    r = Math.min(r, Math.max(Math.abs(lx - EO.C0) - EO.W, ly - lidUp(lx), lidLo(lx) - ly)); }
   return r; }
 // region scalars: arm / leg parameter (metres from shoulder / hip along the limb)
 export function limbT(p, s, a, b, c, l1, l2) { const A = mx(s, a), Bb = mx(s, b), C = mx(s, c); const u = sub(Bb, A), t1 = dot(sub(p, A), u) / dot(u, u); if (t1 < 1) return t1 * l1; const v = sub(C, Bb); return l1 + Math.max(0, dot(sub(p, Bb), v) / dot(v, v)) * l2; }

@@ -5,8 +5,9 @@ import * as THREE from 'three';
 import { ATM, ATM_GLSL, NOISE_GLSL, atmos } from './sky.js';
 import { REGIONS, climateFor } from './surroundings.js';
 import { Geo, haversine, D2R } from './data.js';
+import { HOOD, HOOD_GLSL, hoodUniformDefs, blockInfo, genTall, lists as hoodLists, toGrid, tallKits, B as HB } from './wld-hood.js';
 
-export const HILL_SCALE = 4000, MOUNT = 3400, NAPT = 8; // hand-made region hills (masks) / planet mountain belts (ridged noise × amplitude)
+export const HILL_SCALE = 4000, MOUNT = 5000, NAPT = 8; // hand-made region hills (masks) / planet mountain belts (ridged noise × amplitude)
 const NEAR_SIZE = 48000, WIDE_SIZE = 440000;
 
 const CLIMATES = {
@@ -145,7 +146,7 @@ const TERRAIN_VS = /* glsl */`
 #include <common>
 #include <logdepthbuf_pars_vertex>
 ${TERRAIN_COMMON}
-uniform vec2 uCenter; varying vec3 vW; varying vec3 vN; varying float vFlat;
+uniform vec2 uCenter; varying vec3 vW; varying vec3 vN; varying float vFlat; varying float vFlatO;
 void main(){
   vec2 p = position.xz + uCenter;
   float f; vec4 m = masksL(p); float h = terrainH(p, m, f);
@@ -154,6 +155,7 @@ void main(){
   float hz = terrainH(p + vec2(0.0, e), masksL(p + vec2(0.0, e)), f2);
   vN = normalize(vec3(h - hx, e, h - hz));
   vW = vec3(p.x, h, p.y); vFlat = f;
+  vFlatO = 1.0; for (int i = 1; i < NAPT; i++) { vec4 A = uApt[i]; if (A.z > 1.0) { float fo = clamp((length(p - A.xy) - A.z) / 1800.0, 0.0, 1.0); vFlatO = min(vFlatO, fo * fo * (3.0 - 2.0 * fo)); } } // other airports (zone 0 is the primary: its fence comes from the hull)
   gl_Position = projectionMatrix * viewMatrix * vec4(vW, 1.0);
   #include <logdepthbuf_vertex>
 }`;
@@ -163,9 +165,10 @@ const TERRAIN_FS = /* glsl */`
 #include <logdepthbuf_pars_fragment>
 ${TERRAIN_COMMON}
 ${ATM_GLSL}
+${HOOD_GLSL}
 uniform vec3 uSunCol; uniform vec3 uAmbCol; uniform float uNight; uniform float uTime; uniform float uWet;
 uniform vec3 cGrass; uniform vec3 cDry; uniform vec3 cDark; uniform vec3 cSoil; uniform vec3 cShallow; uniform float uFields;
-varying vec3 vW; varying vec3 vN; varying float vFlat;
+varying vec3 vW; varying vec3 vN; varying float vFlat; varying float vFlatO;
 vec4 masksF(vec2 p){
   vec2 un = (p - uNearR.xy)/uNearR.z + 0.5; vec2 uw = (p - uWideR.xy)/uWideR.z + 0.5;
   vec4 mw = texture2D(uWide, uw) * maskFade(uw);
@@ -188,7 +191,7 @@ void main(){
   vec2 q = mat2(0.94, 0.34, -0.34, 0.94) * p; vec2 cell = floor(q / vec2(420.0, 300.0)); float hc = h12(cell);
   vec3 fieldC = hc < 0.3 ? cDry * 1.08 : hc < 0.55 ? cGrass * 1.15 : hc < 0.75 ? cSoil : cDark * 1.2;
   vec2 fq = fract(q / vec2(420.0, 300.0)); float edge = smoothstep(0.0, 0.02, min(min(fq.x, 1.0-fq.x), min(fq.y, 1.0-fq.y)));
-  float fieldsW = uFields * smoothstep(0.35, 0.6, vnoise(p/5000.0 + 3.0)) * (1.0 - m.g);
+  float fieldsW = uFields * smoothstep(0.35, 0.6, vnoise(p/5000.0 + 3.0)) * (1.0 - m.g) * (1.0 - smoothstep(0.12, 0.4, planetAt(pL).b * uPlanetOn)); // no field patchwork on mountains
   col = mix(col, fieldC * mix(0.8, 1.0, edge), fieldsW);
   col *= 0.88 + 0.24 * n3;
   // rock on steep slopes and high ground
@@ -209,7 +212,10 @@ void main(){
   roof = mix(roof, cDark * 1.1, trees * 0.75);
   float blockTone = 0.85 + 0.3 * h12(bc * 0.71);
   vec3 urbanC = mix(roof * blockTone, vec3(0.17, 0.17, 0.18), street * 0.9);
-  col = mix(col, urbanC, urb);
+  vec4 hg = uHood.z > 0.5 ? hoodGround(p, pL, m.g, cGrass, cDark, max(fwidth(p.x), fwidth(p.y))) : vec4(0.0); float hcov = 0.0;
+  if (hg.a > 0.0) { // neighbourhood grid (wld-hood.js): streets, sidewalks, lawns, hedges, driveways, pools, trees and far roofs, matching the 3D houses; the city runs up to the primary airport's fence
+    hcov = hg.a * vFlatO * smoothstep(0.0, 0.1, m.g); col = mix(col, hg.rgb, hcov); urb = max(urb * 0.5, hcov * 0.8); }
+  else col = mix(col, urbanC, urb); // cities outside the neighbourhood list keep the simple fabric
   col = mix(col, mix(cDark * 0.7, vec3(0.05, 0.09, 0.08), n2), marsh);
   col *= 1.0 - uWet * 0.35;
   // ---- lighting ----
@@ -238,7 +244,8 @@ void main(){
     lit = mix(lit, wcol, water);
   }
   // ---- night city lights ----
-  if (uNight > 0.01 && urb > 0.02) {
+  if (hcov > 0.01) lit += hoodGlow * hcov * uNight * 2.2; // street-lamp chains along the roads and lit windows
+  else if (uNight > 0.01 && urb > 0.02) {
     vec2 g = bq / 26.0; vec2 gi = floor(g); vec2 gf = fract(g) - 0.5; float hh = h12(gi + 0.31);
     vec2 off = vec2(h12(gi + 1.7), h12(gi + 4.1)) - 0.5;
     float px = max(fwidth(g.x), 1e-4);
@@ -268,6 +275,7 @@ export class Terrain {
       ...ATM, uNear: { value: null }, uWide: { value: null }, uNearR: { value: new THREE.Vector4() }, uWideR: { value: new THREE.Vector4() },
       uBase: { value: 0 }, uNoiseAmp: { value: 30 }, uApt: { value: Array.from({ length: NAPT }, () => new THREE.Vector4(0, 0, 0, 0)) }, uAptElev: { value: new Array(NAPT).fill(0) },
       uCenter: { value: new THREE.Vector2() }, uWet: { value: 0 },
+      ...hoodUniformDefs(),
       uPlanet: { value: null }, uPBase: { value: null }, uGeo: { value: new THREE.Vector4(0, 0, 111000, 111000) }, uPlanetOn: { value: 0 }, uWorld: { value: new THREE.Vector2() },
       cGrass: { value: new THREE.Color() }, cDry: { value: new THREE.Color() }, cDark: { value: new THREE.Color() }, cSoil: { value: new THREE.Color() }, cShallow: { value: new THREE.Color() }, uFields: { value: 0.5 },
     };
@@ -368,6 +376,13 @@ export class City {
       for (const r of g.runways) keepOut.push([ox + r.cx, oz + r.cz, r.dir.x, r.dir.z, r.L / 2 + 300 + 40, r.W / 2 + 150 + 40]);
       if (g.apron) { const ap = g.apron; keepOut.push([ox + ap.x, oz + ap.z, ap.dx, ap.dz, ap.len / 2 + 450, ap.dep / 2 + 650]); } }
     const kept = (x, z) => { for (const k of keepOut) { const dx = x - k[0], dz = z - k[1]; if (Math.abs(dx * k[2] + dz * k[3]) < k[4] && Math.abs(-dx * k[3] + dz * k[2]) < k[5]) return false; } return true; };
+    this.blocked = (x, z) => airportsLocal.some(a => Math.hypot(x - a.x, z - a.z) < a.r + 500) || !kept(x, z) || (this.extraBlocked ? this.extraBlocked(x, z) : false); // + road corridors (wld-roads.js)
+    if (HOOD.on) { // block-based far ring (wld-hood.js): apartment rows, mid-rise blocks and towers with setbacks on the street grid; houses come from the near tiles
+      const L = hoodLists(), ctx = { heightAt: (x, z) => terrain.heightAt(x, z), blocked: this.blocked }, [gu, gv] = toGrid(cx, cz), n = Math.ceil(range / HB);
+      for (let bj = Math.floor(gv / HB) - n; bj <= Math.floor(gv / HB) + n; bj++) { yield; for (let bi = Math.floor(gu / HB) - n; bi <= Math.floor(gu / HB) + n; bi++) { const info = blockInfo(bi, bj); if (info.cls >= 3 && Math.hypot(info.x - cx, info.z - cz) < range) genTall(bi, bj, info, ctx, L); } }
+      this.clear(); this.count = 0; const K = tallKits(); for (const [name, geo, mat] of K) { const l = L[name]; if (!l.n) continue; const im = new THREE.InstancedMesh(geo, mat, l.n); im.instanceMatrix.array.set(l.m.subarray(0, l.n * 16)); im.instanceColor = new THREE.InstancedBufferAttribute(l.c.slice(0, l.n * 3), 3);
+        if (name === 'body') { geo.setAttribute('aStyle', new THREE.InstancedBufferAttribute(l.s.slice(0, l.n), 1)); this.count = l.n; } im.frustumCulled = false; this.group.add(im); }
+      this._landmarks(terrain, geo, cx, cz); return; }
     for (let z = cz - range; z < cz + range && out.length < max * 1.4; z += step0) { yield; for (let x = cx - range; x < cx + range; x += step0) {
       const jx = x + (R() - 0.5) * step0 * 0.7, jz = z + (R() - 0.5) * step0 * 0.7;
       const m = terrain.masks.sample(jx, jz); if (m[0] > 0.3 || m[1] < 0.18) continue;
@@ -396,6 +411,9 @@ export class City {
       im.castShadow = false; im.receiveShadow = false; im.frustumCulled = false; this.group.add(im);
     }
     this.count = list.length;
+    this._landmarks(terrain, geo, cx, cz);
+  }
+  _landmarks(terrain, geo, cx, cz) {
     // landmarks (tall towers) with red obstruction lights
     const lmMat = facadeMaterial({ glass: true }); lmMat.color.setRGB(0.7, 0.76, 0.82); lmMat.metalness = 0.5; lmMat.roughness = 0.3;
     const lights = [];

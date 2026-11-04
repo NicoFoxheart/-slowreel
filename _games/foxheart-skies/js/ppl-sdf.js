@@ -185,6 +185,11 @@ export function bakeAO(m, f, o = {}) { // SDF ambient occlusion (two scales) int
     for (const [s, w] of steps) { const v = f(px + nx * s, py + ny * s, pz + nz * s); occ += w * Math.max(0, s - v) / s; tot += w; }
     d[i] = clamp(1 - k * occ / tot, 0.08, 1); }
   m.A.ao = { data: d, size: 1 }; return m; }
+// mean curvature (SDF Laplacian = k1 + k2, 1/m) scaled to 0..1 per vertex, for the curvature-based skin scattering
+export function bakeCurv(m, f, o = {}) { const n = vcount(m), e = o.eps || 0.004, sc = o.scale || 250, C = new Float32Array(n);
+  for (let i = 0; i < n; i++) { const x = m.P[i * 3], y = m.P[i * 3 + 1], z = m.P[i * 3 + 2], c0 = f(x, y, z);
+    const lap = (f(x + e, y, z) + f(x - e, y, z) + f(x, y + e, z) + f(x, y - e, z) + f(x, y, z + e) + f(x, y, z - e) - 6 * c0) / (e * e); C[i] = clamp(lap / sc, 0, 1); }
+  return C; }
 // morph target: project each vertex onto the variant SDF surface; returns a delta attribute
 export function morph(m, f, name, o = {}) { const n = vcount(m), d = new Float32Array(n * 3), eps = 0.0008, mask = o.mask; const g = [0, 0, 0];
   for (let i = 0; i < n; i++) { const w = mask ? mask(m.P[i * 3], m.P[i * 3 + 1], m.P[i * 3 + 2], i) : 1; if (w <= 0) continue; let x = m.P[i * 3], y = m.P[i * 3 + 1], z = m.P[i * 3 + 2]; const x0 = x, y0 = y, z0 = z; const off = o.off ? o.off[i] : 0;

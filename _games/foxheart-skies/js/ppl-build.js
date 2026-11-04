@@ -1,8 +1,8 @@
 // People mesh builder: turns the sculpted SDF anatomy into skinned LOD layers (body, head, hands, eyes,
 // layered garments, shoes, hair styles, beards, accessories and props). Built once, cached per quality.
 import * as THREE from 'three';
-import { P, Shape, polygonize, axis, clip, hem, merge, offset, setAttr, bakeAO, morph, skinWeights, constWeights, ensure, vcount, field, transform } from './ppl-sdf.js';
-import { B, NB, J, LM, HF, bodyPrims, headPrims, handPrims, craniumPrims, eyeOpening, headSide, ARM, LEG, nrm, sub, add, mul, dot, cross, lerp, mx } from './ppl-body.js';
+import { P, Shape, polygonize, axis, clip, hem, merge, offset, setAttr, bakeAO, bakeCurv, morph, skinWeights, constWeights, ensure, vcount, field, transform } from './ppl-sdf.js';
+import { B, NB, J, LM, HF, EO, lidUp, lidLo, bodyPrims, headPrims, handPrims, craniumPrims, eyeOpening, headSide, ARM, LEG, nrm, sub, add, mul, dot, cross, lerp, mx } from './ppl-body.js';
 
 const ATTRS = [['skinIndex', 4], ['skinWeight', 4], ['aM0', 3], ['aM1', 3], ['aM2', 3], ['aAO', 1], ['aReg', 4], ['aExt', 4], ['uv', 2]];
 const ramp = (x, a, b, fine, coarse, k = 0.3) => { const d = x < a ? a - x : x > b ? x - b : 0; return Math.min(coarse, fine + d * k); };
@@ -30,7 +30,7 @@ function shapes() { if (SH) return SH; const body = bodyPrims({}), head = headPr
     fHands: new Shape([...handPrims(-1, { fem: 1 }), ...handPrims(1, { fem: 1 })]).fn, hHands: new Shape([...handPrims(-1, { heavy: 1 }), ...handPrims(1, { heavy: 1 })]).fn };
   SH.fAll = (x, y, z) => { let d = SH.sBody.eval(x, y, z); for (const s of [SH.sHead, SH.sHands]) if (s.bound(x, y, z) < d) d = Math.min(d, s.eval(x, y, z)); return d; }; return SH; }
 const AO_BODY = { steps: [[0.015, 1], [0.04, 0.7], [0.09, 0.4], [0.16, 0.2]], k: 1.5 };
-const AO_FACE = { steps: [[0.003, 1], [0.008, 0.8], [0.018, 0.5], [0.04, 0.3]], k: 1.35 };
+const AO_FACE = { steps: [[0.003, 1], [0.008, 0.8], [0.018, 0.5], [0.04, 0.3]], k: 1.6 };
 // wrist cut: >0 keeps the forearm side (only near the forearm axis)
 function wristKeep(x, y, z) { const s = x < 0 ? -1 : 1, W = mx(s, LM.WR), A = mx(s, nrm(sub(LM.WR, LM.EL))); const d = [x - W[0], y - W[1], z - W[2]], u = dot(d, A); const rad = Math.hypot(d[0] - A[0] * u, d[1] - A[1] * u, d[2] - A[2] * u); return Math.max(-0.03 - u, rad - 0.055); }
 
@@ -49,13 +49,14 @@ function figureMesh(h) { // LOD2: whole figure (body + head + hands + feet), clo
 function headMesh(fine, coarse) { const S = shapes();
   const ef = Math.min(fine, 0.0032), xs = axis(-0.11, 0.11, x => ramp(Math.abs(x), 0, 0.075, Math.abs(x) < 0.05 ? Math.max(ef, fine * 0.7) : fine, coarse * 0.85)), ys = axis(1.476, 1.775, y => y > 1.62 && y < 1.664 ? ef : ramp(y, 1.55, 1.70, fine, coarse)), zs = axis(-0.13, 0.125, z => z > 0.05 ? Math.max(ef, fine * 0.7) : ramp(z, -0.035, 0.2, fine, coarse));
   let m = polygonize(S.sHead.fn, null, fine, { xs, ys, zs });
-  ensure(m, 'hem', 1, 0); m = clip(m, eyeOpening); m = hem(m, 0.0018, { round: 0.12, attr: (k, c, v, inner) => k === 'hem' ? (inner ? 1 : 0.5) : v });
+  ensure(m, 'hem', 1, 0); m = clip(m, eyeOpening); m = hem(m, 0.0026, { round: 0.12, attr: (k, c, v, inner) => k === 'hem' ? (inner ? 1 : 0.5) : v });
   m = clip(m, (x, y, z) => headSide(x, y, z) + 0.003);
   skinWeights(m, S.head, { nbones: NB, tau: 0.01 }); bakeAO(m, S.sHead.fn, AO_FACE); { const a = m.A.ao.data, b = bakeAO({ P: m.P, N: m.N, A: {} }, S.fAll, AO_BODY).A.ao.data; for (let i = 0; i < a.length; i++) { const k = sstep(1.5, 1.545, m.P[i * 3 + 1]); a[i] = (1 + (a[i] - 1) * k) * b[i]; } }
   morph(m, S.fHead, 'aM0', { max: 0.02 }); morph(m, S.wHead, 'aM1', { max: 0.02 }); morph(m, S.nHead, 'aM2', { max: 0.02 });
   setAttr(m, 'uv', 2, (x, y, z, i, o) => { o[0] = 0.5 + x / 0.2; o[1] = (y - 1.49) / 0.29; });
   tuck(m, (x, y, z) => 0.0012 * sstep(0.003, -0.003, headSide(x, y, z)));
-  const hm = m.A.hem.data; setAttr(m, 'aReg', 4, (x, y, z, i, o) => { o[0] = hm[i]; o[1] = scalpMask(x, y, z); o[2] = beardMask(x, y, z); o[3] = 0; }); return m; }
+  const hm = m.A.hem.data; setAttr(m, 'aReg', 4, (x, y, z, i, o) => { o[0] = hm[i]; o[1] = scalpMask(x, y, z); o[2] = beardMask(x, y, z); o[3] = 0; });
+  const cv = bakeCurv(m, S.sHead.fn); setAttr(m, 'aExt', 4, (x, y, z, i, o) => { o[0] = cv[i]; o[1] = o[2] = o[3] = 0; }); return m; }
 export function scalpMask(x, y, z) { const th = Math.atan2(x, z + 0.01); const a = Math.abs(th); const yl = a < 0.6 ? 1.703 - a * 0.012 : a < 1.3 ? 1.696 - (a - 0.6) * 0.09 : a < 2.0 ? 1.633 - (a - 1.3) * 0.02 : 1.619 - (a - 2.0) * 0.035;
   let v = sstep(-0.004, 0.006, y - yl); const ear = Math.hypot((Math.abs(x) - 0.078) * 0.6, y - 1.636, z + 0.012) - 0.031; v *= sstep(-0.004, 0.006, ear); return v; }
 export function beardMask(x, y, z) { if (z < -0.02) return 0; const th = Math.atan2(x, z + 0.01), a = Math.abs(th); let v = sstep(1.64, 1.615, y) * sstep(1.45, 0.9, a) * sstep(-0.015, 0.01, z);
@@ -63,15 +64,40 @@ export function beardMask(x, y, z) { if (z < -0.02) return 0; const th = Math.at
 function handsMesh(h) { const S = shapes();
   let m = polygonize(S.sHands.fn, [-0.37, 0.69, -0.09, 0.37, 0.96, 0.12], h, { xs: axis(-0.37, 0.37, x => Math.abs(x) < 0.21 ? 0.03 : h) });
   m = clip(m, (x, y, z) => -wristKeep(x, y, z) + 0.003);
-  tuck(m, (x, y, z) => 0.0012 * sstep(0.003, -0.003, -wristKeep(x, y, z))); skinWeights(m, S.hands, { nbones: NB, tau: 0.006 }); bakeAO(m, S.fAll, { steps: [[0.004, 1], [0.01, 0.7], [0.025, 0.4], [0.06, 0.2]], k: 1.3 }); morph(m, S.fHands, 'aM0', { max: 0.01 }); morph(m, S.hHands, 'aM1', { max: 0.01 }); return m; }
+  tuck(m, (x, y, z) => 0.0012 * sstep(0.003, -0.003, -wristKeep(x, y, z))); skinWeights(m, S.hands, { nbones: NB, tau: 0.006 }); bakeAO(m, S.fAll, { steps: [[0.004, 1], [0.01, 0.7], [0.025, 0.4], [0.06, 0.2]], k: 1.3 }); morph(m, S.fHands, 'aM0', { max: 0.01 }); morph(m, S.hHands, 'aM1', { max: 0.01 });
+  const cv = bakeCurv(m, S.sHands.fn, { eps: 0.003 }); setAttr(m, 'aExt', 4, (x, y, z, i, o) => { o[0] = cv[i]; o[1] = o[2] = o[3] = 0; }); return m; }
 
 // ---------------------------------------------------------------- eyes: eyeballs + blink lids (aReg.x: 0 eyeball, 1 lid; aReg.y side)
-function eyesMesh(seg) { const parts = [];
-  for (const s of [-1, 1]) { const c = mx(s, LM.EYE);
-    const eb = new THREE.SphereGeometry(LM.EYER, seg, Math.round(seg * 0.75)).rotateX(Math.PI / 2); // pole forward (+z) for clean iris rings
+// aReg.x kind: 0 eyeball (gaze-rotated), 1 blink lid (rotates down about the eye's x axis), 2 upper lashes (ride on the lid), 3 lower lashes, 4 corner filler
+// (static conjunctiva/caruncle that fills the fissure corners beyond the eyeball). uv: lid/lash coordinates (u along the lid, v from the margin).
+function eyesMesh(seg, lashes = true) { const parts = [], R = LM.EYER, RS = R + EO.LID, RI = R + 0.0003, RO = R + 0.001, LXB = 1.12, Sh = shapes().sHead;
+  const rho = (r, lx, k = EO.LX) => r * Math.sqrt(Math.max(0.04, 1 - (lx / (r * k)) ** 2)); // radius of the x-slice of an x-stretched ellipsoid (revolution about x)
+  const elev = (y, lx) => { const rs = rho(RS, lx); return Math.atan2(y, Math.sqrt(Math.max(1e-10, rs * rs - y * y))); };
+  const grid = (nu, nv, f, kind, s) => { const P = [], N = [], U = [], I = []; // f(u, v) → [lx, y, z, nx, ny, nz, v]
+    for (let j = 0; j <= nv; j++) for (let i = 0; i <= nu; i++) { const o = f(i / nu, j / nv); P.push(s * o[0], o[1], o[2]); const l = Math.hypot(o[3], o[4], o[5]) || 1; N.push(s * o[3] / l, o[4] / l, o[5] / l); U.push(i / nu, o[6] ?? j / nv); }
+    for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) { const a = j * (nu + 1) + i, b = a + 1, c = a + nu + 1, d = c + 1; if (s > 0) I.push(a, c, b, b, c, d); else I.push(a, b, c, b, d, c); }
+    const n = P.length / 3; return { P: new Float32Array(P), N: new Float32Array(N), I: new Uint32Array(I), A: { aReg: { data: new Float32Array(Array.from({ length: n }, () => [kind, s, 0, 0]).flat()), size: 4 }, uv: { data: new Float32Array(U), size: 2 } } }; };
+  const at = (r, lx, e, k = EO.LX) => { const rh = rho(r, lx, k); return [lx, rh * Math.sin(e), rh * Math.cos(e), lx / (k * k), rh * Math.sin(e), rh * Math.cos(e)]; };
+  for (const s of [-1, 1]) { const c = mx(s, LM.EYE), off = m => { for (let i = 0; i < m.P.length; i += 3) { m.P[i] += c[0]; m.P[i + 1] += c[1]; m.P[i + 2] += c[2]; } return m; };
+    const skinR = (lx, e) => { let r = 0.024; const rh = k => Math.sqrt(Math.max(0.04, 1 - (lx / (k * EO.LX)) ** 2)); while (r > R && Sh.eval(c[0] + s * lx, c[1] + r * rh(r) * Math.sin(e), c[2] + r * rh(r) * Math.cos(e)) > 0) r -= 0.0002; return r; };
+    const eb = new THREE.SphereGeometry(R, seg, Math.round(seg * 0.75)).rotateX(Math.PI / 2); // pole forward (+z) for clean iris rings
     parts.push(fromThree(eb, (p, n) => { p[0] += c[0]; p[1] += c[1]; p[2] += c[2]; }, [0, s]));
-    const lid = new THREE.SphereGeometry(LM.EYER + 0.0009, seg, Math.round(seg / 2), 0.26, 2.62, 0.52, 1.48); // closed-lid patch over the front; the shader swings it up under the lid when open
-    parts.push(fromThree(lid, (p, n) => { p[0] += c[0]; p[1] += c[1]; p[2] += c[2]; }, [1, s]));
+    const fl = new THREE.SphereGeometry(1, Math.max(8, seg), Math.max(6, Math.round(seg * 0.6)), 0, Math.PI * 2, 0, Math.PI * 0.62).rotateX(Math.PI / 2); // front cap only
+    parts.push(fromThree(fl, (p, n) => { p[0] = p[0] * R * 1.17 + c[0]; p[1] = p[1] * R * 0.955 + c[1]; p[2] = p[2] * R * 0.955 + c[2]; n[0] /= 1.225; }, [4, s]));
+    const nu = Math.max(8, Math.round(seg * 0.9)), lxOf = u => EO.C0 + (u * 2 - 1) * (EO.W + 0.0004);
+    // blink lid: a 1 mm margin band (inner edge on the eyeball) then the lid surface; at rest the margin sits just above (behind) the skin lid margin,
+    // the shader rotates it down by closure * EO.CLOSE. v: 0 inner margin, 0.04 outer margin, 1 top.
+    parts.push(off(grid(nu, 6, (u, v) => { const lx = lxOf(u), e0 = elev(lidUp(lx), lx) + 0.035;
+      if (v === 0) { const o = at(RI, lx, e0, LXB); return [o[0], o[1], o[2], 0, -Math.sin(e0) * 0.6 - 0.4, Math.cos(e0) * 0.2, 0]; }
+      const e = e0 + 0.01 + (v - 1 / 6) * 1.5; return [...at(RO, lx, e, LXB), 0.04 + (v - 1 / 6) * 1.15]; }, 1, s)));
+    if (lashes) { const nl = 22;
+      // upper lashes ride on the lid (rotate with it), rooted on its outer margin: mostly forward, curling up; longer and denser at the outer third
+      parts.push(off(grid(nl, 3, (u, v) => { const lx = EO.C0 - EO.W * 0.94 + 1.88 * EO.W * u, e = elev(lidUp(lx), lx) + 0.045, t = (lx - EO.C0) / EO.W, L = (0.0048 + 0.0028 * Math.max(0, Math.min(1, (t + 0.2) / 0.9))) * Math.pow(Math.max(0, 1 - t * t), 0.3);
+        const r0 = at(RO + 0.0003, lx, e, LXB), ln = Math.hypot(r0[3], r0[4], r0[5]), n = [r0[3] / ln, r0[4] / ln, r0[5] / ln], f = [n[0] * 0.35, n[1] * 0.35, n[2] * 0.35 + 0.65], fl = Math.hypot(...f);
+        const out = L * 0.85 * v, up = L * 0.5 * v * v; return [r0[0] + f[0] / fl * out, r0[1] + f[1] / fl * out + up, r0[2] + f[2] / fl * out, 0, -0.3, 1]; }, 2, s)));
+      // lower lashes: static, rooted on the skin's lower lid margin, short and sparse, forward and down
+      parts.push(off(grid(nl, 1, (u, v) => { const lx = EO.C0 - EO.W * 0.8 + 1.6 * EO.W * u, t = (lx - EO.C0) / EO.W, e = elev(lidLo(lx), lx) - 0.03, L = 0.0026 * Math.pow(Math.max(0, 1 - t * t), 0.4);
+        const r = skinR(lx, e) - 0.0004, r0 = at(r, lx, e); return [r0[0], r0[1] - L * 0.45 * v, r0[2] + L * 0.85 * v, 0, -0.2, 1]; }, 3, s))); }
   }
   const m = merge(parts); constWeights(m, B.head); return m; }
 function fromThree(g, tf, reg = [0, 0, 0, 0], ext) { const gi = g.index ? g : g; const P0 = g.attributes.position, N0 = g.attributes.normal, n = P0.count; const Pp = new Float32Array(n * 3), Nn = new Float32Array(n * 3), R = new Float32Array(n * 4), U = new Float32Array(n * 2);
@@ -151,17 +177,23 @@ function shoeMesh(h, kind) { const L = [];
   setAttr(m, 'aExt', 4, (x, y, z, i, o) => { o[0] = y < soleH + 0.003 ? 3 : 2; o[1] = H[i]; o[2] = 1; o[3] = kind === 'dress' ? 5 : 6; }); setAttr(m, 'aReg', 4, (x, y, z, i, o) => { o[0] = y; o[1] = z; o[2] = soleH; o[3] = 0; });
   bakeAO(m, (x, y, z) => Math.min(sh.eval(x, y, z), y + 0.0), { steps: [[0.008, 1], [0.02, 0.6], [0.05, 0.3]], k: 0.9 }); return m; }
 
-// ---------------------------------------------------------------- hair (volumes around the cranium, clipped at the hairline; aExt = flow tangent xyz + edge)
+// ---------------------------------------------------------------- hair: a sculpted base volume 1-1.5 cm off the skull (painted strand texture, soft hairline),
+// plus strand cards that follow the scalp curve (LOD0 25-60, LOD1 8-15). aExt = flow tangent xyz + edge (0 at the hairline); cards: aReg.x = 1, uv across / along.
+// cards: [count LOD0, count LOD1, length min, length max, width]
+const curl = (x, y, z, k) => Math.sin(x * k) * Math.sin(y * k * 0.96 + 1.3) * Math.sin(z * k * 1.04 + 0.7);
 const HAIR = {
-  short: { T: (x, y, z) => 0.006 + 0.004 * sstep(1.66, 1.74, y), line: { front: 1.704 }, flow: (x, y, z) => [x * 0.3, -0.25, -1] },
-  side: { T: (x, y, z) => 0.007 + 0.016 * sstep(1.66, 1.75, y) * sstep(-0.06, 0.06, z), line: { front: 1.708 }, flow: (x, y, z) => [x > 0.025 ? 1 : -0.6, -0.35, -0.35], extra: [P.ell([0.012, 1.735, 0.035], [0.06, 0.035, 0.065], { k: 0.03 })] },
-  long: { T: (x, y, z) => 0.01 + 0.006 * sstep(1.65, 1.74, y), line: { front: 1.712, long: 1.40, ears: false }, flow: (x, y, z) => [Math.sign(x) * 0.5 * sstep(1.6, 1.75, y), -1, -0.2 * sstep(1.6, 1.74, y)],
-    extra: [P.box([0, 1.52, -0.105], [0.082, 0.14, 0.035], 0.03, { k: 0.06, rot: [0.12, 0, 0] }), ...[-1, 1].map(s => P.box([s * 0.078, 1.57, -0.02], [0.022, 0.1, 0.05], 0.018, { k: 0.04, rot: [0.0, 0, s * 0.06] }))] },
-  bob: { T: (x, y, z) => 0.012 + 0.004 * sstep(1.65, 1.74, y), line: { front: 1.69, long: 1.565, ears: false, fringe: true }, flow: (x, y, z) => [Math.sign(x) * 0.3, -1, 0.15],
-    extra: [P.ell([0, 1.62, -0.03], [0.098, 0.075, 0.105], { k: 0.04 }), P.box([0, 1.7, 0.075], [0.06, 0.03, 0.02], 0.015, { k: 0.03, rot: [-0.5, 0, 0] })] },
-  pony: { T: (x, y, z) => 0.005 + 0.002 * sstep(1.66, 1.74, y), line: { front: 1.71 }, flow: (x, y, z) => [x * 0.2, 0.15, -1], extra: [P.cone([0, 1.68, -0.12], [0, 1.52, -0.165], 0.022, 0.012, { k: 0.02 }), P.sph([0, 1.675, -0.118], 0.02, { k: 0.01 })], ponyLong: true },
-  bun: { T: (x, y, z) => 0.005 + 0.002 * sstep(1.66, 1.74, y), line: { front: 1.71 }, flow: (x, y, z) => [x * 0.2, 0.4, -1], extra: [P.ell([0, 1.74, -0.085], [0.04, 0.034, 0.036], { k: 0.012 })] },
-  curly: { T: (x, y, z) => 0.022 + 0.012 * sstep(1.66, 1.76, y) + 0.004 * Math.sin(x * 240) * Math.sin(y * 230) * Math.sin(z * 250), line: { front: 1.70 }, flow: (x, y, z) => [Math.sin(y * 300), Math.cos(z * 280), Math.sin(x * 290)] },
+  short: { T: (x, y, z) => 0.005 + 0.004 * sstep(1.66, 1.74, y), line: { front: 1.704 }, flow: (x, y, z) => [x * 0.3, -0.25, -1], cards: [30, 10, 0.045, 0.07, 0.02] },
+  side: { T: (x, y, z) => 0.006 + 0.011 * sstep(1.66, 1.75, y) * sstep(-0.06, 0.06, z), line: { front: 1.708 }, flow: (x, y, z) => [x > 0.025 ? 1 : -0.6, -0.35, -0.35], extra: [P.ell([0.012, 1.733, 0.032], [0.058, 0.03, 0.062], { k: 0.03 })], cards: [36, 12, 0.06, 0.095, 0.022] },
+  long: { T: (x, y, z) => 0.008 + 0.005 * sstep(1.65, 1.74, y), line: { front: 1.712, long: 1.40, ears: false }, flow: (x, y, z) => [Math.sign(x) * 0.5 * sstep(1.6, 1.75, y), -1, -0.2 * sstep(1.6, 1.74, y)],
+    extra: [P.box([0, 1.52, -0.1], [0.078, 0.14, 0.03], 0.026, { k: 0.06, rot: [0.12, 0, 0] }), ...[-1, 1].map(s => P.box([s * 0.076, 1.57, -0.02], [0.019, 0.1, 0.048], 0.016, { k: 0.04, rot: [0.0, 0, s * 0.06] }))], cards: [54, 14, 0.12, 0.3, 0.024] },
+  bob: { T: (x, y, z) => 0.009 + 0.004 * sstep(1.65, 1.74, y), line: { front: 1.69, long: 1.565, ears: false, fringe: true }, flow: (x, y, z) => [Math.sign(x) * 0.3, -1, 0.15],
+    extra: [P.ell([0, 1.625, -0.028], [0.091, 0.07, 0.1], { k: 0.04 }), P.box([0, 1.7, 0.073], [0.058, 0.026, 0.017], 0.014, { k: 0.03, rot: [-0.5, 0, 0] })], cards: [48, 14, 0.08, 0.13, 0.024] },
+  pony: { T: (x, y, z) => 0.0045 + 0.002 * sstep(1.66, 1.74, y), line: { front: 1.71 }, flow: (x, y, z) => [x * 0.2, 0.15, -1], extra: [P.cone([0, 1.68, -0.12], [0, 1.52, -0.165], 0.022, 0.012, { k: 0.02 }), P.sph([0, 1.675, -0.118], 0.02, { k: 0.01 })], ponyLong: true, cards: [32, 10, 0.05, 0.09, 0.02] },
+  bun: { T: (x, y, z) => 0.0045 + 0.002 * sstep(1.66, 1.74, y), line: { front: 1.71 }, flow: (x, y, z) => [x * 0.2, 0.4, -1], extra: [P.ell([0, 1.74, -0.085], [0.04, 0.034, 0.036], { k: 0.012 })], cards: [28, 9, 0.05, 0.075, 0.02] },
+  curly: { T: (x, y, z) => 0.016 + 0.01 * sstep(1.66, 1.76, y) + 0.003 * curl(x, y, z, 240), line: { front: 1.70 }, flow: (x, y, z) => [Math.sin(y * 300), Math.cos(z * 280), Math.sin(x * 290)], curly: 1 },
+  coily: { T: (x, y, z) => 0.0075 + 0.004 * sstep(1.66, 1.75, y) + 0.0018 * curl(x, y, z, 320), line: { front: 1.703 }, flow: (x, y, z) => [Math.sin(y * 420 + z * 90), Math.cos(z * 400 + x * 70), Math.sin(x * 410)], curly: 1 },
+  afro: { T: (x, y, z) => 0.024 + 0.016 * sstep(1.6, 1.75, y) + 0.004 * curl(x, y, z, 150), line: { front: 1.70, ears: true }, flow: (x, y, z) => [Math.sin(y * 260 + z * 50), Math.cos(z * 240 + x * 60), Math.sin(x * 250)], curly: 1 },
+  buzz: { T: (x, y, z) => 0.0022, line: { front: 1.703 }, flow: (x, y, z) => [x * 0.3, -0.3, -1] },
   bald: { T: (x, y, z) => 0.003, line: { front: 1.64, crown: true }, flow: (x, y, z) => [0, -1, -0.3] },
 };
 export const HAIR_STYLES = Object.keys(HAIR);
@@ -174,21 +206,44 @@ function hairLine(x, y, z, L) { // >0 inside the hair region
   if (L.fringe) v = Math.max(v, Math.min(y - 1.684, (0.95 - a) * 0.06));
   if (L.crown) v = Math.min(v, 1.70 - y, (a - 1.1) * 0.05); // male pattern: ring around the sides/back
   return v; }
-function hairMesh(style, fine, coarse) { const H = HAIR[style]; const S = shapes(); const cr = new Shape(craniumPrims());
-  const sh = new Shape([P.fn((x, y, z) => cr.eval(x, y, z) - H.T(x, y, z) * sstep(-0.004, 0.012, hairLine(x, y, z, H.line)) - 0.0012, [-0.12, 1.5, -0.16], [0.12, 1.8, 0.12], { k: 0.0 }), ...(H.extra || [])]);
+function hairWeights(m) { const SI = new Float32Array(vcount(m) * 4), SW = new Float32Array(vcount(m) * 4);
+  for (let i = 0; i < vcount(m); i++) { const y = m.P[i * 3 + 1], z = m.P[i * 3 + 2]; const lw = sstep(1.58, 1.46, y) * (z < -0.04 || Math.abs(m.P[i * 3]) > 0.07 ? 0.85 : 0.5); SI.set([B.head, B.chest, B.neck, 0], i * 4); SW.set([1 - lw, lw * 0.7, lw * 0.3, 0], i * 4); }
+  m.A.skinIndex = { data: SI, size: 4 }; m.A.skinWeight = { data: SW, size: 4 }; }
+function hairShape(H) { const cr = new Shape(craniumPrims());
+  return new Shape([P.fn((x, y, z) => cr.eval(x, y, z) - H.T(x, y, z) * sstep(-0.004, 0.012, hairLine(x, y, z, H.line)) - 0.0012, [-0.14, 1.5, -0.17], [0.14, 1.82, 0.13], { k: 0.0 }), ...(H.extra || [])]); }
+const inHair = (H, x, y, z) => { let v = hairLine(x, y, z, H.line); if (H.extra) for (const e of H.extra) if (e.f(x, y, z) < 0.006) v = Math.max(v, 0.01); return v; };
+// strand cards lying on the hair volume (+2..5 mm), grown along the style's flow field from roots spread over the hair region
+function hairCards(H, sh, n, seed) {
+  const [, , l0, l1, w0] = H.cards, f = (x, y, z) => sh.eval(x, y, z); let rs = seed; const rnd = () => (rs = (rs * 16807) % 2147483647) / 2147483647;
+  const grad = p => { const e = 0.0007; const g = [f(p[0] + e, p[1], p[2]) - f(p[0] - e, p[1], p[2]), f(p[0], p[1] + e, p[2]) - f(p[0], p[1] - e, p[2]), f(p[0], p[1], p[2] + e) - f(p[0], p[1], p[2] - e)]; const l = Math.hypot(...g) || 1; return g.map(v => v / l); };
+  const proj = (p, lift) => { for (let k = 0; k < 5; k++) { const d = f(p[0], p[1], p[2]) - lift, g = grad(p); p[0] -= g[0] * d; p[1] -= g[1] * d; p[2] -= g[2] * d; } return p; };
+  const Pp = [], Nn = [], Uu = [], Ee = [], Rg = [], Ii = []; let made = 0;
+  for (let k = 0; made < n && k < n * 40; k++) {
+    const yv = 1 - rnd() * 1.35, r = Math.sqrt(Math.max(0, 1 - yv * yv)), ph = rnd() * Math.PI * 2, dir = [Math.cos(ph) * r, yv, Math.sin(ph) * r];
+    const p = proj([dir[0] * 0.14, 1.67 + dir[1] * 0.14, -0.015 + dir[2] * 0.14], 0.002); if (inHair(H, ...p) < 0.012 || p[2] > 0.1) continue;
+    const len = l0 + (l1 - l0) * rnd(), segs = Math.max(4, Math.round(len / 0.012)), st = len / segs, w = w0 * (0.75 + 0.5 * rnd()), id = rnd();
+    let d = H.flow(...p), base = Pp.length / 3; const pts = [];
+    for (let j = 0; j <= segs; j++) { const v = j / segs; if (j) { p[0] += d[0] * st; p[1] += d[1] * st; p[2] += d[2] * st; proj(p, 0.0022 + 0.003 * v); if (inHair(H, ...p) < -0.006) break; }
+      const g = grad(p), fl = H.flow(...p); let nd = [d[0] * 0.55 + fl[0] * 0.45, d[1] * 0.55 + fl[1] * 0.45, d[2] * 0.55 + fl[2] * 0.45]; const dn = nd[0] * g[0] + nd[1] * g[1] + nd[2] * g[2]; nd = [nd[0] - g[0] * dn, nd[1] - g[1] * dn, nd[2] - g[2] * dn]; const dl = Math.hypot(...nd) || 1; d = nd.map(q => q / dl);
+      pts.push([p[0], p[1], p[2], g, d.slice(), v]); }
+    if (pts.length < 3) continue; made++;
+    for (const [x, y, z, g, dd, v] of pts) { const b = [g[1] * dd[2] - g[2] * dd[1], g[2] * dd[0] - g[0] * dd[2], g[0] * dd[1] - g[1] * dd[0]], hw = w * 0.5 * (1 - v * 0.55);
+      for (const sd of [-1, 1]) { Pp.push(x + b[0] * hw * sd + g[0] * 0.0012 * (1 - Math.abs(sd)), y + b[1] * hw * sd, z + b[2] * hw * sd); Nn.push(g[0], g[1], g[2]); Uu.push(sd < 0 ? 0 : 1, v); Ee.push(dd[0], dd[1], dd[2], 1); Rg.push(1, id, 0, 0); } }
+    for (let j = 0; j < pts.length - 1; j++) { const a = base + j * 2; Ii.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); } }
+  return { P: new Float32Array(Pp), N: new Float32Array(Nn), I: new Uint32Array(Ii), A: { uv: { data: new Float32Array(Uu), size: 2 }, aExt: { data: new Float32Array(Ee), size: 4 }, aReg: { data: new Float32Array(Rg), size: 4 } } }; }
+function hairMesh(style, fine, coarse, lod = 0) { const H = HAIR[style]; const S = shapes(); const sh = hairShape(H);
   const lo = H.line.long ? Math.min(H.line.long, 1.5) - 0.03 : H.ponyLong ? 1.49 : 1.56;
-  const xs = axis(-0.13, 0.13, () => fine), ys = axis(lo, 1.8, y => ramp(y, 1.6, 1.74, fine, coarse)), zs = axis(-0.2, 0.13, z => ramp(z, 0.0, 0.2, fine, coarse));
+  const xs = axis(-0.14, 0.14, () => fine), ys = axis(lo, 1.82, y => ramp(y, 1.6, 1.74, fine, coarse)), zs = axis(-0.2, 0.14, z => ramp(z, 0.0, 0.2, fine, coarse));
   let m = polygonize(sh.fn, null, fine, { xs, ys, zs });
-  const keep = field(m, (x, y, z) => { let v = hairLine(x, y, z, H.line); if (H.extra) for (const e of H.extra) if (e.f(x, y, z) < 0.006) v = Math.max(v, 0.01); return Math.min(v + 0.004, S.sHead.eval(x, y, z) + 0.0006); });
+  const keep = field(m, (x, y, z) => Math.min(inHair(H, x, y, z) + 0.004, S.sHead.eval(x, y, z) + 0.0006));
   m = clip(m, keep);
-  // weights: head, lower long hair follows the chest
-  const SI = new Float32Array(vcount(m) * 4), SW = new Float32Array(vcount(m) * 4); for (let i = 0; i < vcount(m); i++) { const y = m.P[i * 3 + 1], z = m.P[i * 3 + 2]; const lw = sstep(1.58, 1.46, y) * (z < -0.04 || Math.abs(m.P[i * 3]) > 0.07 ? 0.85 : 0.5); SI.set([B.head, B.chest, B.neck, 0], i * 4); SW.set([1 - lw, lw * 0.7, lw * 0.3, 0], i * 4); }
-  m.A.skinIndex = { data: SI, size: 4 }; m.A.skinWeight = { data: SW, size: 4 };
   setAttr(m, 'aExt', 4, (x, y, z, i, o, nx, ny, nz) => { let f = H.flow(x, y, z); const d = f[0] * nx + f[1] * ny + f[2] * nz; f = [f[0] - nx * d, f[1] - ny * d, f[2] - nz * d]; const l = Math.hypot(...f) || 1; o[0] = f[0] / l; o[1] = f[1] / l; o[2] = f[2] / l;
-    let e = hairLine(x, y, z, H.line); if (H.extra) for (const q of H.extra) if (q.f(x, y, z) < 0.006) e = Math.max(e, 0.02); o[3] = sstep(-0.002, 0.016, e); });
-  bakeAO(m, (x, y, z) => Math.min(sh.eval(x, y, z), S.fAll(x, y, z)), { steps: [[0.006, 1], [0.015, 0.7], [0.04, 0.4], [0.08, 0.2]], k: 1.1 }); return m; }
+    o[3] = sstep(-0.002, 0.016, inHair(H, x, y, z) + (H.extra && H.extra.some(q => q.f(x, y, z) < 0.006) ? 0.01 : 0)); });
+  ensure(m, 'aReg', 4, 0); ensure(m, 'uv', 2, 0);
+  const nc = H.cards && lod < 2 ? H.cards[lod] : 0; if (nc) m = merge([m, hairCards(H, sh, nc, 9001 + style.length * 31 + lod)]);
+  hairWeights(m); bakeAO(m, (x, y, z) => Math.min(sh.eval(x, y, z), S.fAll(x, y, z)), { steps: [[0.006, 1], [0.015, 0.7], [0.04, 0.4], [0.08, 0.2]], k: 1.1 }); return m; }
 function beardMesh(kind, fine) { const S = shapes(); const msk = kind === 'moustache' ? (x, y, z) => sstep(1.6, 1.592, y) * sstep(1.582, 1.588, y) * sstep(0.034, 0.02, Math.abs(x)) * sstep(0.05, 0.08, z) : beardMask;
-  const T = kind === 'moustache' ? 0.0045 : 0.0065; const sh = new Shape([P.fn((x, y, z) => { const k = msk(x, y, z); return k < 0.06 ? 0.01 : S.sHead.eval(x, y, z) - T * k - 0.0008; }, [-0.1, 1.5, -0.05], [0.1, 1.66, 0.13], { k: 0 })]);
+  const T = kind === 'moustache' ? 0.004 : 0.0052; const sh = new Shape([P.fn((x, y, z) => { const k = msk(x, y, z); return k < 0.06 ? 0.01 : S.sHead.eval(x, y, z) - T * k - 0.0008; }, [-0.1, 1.5, -0.05], [0.1, 1.66, 0.13], { k: 0 })]);
   let m = polygonize(sh.fn, [-0.09, 1.51, -0.04, 0.09, 1.65, 0.125], fine); m = clip(m, (x, y, z) => msk(x, y, z) - 0.12);
   constWeights(m, B.head); setAttr(m, 'aExt', 4, (x, y, z, i, o, nx, ny, nz) => { let f = [0, -1, 0.2]; const d = f[0] * nx + f[1] * ny + f[2] * nz; f = [f[0] - nx * d, f[1] - ny * d, f[2] - nz * d]; const l = Math.hypot(...f) || 1; o[0] = f[0] / l; o[1] = f[1] / l; o[2] = f[2] / l; o[3] = -Math.max(0.02, sstep(0.12, 0.6, msk(x, y, z))); });
   bakeAO(m, S.sHead.fn, AO_FACE); morph(m, S.fHead, 'aM0', { max: 0.02 }); morph(m, S.wHead, 'aM1', { max: 0.02 }); return m; }
@@ -247,13 +302,13 @@ export function buildLayers(q = 'high') {
   put('body0', b0, 'skin', 0); put('body1', b1, 'skin', 0); put('fig2', figureMesh(0.058), 'skin', 3);
   put('head0', headMesh(lowQ ? 0.0065 : 0.0055, 0.011), 'skin', 1); put('head1', headMesh(0.015, 0.022), 'skin', 1);
   put('hands0', handsMesh(lowQ ? 0.0085 : 0.0068), 'skin', 2); put('hands1', handsMesh(0.017), 'skin', 2);
-  put('eyes0', eyesMesh(lowQ ? 12 : 16), 'eye'); put('eyes1', eyesMesh(6), 'eye');
+  put('eyes0', eyesMesh(lowQ ? 14 : 20), 'eye'); put('eyes1', eyesMesh(8, false), 'eye');
   for (const [k, o] of Object.entries(TOPS)) { put(k + '0', shell(b0, { ...o, top: true, slot: k === 'vest' ? 9 : 0, kind: { tee: 0, long: 0, jacket: 1, hoodie: 2, vest: 9 }[k] }), 'cloth'); put(k + '1', shell(b1, { ...o, top: true, slot: k === 'vest' ? 9 : 0, kind: { tee: 0, long: 0, jacket: 1, hoodie: 2, vest: 9 }[k] }), 'cloth'); }
   for (const [k, o] of Object.entries(BOTTOMS)) { put(k + '0', shell(b0, { ...o, slot: 1, kind: 3 }), 'cloth'); put(k + '1', shell(b1, { ...o, slot: 1, kind: 3 }), 'cloth'); }
   put('skirt0', skirtMesh(0.016, 0.5), 'cloth'); put('skirt1', skirtMesh(0.05, 0.5), 'cloth');
   put('hood0', hoodMesh(0.012), 'cloth'); put('hood1', hoodMesh(0.024), 'cloth');
   for (const k of ['sneaker', 'dress']) { put(k + '0', shoeMesh(lowQ ? 0.011 : 0.0092, k), 'cloth'); put(k + '1', shoeMesh(0.024, k), 'cloth'); }
-  for (const k of HAIR_STYLES) { put('hair_' + k + '0', hairMesh(k, lowQ ? 0.009 : 0.0072, 0.012), 'hair', 0, { shells: lowQ ? 1 : 2 }); put('hair_' + k + '1', hairMesh(k, 0.018, 0.025), 'hair'); put('hair_' + k + '2', hairMesh(k, 0.03, 0.036), 'hair'); }
+  for (const k of HAIR_STYLES) { put('hair_' + k + '0', hairMesh(k, lowQ ? 0.009 : 0.0068, 0.012, 0), 'hair'); put('hair_' + k + '1', hairMesh(k, 0.016, 0.024, 1), 'hair'); put('hair_' + k + '2', hairMesh(k, 0.03, 0.036, 2), 'hair'); }
   put('beard0', beardMesh('beard', 0.005), 'hair'); put('beard1', beardMesh('beard', 0.013), 'hair'); put('moustache0', beardMesh('moustache', 0.0042), 'hair');
   const A = accessories(); for (const [k, m] of Object.entries(A)) put(k, m, 'cloth');
   // hair fur shells: duplicate LOD0 hair with a layer index in aExt? (layer in skinWeight slot unused) → separate attribute
