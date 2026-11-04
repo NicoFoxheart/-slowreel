@@ -31,7 +31,6 @@ import { buildCabin } from './interiors.js';
 import { rng } from './terrain.js';
 import { buildCopilot } from './ppl-crew.js';
 import { buildPlanet, drawWorldMap } from './wld-planet.js';
-import { Hood, setHood, hoodUniforms, styleFor, gridAngleFor } from './wld-hood.js';
 
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const errors = []; window.addEventListener('error', e => errors.push(String(e.message))); window.addEventListener('unhandledrejection', e => errors.push(String(e.reason)));
@@ -68,7 +67,6 @@ addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; cam
 let sky = new Sky(renderer, scene, settings.quality);
 let terrain = new Terrain(scene, settings.quality);
 let city = new City(scene, settings.quality);
-const hood = new Hood(scene, settings.quality); // neighbourhoods near the camera (wld-hood.js)
 const aircraft = buildAircraft(settings.quality); scene.add(aircraft);
 const displays = new Displays();
 let cockpit = new THREE.Group(); cockpit.userData = { screens: [] }; cockpit.visible = false; aircraft.add(cockpit); // the real flight deck is built at boot, once fonts are in
@@ -148,24 +146,16 @@ function buildWorldAt(lat, lon, primaryApt) {
   }
   W.primary = W.built.find(b => b.apt === primaryApt) || W.built[0] || null;
   terrainAround(lat, lon, false);
-  setupHood(lat, lon, primaryApt);
   city.build(terrain, W.geo, 0, 0, FLY_ANYWHERE ? aptZones() : legacyZones()); W.cityLL = { lat, lon }; city.group.position.set(0, 0, 0);
-  hood.setup({ heightAt: (x, z) => terrain.heightAt(x, z), blocked: (x, z) => city.blocked ? city.blocked(x, z) : false });
   W.navs = navsAround(lat, lon);
   W.originLL = { lat, lon }; STREAM.t = 0; STREAM.shifts = 0;
-}
-// the street grid, city blobs and regional style shared by the terrain shader, the far ring (City) and the near tiles (Hood)
-function setupHood(lat, lon, A) {
-  A = A || W.primary?.apt || nearestAirports(lat, lon, 400000, 1)[0]; const style = styleFor(A, climateFor(lat, lon));
-  const cs = terrain.masks.near.cities.map(c => ({ x: W.geo.x(c.lon), z: W.geo.z(c.lat), r: c.r * 1000, d: c.d, h: c.h })).sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z));
-  setHood({ angle: gridAngleFor(A, style), cities: cs, style }); hoodUniforms(terrain.uniforms);
 }
 // ---------------------------------------------------------------- world streaming: free flight anywhere
 // The planet (wld-planet.js) gives sea, mountains and base elevation everywhere; around the aircraft the world streams:
 // airports within loadR are built one per tick (light detail, full detail within fullR or for the destination), far ones are
 // disposed, city blocks are rebuilt in time slices when low, and the floating origin re-centres on the aircraft every
 // shiftR so long flights keep float precision (everything world-space is re-derived from lat/lon; noise stays anchored).
-const FLY_ANYWHERE = settings.anywhere === true; // Part B PAUSED: off unless a test sets settings.anywhere; off = the pre-streaming world (built once per flight + rebase on long flights, no planet, no 'Start anywhere')
+const FLY_ANYWHERE = false; // Part B PAUSED: off unless a test sets settings.anywhere; off = the pre-streaming world (built once per flight + rebase on long flights, no planet, no 'Start anywhere')
 const STREAM = { loadR: 50000, max: 8, fullR: 16000, dropR: 80000, shiftR: 60000, t: 0, shifts: 0, loads: 0, drops: 0, ms: 0 };
 function builtEntry(A, full) {
   const t0 = performance.now(), g = airportGeometry(A); const b = buildAirport(A, { quality: settings.quality, wet: W.wet, full });
@@ -1144,9 +1134,6 @@ function renderFrame(dt) {
   animateAircraft(aircraft, { flapPos: fdm.flapPos, slatPos: fdm.slatPos, ailR: -fdm.da, ailL: fdm.da, spoilerRollR: Math.max(0, fdm.da / (25 * D2R) - 0.3), spoilerRollL: Math.max(0, -fdm.da / (25 * D2R) - 0.3), speedbrake: Math.max(fdm.speedbrake * 0.6, fdm.groundSpoilers),
     elevator: fdm.de, rudder: fdm.dr, gearPos: fdm.gearPos, steer: fdm.steer, groundSpeed: sp, onGround: fdm.onGround, n1: fdm.n1, reverser: fdm.reverser, lights }, dt * W.timeAccel, W.simTime, night);
   updateCamera(dt);
-  if (!W.onFoot) hood.update(camera.position, 1);
-  if (!FLY_ANYWHERE && !W.onFoot && W.started && city.at) { // the far ring of tall buildings follows the camera (time-sliced rebuild)
-    if (city.job) city.step(2); else if (Math.hypot(camera.position.x - city.at.x, camera.position.z - city.at.z) > 8000 && camera.position.y - ground(camera.position.x, camera.position.z).h < 5000) city.start(terrain, W.geo, camera.position.x, camera.position.z, legacyZones()); }
   sky.update(dt, camera, W.simTime);
   updateShadows();
   cabinStep(dt);
@@ -1612,7 +1599,6 @@ window.__sim = {
     built: W.built.map(b => b.icao + (b.full ? '*' : '')), primary: W.primary?.icao || null, dest: W.dest?.icao, dct: !!W.dct, ap: fdm.ap.on ? fdm.ap.lat + '/' + fdm.ap.vert : 'off', ias: Math.round(fdm.ias), accel: W.timeAccel, city: city.count || 0, cityJob: !!city.job, ils: W.ils ? W.ils.apt.icao + ' ' + W.ils.end.ident : null, phase: atc.phase, clim: terrain.climate, desc: W.descending }; },
   directTo(icao) { return directTo(icao ? World.byIcao.get(icao) : null); }, accel(v) { W.timeAccel = v; return W.timeAccel; },
   planetAt(lat, lon) { return terrain.planet ? terrain.planet.sample(lat, lon).map(v => +v.toFixed(3)) : null; },
-  hoodStats() { return { hood: hood.stats(), city: city.count, cityCalls: city.group.children.length }; }, hood,
   footCam(m) { if (m) foot.setCamMode(m); return { mode: foot.camMode, dist: foot.camDist, boom: +foot.camE.toFixed(2), fpK: +foot.fpK.toFixed(2), avatar: foot.avRoot.visible, grid: !!foot.grid, bodyYaw: +foot.bodyYaw.toFixed(2), anim: foot.av ? foot.av.p[0].mode : null }; },
   // on-foot pose for shots: hall-local (x, z) when hall is true, else world; yaw / body relative to the hall axis (hall) or absolute
   footPose(o) { const t = foot.parts.term; if (o.x != null) { const p = o.hall ? t.world(o.x, t.F, o.z) : V3(o.x, o.y ?? foot.pos.y, o.z); foot.pos.copy(p); foot.floorY = foot.walk.floorAt(p.x, p.z, p.y)?.y ?? p.y; foot.pos.y = foot.floorY; }
