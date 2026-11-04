@@ -31,6 +31,7 @@ import { buildCabin } from './interiors.js';
 import { rng } from './terrain.js';
 import { buildCopilot } from './ppl-crew.js';
 import { buildPlanet, drawWorldMap } from './wld-planet.js';
+import { Hood, setHood, hoodUniforms, styleFor, gridAngleFor } from './wld-hood.js';
 
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const errors = []; window.addEventListener('error', e => errors.push(String(e.message))); window.addEventListener('unhandledrejection', e => errors.push(String(e.reason)));
@@ -67,6 +68,7 @@ addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; cam
 let sky = new Sky(renderer, scene, settings.quality);
 let terrain = new Terrain(scene, settings.quality);
 let city = new City(scene, settings.quality);
+const hood = new Hood(scene, settings.quality); // neighbourhoods near the camera (wld-hood.js)
 const aircraft = buildAircraft(settings.quality); scene.add(aircraft);
 const displays = new Displays();
 let cockpit = new THREE.Group(); cockpit.userData = { screens: [] }; cockpit.visible = false; aircraft.add(cockpit); // the real flight deck is built at boot, once fonts are in
@@ -137,7 +139,7 @@ function aptPos(A) { return new THREE.Vector3(W.geo.x(A.lon), airportGeometry(A)
 function buildWorldAt(lat, lon, primaryApt) {
   W.geo = new Geo(lat, lon);
   for (const e of W.built) dropAirport(e, true); airportsRoot.clear(); W.built = [];
-  const near = nearestAirports(lat, lon, STREAM.loadR, STREAM.max);
+  const near = FLY_ANYWHERE ? nearestAirports(lat, lon, STREAM.loadR, STREAM.max) : nearestAirports(lat, lon, 95000, 14);
   if (primaryApt && !near.includes(primaryApt)) near.unshift(primaryApt);
   for (const A of near) {
     if (!airportGeometry(A).runways.length) continue;
@@ -146,15 +148,24 @@ function buildWorldAt(lat, lon, primaryApt) {
   }
   W.primary = W.built.find(b => b.apt === primaryApt) || W.built[0] || null;
   terrainAround(lat, lon, false);
-  city.build(terrain, W.geo, 0, 0, aptZones()); W.cityLL = { lat, lon }; city.group.position.set(0, 0, 0);
+  setupHood(lat, lon, primaryApt);
+  city.build(terrain, W.geo, 0, 0, FLY_ANYWHERE ? aptZones() : legacyZones()); W.cityLL = { lat, lon }; city.group.position.set(0, 0, 0);
+  hood.setup({ heightAt: (x, z) => terrain.heightAt(x, z), blocked: (x, z) => city.blocked ? city.blocked(x, z) : false });
   W.navs = navsAround(lat, lon);
   W.originLL = { lat, lon }; STREAM.t = 0; STREAM.shifts = 0;
+}
+// the street grid, city blobs and regional style shared by the terrain shader, the far ring (City) and the near tiles (Hood)
+function setupHood(lat, lon, A) {
+  A = A || W.primary?.apt || nearestAirports(lat, lon, 400000, 1)[0]; const style = styleFor(A, climateFor(lat, lon));
+  const cs = terrain.masks.near.cities.map(c => ({ x: W.geo.x(c.lon), z: W.geo.z(c.lat), r: c.r * 1000, d: c.d, h: c.h })).sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z));
+  setHood({ angle: gridAngleFor(A, style), cities: cs, style }); hoodUniforms(terrain.uniforms);
 }
 // ---------------------------------------------------------------- world streaming: free flight anywhere
 // The planet (wld-planet.js) gives sea, mountains and base elevation everywhere; around the aircraft the world streams:
 // airports within loadR are built one per tick (light detail, full detail within fullR or for the destination), far ones are
 // disposed, city blocks are rebuilt in time slices when low, and the floating origin re-centres on the aircraft every
 // shiftR so long flights keep float precision (everything world-space is re-derived from lat/lon; noise stays anchored).
+const FLY_ANYWHERE = settings.anywhere === true; // Part B PAUSED: off unless a test sets settings.anywhere; off = the pre-streaming world (built once per flight + rebase on long flights, no planet, no 'Start anywhere')
 const STREAM = { loadR: 50000, max: 8, fullR: 16000, dropR: 80000, shiftR: 60000, t: 0, shifts: 0, loads: 0, drops: 0, ms: 0 };
 function builtEntry(A, full) {
   const t0 = performance.now(), g = airportGeometry(A); const b = buildAirport(A, { quality: settings.quality, wet: W.wet, full });
@@ -167,12 +178,14 @@ function aptZones() { const p = fdm.pos, d = b => Math.hypot(b.x - p.x, b.z - p.
 function navsAround(lat, lon) { return World.navaids.filter(n => Math.abs(n.lat - lat) < 2.4 && haversine(lat, lon, n.lat, n.lon) < 260000).map(n => ({ ...n, x: W.geo.x(n.lon), z: W.geo.z(n.lat) })); }
 function inFeatured(lat, lon) { return REGIONS.some(r => lat >= r.bbox[0] && lat <= r.bbox[2] && lon >= r.bbox[1] && lon <= r.bbox[3]); }
 // terrain masks around the (new) origin: hand-made regions in range, every built airport carved, a plausible town beside every airport within 230 km
+function legacyZones() { return W.built.slice().sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z)).slice(0, 4).map(b => ({ x: b.x + b.geom.cx, z: b.z + b.geom.cz, r: b.geom.radius, elev: b.elev - 0.15 })); }
 function terrainAround(lat, lon, keep) {
-  const cities = []; for (const A of nearestAirports(lat, lon, 230000, 60)) if (!A.featured) cities.push(...genericSurroundings(A, W.geo).cities);
-  const gen = W.primary ? genericSurroundings(W.primary.apt, W.geo) : { noiseAmp: 40 }, feat = inFeatured(lat, lon);
-  terrain.setup(W.geo, 0, 0, aptZones(), W.built.map(b => b.apt), { base: W.primary ? W.primary.elev : 0, noiseAmp: feat ? (/desert/.test(climateFor(lat, lon)) ? 10 : 6) : gen.noiseAmp, climate: climateFor(lat, lon), extraCities: cities, keepClimate: keep });
+  const gen = W.primary ? genericSurroundings(W.primary.apt, W.geo) : { noiseAmp: 40, cities: [] }, feat = inFeatured(lat, lon);
+  const cities = []; if (!FLY_ANYWHERE) { if (!feat) cities.push(...gen.cities); } else for (const A of nearestAirports(lat, lon, 230000, 60)) if (!A.featured) cities.push(...genericSurroundings(A, W.geo).cities);
+  terrain.setup(W.geo, 0, 0, FLY_ANYWHERE ? aptZones() : legacyZones(), W.built.map(b => b.apt), { base: W.primary ? W.primary.elev : 0, noiseAmp: feat ? (/desert/.test(climateFor(lat, lon)) ? 10 : 6) : gen.noiseAmp, climate: climateFor(lat, lon), extraCities: cities, keepClimate: keep });
 }
-function shiftOrigin(ll) {
+function shiftOrigin(ll) { const t0 = performance.now(); try { shiftOriginNow(ll); } finally { STREAM.shiftMs = Math.max(STREAM.shiftMs || 0, performance.now() - t0); } }
+function shiftOriginNow(ll) {
   const old = W.geo, ng = new Geo(ll.lat, ll.lon), mapV = v => { if (!v) return v; const q = old.toLatLon(v.x, v.z); v.x = ng.x(q.lon); v.z = ng.z(q.lat); return v; };
   const d = { x: ng.x(old.lon0), z: ng.z(old.lat0) }; // where the old origin lands in the new frame
   W.geo = ng; mapV(fdm.pos); if (chasePos) mapV(chasePos); flyby.set = false;
@@ -650,7 +663,7 @@ addEventListener('keydown', e => {
     case 'KeyP': W.paused = !W.paused; toast(W.paused ? 'Paused' : 'Resumed'); break;
     case 'Escape': togglePause(); break;
     case 'KeyM': mouseYoke = !mouseYoke; $('#yoke').hidden = !mouseYoke; toast('Mouse yoke ' + (mouseYoke ? 'on (move the mouse from the centre)' : 'off')); break;
-    case 'KeyN': if (e.shiftKey) { directTo(); break; } ndOverlay = !ndOverlay; layoutOverlays(); break;
+    case 'KeyN': if (e.shiftKey && FLY_ANYWHERE) { directTo(); break; } ndOverlay = !ndOverlay; layoutOverlays(); break;
     case 'Period': W.timeAccel = Math.min(maxAccel(), W.timeAccel * 2); toast('Time ×' + W.timeAccel + (W.timeAccel >= maxAccel() && maxAccel() < 64 ? (maxAccel() < 16 ? '' : ' (×64 in cruise on autopilot)') : '')); break;
     case 'Comma': W.timeAccel = Math.max(1, W.timeAccel / 2); toast('Time ×' + W.timeAccel); break;
     case 'KeyT': if (e.shiftKey) { fdm.tl = 1; ap.athr = false; toast('TOGA'); } break;
@@ -863,14 +876,32 @@ function padLook(dt, rx, ry) {
 }
 function padRecentre() { const v = W.view; if (v === 'cockpit') look.target = LOOKS.fwd; else if (v === 'cabin') { cabLook.yaw = cabLook.rear ? 0 : 180; cabLook.pitch = -6; } else if (v === 'chase') { chase.yaw = 0; chase.pitch = 0; } else { orbit.yaw = 200; orbit.pitch = 12; } }
 // long flights: time acceleration up to ×64 in cruise on autopilot (×16 otherwise), and a direct-to destination on NAV
-function maxAccel() { const agl = fdm.pos.y - (fdm.gnd?.h || 0); return !fdm.onGround && fdm.ap.on && agl > 3000 && !W.hand ? 64 : 16; }
+function rebase(lat, lon, primary) { // pre-streaming: rebuild the world around a new origin (FLY_ANYWHERE off)
+  const ll = W.geo.toLatLon(fdm.pos.x, fdm.pos.z);
+  buildWorldAt(lat, lon, primary);
+  fdm.pos.x = W.geo.x(ll.lon); fdm.pos.z = W.geo.z(ll.lat);
+  if (W.route) { W.route.forEach(w => { w.x = W.geo.x(w.lon); w.z = W.geo.z(w.lat); }); fdm.ap.route = W.route; }
+  if (fdm.ap.ils) { const A = fdm.ap.ils.apt; fdm.ap.ils = W.ils = ilsFor(A, fdm.ap.ils.end, aptPos(A)); }
+  if (W.primary) { const act = activeRunwayEnd(W.primary); traffic.setup(W.primary.apt, new THREE.Vector3(W.primary.x, W.primary.elev, W.primary.z), W.primary.geom.ends, act); }
+  sky.envAge = 1e9; flyby.set = false;
+}
+function maxAccel() { if (!FLY_ANYWHERE) return 16; const agl = fdm.pos.y - (fdm.gnd?.h || 0); return !fdm.onGround && fdm.ap.on && agl > 3000 && !W.hand ? 64 : 16; }
 function directTo(A) {
   A = A || atc.arr || W.dest; if (!A || fdm.onGround) { toast(fdm.onGround ? 'Direct-to works in the air' : 'No destination set'); return false; }
   W.dct = { apt: A }; W.descending = false; W.route = [{ lat: A.lat, lon: A.lon, name: A.icao, x: W.geo.x(A.lon), z: W.geo.z(A.lat) }];
   const ap = fdm.ap; ap.route = W.route; ap.wp = 0; ap.lat = 'NAV'; if (!ap.on) toggleAP(); ap.athr = true; ap.autoConfig = true;
-  if (ap.alt * FT < fdm.pos.y - 300 || ap.alt < 10000) { const cr = Math.max(10000, Math.min(37000, atc.cruise || 35000)); ap.alt = cr; ap.vert = 'ALT'; }
   const nm = Math.round(haversine(W.geo.toLatLon(fdm.pos.x, fdm.pos.z).lat, W.geo.toLatLon(fdm.pos.x, fdm.pos.z).lon, A.lat, A.lon) / NM);
+  if (nm > 120 && (ap.alt * FT < fdm.pos.y - 300 || ap.alt < 10000)) { ap.alt = Math.max(10000, Math.min(37000, atc.cruise || 35000)); ap.vert = 'ALT'; } // long leg: climb to cruise
+  else if (nm <= 120) { ap.alt = Math.max(Math.round((A.elevFt + 3000) / 100) * 100, Math.min(ap.alt, Math.round(fdm.pos.y / FT / 100) * 100)); ap.vert = 'ALT'; } // short leg: no climb, the descent comes from the distance
   toast(`Direct to ${A.icao} · ${nm} nm · autopilot NAV. Use . for time acceleration (×64 in cruise); descent and the ILS are automatic.`, 6000); return true;
+}
+// direct-to, once the destination is built: a simple approach path onto the ILS from the side the aircraft is on
+// (abeam the runway if it is beyond or beside it, a base entry, the 10 nm final fix); the FDM arms LOC / G/S at the final fix
+function dctApproach() {
+  const il = W.ils, thr = il.thr, d = il.dir, n0 = V3(-d.z, 0, d.x), rel = V3(fdm.pos.x - thr.x, 0, fdm.pos.z - thr.z), s = rel.dot(d), lat = rel.dot(n0), n = n0.clone().multiplyScalar(Math.sign(lat) || 1);
+  const P = (along, off, name) => { const v = thr.clone().addScaledVector(d, along).addScaledVector(n, off), q = W.geo.toLatLon(v.x, v.z); return { x: v.x, z: v.z, lat: q.lat, lon: q.lon, name }; };
+  const pts = []; if (s > -3 * NM) pts.push(P(2 * NM, 9 * NM, 'ABM')); if (s > -14 * NM || Math.abs(lat) > 5 * NM) pts.push(P(-15 * NM, 6 * NM, 'BASE')); pts.push(P(-10 * NM, 0, 'FINAL'));
+  W.route = pts; fdm.ap.route = W.route; fdm.ap.wp = 0; fdm.ap.lat = 'NAV'; fdm.ap.locArmed = fdm.ap.gsArmed = false; fdm.ap.autoConfig = true;
 }
 function toggleAP() {
   const ap = fdm.ap;
@@ -999,12 +1030,15 @@ function simulate(dtReal) {
     const dest0 = W.dct ? W.dct.apt : W.cfg.route.toApt, rEnd = W.dct ? null : W.cfg.route.end;
     if (!fdm.ap.ils || fdm.ap.ils.apt !== dest0) { const b = W.built.find(b => b.apt === dest0); if (b) { const E = (rEnd && b.geom.ends.find(e => e.ident === rEnd)) || (atc.arr === dest0 ? atcCtx.arrEnd() : activeRunwayEnd(b)) || b.geom.ends[0]; W.ils = fdm.ap.ils = ilsFor(dest0, E, new THREE.Vector3(b.x, b.elev, b.z));
       const last = W.route[W.route.length - 1], fp = W.ils.thr.clone().addScaledVector(W.ils.dir, -10 * NM), fl = W.geo.toLatLon(fp.x, fp.z); Object.assign(last, { x: fp.x, z: fp.z, lat: fl.lat, lon: fl.lon });
-      if (W.dct) { fdm.ap.locArmed = fdm.ap.gsArmed = true; fdm.ap.appr = true; fdm.ap.autoConfig = true; } } }
+      if (W.dct) dctApproach(); } }
     let rem = 0, px = fdm.pos.x, pz = fdm.pos.z; for (let i = fdm.ap.wp; i < W.route.length; i++) { rem += Math.hypot(W.route[i].x - px, W.route[i].z - pz); px = W.route[i].x; pz = W.route[i].z; }
     const tgtAlt = Math.round((airportGeometry(dest0).elevFt + 3000) / 100) * 100;
     if (!W.descending && fdm.ap.lat === 'NAV' && rem / NM < (fdm.pos.y / FT - tgtAlt) / 250 + 5) { W.descending = true; fdm.ap.alt = tgtAlt; fdm.ap.spd = 220; toast('Top of descent: ' + tgtAlt + ' ft'); }
   }
-  streamStep(simDt); // airports, city blocks and the floating origin follow the aircraft (no rebuild, no edge)
+  if (FLY_ANYWHERE) streamStep(simDt); // airports, city blocks and the floating origin follow the aircraft (no rebuild, no edge)
+  else { const dO = Math.hypot(fdm.pos.x, fdm.pos.z); // pre-streaming origin management
+    if (W.route && W.cfg?.route) { const dest = W.cfg.route.toApt, ll = W.geo.toLatLon(fdm.pos.x, fdm.pos.z), dd = haversine(ll.lat, ll.lon, dest.lat, dest.lon); if (dd < 40000 && W.primary?.apt !== dest) rebase(dest.lat, dest.lon, dest); else if (dO > 85000) rebase(ll.lat, ll.lon, null); }
+    else if (dO > 120000) { const ll = W.geo.toLatLon(fdm.pos.x, fdm.pos.z); rebase(ll.lat, ll.lon, nearestAirports(ll.lat, ll.lon, 30000, 1)[0] || null); } }
   traffic.update(simDt, W.simTime, fdm.pos, ATM.uNight.value > 0.5);
   if (W.phase === 'takeoff' && !fdm.onGround && fdm.pos.y - (fdm.gnd?.h || 0) > 300) W.phase = 'climb';
 }
@@ -1110,6 +1144,9 @@ function renderFrame(dt) {
   animateAircraft(aircraft, { flapPos: fdm.flapPos, slatPos: fdm.slatPos, ailR: -fdm.da, ailL: fdm.da, spoilerRollR: Math.max(0, fdm.da / (25 * D2R) - 0.3), spoilerRollL: Math.max(0, -fdm.da / (25 * D2R) - 0.3), speedbrake: Math.max(fdm.speedbrake * 0.6, fdm.groundSpoilers),
     elevator: fdm.de, rudder: fdm.dr, gearPos: fdm.gearPos, steer: fdm.steer, groundSpeed: sp, onGround: fdm.onGround, n1: fdm.n1, reverser: fdm.reverser, lights }, dt * W.timeAccel, W.simTime, night);
   updateCamera(dt);
+  if (!W.onFoot) hood.update(camera.position, 1);
+  if (!FLY_ANYWHERE && !W.onFoot && W.started && city.at) { // the far ring of tall buildings follows the camera (time-sliced rebuild)
+    if (city.job) city.step(2); else if (Math.hypot(camera.position.x - city.at.x, camera.position.z - city.at.z) > 8000 && camera.position.y - ground(camera.position.x, camera.position.z).h < 5000) city.start(terrain, W.geo, camera.position.x, camera.position.z, legacyZones()); }
   sky.update(dt, camera, W.simTime);
   updateShadows();
   cabinStep(dt);
@@ -1121,6 +1158,7 @@ function renderFrame(dt) {
   renderRest(dt, night);
 }
 function cabinStep(dt) { // flight cabin (people, crew director) + cabin crew phases; also run by the cabinRun test hook
+  if (!W.onFoot && W.view === 'cabin' && !cabinObj()) ensureCabin(); // pushback disposes the boarding cabin: the cabin view gets the flight cabin
   { const cb = cabinObj(); if (cb && !W.onFoot) { const vis = W.view === 'cabin'; cb.group.visible = vis; if (vis) { const k = Math.min(1.05, 0.5 / sky.exposure); cb.mat.color.setScalar(k); cb.crowd.setExposure(k * ({ bright: 1.05, dim: 0.7, night: 0.45, off: 0.22 }[W.cabLv] ?? 1)); cb.light(k); }
     // interiors.js live() still walks the second cabin crew member on its own; while the crew director (ppl-service.js) has that crew
     // member (jump seat, service, going home) keep the director's pose, then commit (or tick the director when the cabin is hidden)
@@ -1413,7 +1451,8 @@ function buildMenu() {
   $('#fly').onclick = () => { audio.start(); const g = airportGeometry(sel.apt); go({ apt: sel.apt, end: sel.end, start: sel.start, dest: sel.dest && sel.dest !== sel.apt ? sel.dest.icao : undefined, tod: +tod.value, wx: sel.wx || 'clear', windFrom: +wd.value, windKt: +ws.value, gusts: $('#gusts').checked, mode: 'free', cold: $('#coldDark').checked }); };
   for (const k of ['landBoxes', 'landAutoSpd']) { const el = $('#' + k); el.checked = settings[k] !== false; el.onchange = () => { settings[k] = el.checked; store.set('settings', settings); }; }
   // start anywhere: world map (procedural land, airport dots), position, altitude, heading, speed; starts airborne on autopilot
-  { const cv = $('#wmap'), any = { lat: 45.5, lon: -35 }, num = id => $('#' + id); let wx = 'clear';
+  $('#nav button[data-sec=anywhere]').hidden = !FLY_ANYWHERE;
+  if (FLY_ANYWHERE) { const cv = $('#wmap'), any = { lat: 45.5, lon: -35 }, num = id => $('#' + id); let wx = 'clear';
     const redraw = () => { try { drawWorldMap(cv, { mark: any, hdg: +num('anyHdg').value }); } catch (e) { return; } const A = nearestAnywhere(any.lat, any.lon), s = terrain.planet ? terrain.planet.sample(any.lat, any.lon) : null;
       $('#wmapInfo').textContent = `${fmtLL(any.lat, any.lon)} · ${s ? (s[0] > 0.5 ? 'open sea' : s[2] > 0.25 ? 'mountains' : 'land') : ''} · nearest airport ${A ? A.icao + ' · ' + Math.round(haversine(any.lat, any.lon, A.lat, A.lon) / NM) + ' nm' : '—'}`; };
     const setLL = (la, lo) => { any.lat = Math.max(-80, Math.min(80, la)); any.lon = ((lo + 540) % 360) - 180; num('anyLat').value = any.lat.toFixed(2); num('anyLon').value = any.lon.toFixed(2); redraw(); };
@@ -1569,10 +1608,11 @@ window.__sim = {
   cabinRun(sec) { for (let i = 0; i < Math.round(sec * 30); i++) { simulate(1 / 30); aircraft.position.copy(fdm.pos); aircraft.quaternion.copy(fdm.q); aircraft.updateMatrixWorld(); cabinStep(1 / 30); } return this.cabCrew(); },
   cabCrew() { const c = cabinObj(); return { phase: W.cabPhase, crew: c?.crowd.crewState?.() || null }; }, mealService: () => mealService(),
   foGesture(n) { _foT.last = -9; foGesture(n); return !!fo; }, foInfo() { return fo ? { visible: fo.object3d.visible, g: fo.person._g ? fo.person._g.name : null, mode: fo.person.mode } : null; },
-  streamInfo() { const ll = W.geo.toLatLon(fdm.pos.x, fdm.pos.z), g = ground(fdm.pos.x, fdm.pos.z); return { lat: +ll.lat.toFixed(3), lon: +ll.lon.toFixed(3), altFt: Math.round(fdm.pos.y / FT), gnd: Math.round(g.h), water: !!g.water, origin: W.originLL, shifts: STREAM.shifts, loads: STREAM.loads, drops: STREAM.drops, buildMaxMs: Math.round(STREAM.ms),
+  streamInfo() { const ll = W.geo.toLatLon(fdm.pos.x, fdm.pos.z), g = ground(fdm.pos.x, fdm.pos.z); return { lat: +ll.lat.toFixed(3), lon: +ll.lon.toFixed(3), altFt: Math.round(fdm.pos.y / FT), gnd: Math.round(g.h), water: !!g.water, origin: W.originLL, shifts: STREAM.shifts, loads: STREAM.loads, drops: STREAM.drops, buildMaxMs: Math.round(STREAM.ms), shiftMaxMs: Math.round(STREAM.shiftMs || 0),
     built: W.built.map(b => b.icao + (b.full ? '*' : '')), primary: W.primary?.icao || null, dest: W.dest?.icao, dct: !!W.dct, ap: fdm.ap.on ? fdm.ap.lat + '/' + fdm.ap.vert : 'off', ias: Math.round(fdm.ias), accel: W.timeAccel, city: city.count || 0, cityJob: !!city.job, ils: W.ils ? W.ils.apt.icao + ' ' + W.ils.end.ident : null, phase: atc.phase, clim: terrain.climate, desc: W.descending }; },
   directTo(icao) { return directTo(icao ? World.byIcao.get(icao) : null); }, accel(v) { W.timeAccel = v; return W.timeAccel; },
   planetAt(lat, lon) { return terrain.planet ? terrain.planet.sample(lat, lon).map(v => +v.toFixed(3)) : null; },
+  hoodStats() { return { hood: hood.stats(), city: city.count, cityCalls: city.group.children.length }; }, hood,
   footCam(m) { if (m) foot.setCamMode(m); return { mode: foot.camMode, dist: foot.camDist, boom: +foot.camE.toFixed(2), fpK: +foot.fpK.toFixed(2), avatar: foot.avRoot.visible, grid: !!foot.grid, bodyYaw: +foot.bodyYaw.toFixed(2), anim: foot.av ? foot.av.p[0].mode : null }; },
   // on-foot pose for shots: hall-local (x, z) when hall is true, else world; yaw / body relative to the hall axis (hall) or absolute
   footPose(o) { const t = foot.parts.term; if (o.x != null) { const p = o.hall ? t.world(o.x, t.F, o.z) : V3(o.x, o.y ?? foot.pos.y, o.z); foot.pos.copy(p); foot.floorY = foot.walk.floorAt(p.x, p.z, p.y)?.y ?? p.y; foot.pos.y = foot.floorY; }
@@ -1607,7 +1647,7 @@ window.__sim = {
     $('#loadbar').style.width = '15%'; $('#loadmsg').textContent = 'Loading OurAirports runway data…';
     await loadWorld((p, m) => { $('#loadbar').style.width = (15 + p * 50) + '%'; $('#loadmsg').textContent = m; });
     $('#loadmsg').textContent = 'Shaping the planet…'; await new Promise(r => setTimeout(r, 20));
-    try { const P = buildPlanet(); terrain.setPlanet(P); W.planetMs = P.ms; } catch (e) { errors.push('planet: ' + e.message); console.error(e); }
+    if (FLY_ANYWHERE) try { const P = buildPlanet(); terrain.setPlanet(P); W.planetMs = P.ms; } catch (e) { errors.push('planet: ' + e.message); console.error(e); }
     try { await Promise.race([document.fonts.load('700 40px "Saira Condensed"'), new Promise(r => setTimeout(r, 1500))]); await document.fonts.load('16px "B612 Mono"'); } catch (e) { }
     $('#loadbar').style.width = '70%'; $('#loadmsg').textContent = 'Building the flight deck…'; await new Promise(r => setTimeout(r, 20));
     try { try { await document.fonts.load('600 20px "B612"'); } catch (e) { } const deck = buildCockpit(displays, { quality: settings.quality }); aircraft.remove(cockpit); cockpit = deck; aircraft.add(cockpit); exteriorCasters = null; } catch (e) { errors.push('flight deck: ' + e.message); console.error(e); }
